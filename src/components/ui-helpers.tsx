@@ -42,7 +42,7 @@ export const numVal = (v: any, suffix = "") => {
 
 /** Supabase query with 1 retry */
 export async function queryWithRetry<T>(
-  queryFn: () => Promise<{ data: T | null; error: any }>,
+  queryFn: () => PromiseLike<{ data: T | null; error: any }>,
   label: string
 ): Promise<T | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
