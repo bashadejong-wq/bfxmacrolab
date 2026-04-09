@@ -15,7 +15,7 @@ const SUBCATS: Record<string, string[]> = {
   geopolitical: ["trade", "fiscal", "conflict"],
 };
 const SURPRISES = ["Alle", "beat", "miss", "inline"];
-const COUNTRIES = ["Alle", "US", "EU", "UK", "JP", "CN", "Global"];
+const COUNTRIES = ["Alle", "US", "EU", "UK", "JP", "CN", "GLOBAL"];
 
 const CAT_COLORS: Record<string, string> = {
   inflation: "#F97316",
@@ -26,7 +26,7 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 const FLAG: Record<string, string> = {
-  US: "🇺🇸", EU: "🇪🇺", UK: "🇬🇧", JP: "🇯🇵", CN: "🇨🇳", AU: "🇦🇺", Global: "🌍",
+  US: "🇺🇸", EU: "🇪🇺", UK: "🇬🇧", JP: "🇯🇵", CN: "🇨🇳", AU: "🇦🇺", GLOBAL: "🌍", Global: "🌍",
 };
 
 /* ── helpers ────────────────────────────────────────────── */
@@ -51,9 +51,11 @@ const surpriseDir = (d: string | null) => (d || "").toLowerCase();
 
 /* ── component ──────────────────────────────────────────── */
 export default function EventHistory() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [reactions, setReactions] = useState<any[]>([]);
+  const [releases, setReleases] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"reactions" | "releases">("reactions");
 
   // filters
   const [cat, setCat] = useState("Alle");
@@ -63,48 +65,68 @@ export default function EventHistory() {
 
   useEffect(() => {
     setLoaded(false);
-    const fn = async () => {
-      let q = supabase.from("macro_event_reactions").select("*").order("event_date", { ascending: false }).limit(500);
-      if (cat !== "Alle") q = q.eq("event_category", cat);
-      if (subcat !== "Alle") q = q.eq("event_subcategory", subcat);
-      if (country !== "Alle") q = q.ilike("event_country", country);
-      return q;
-    };
-    queryWithRetry(fn, "EventHistory").then(data => {
-      setEvents((data as any[]) || []);
-      setExpandedId(null);
+    Promise.all([
+      queryWithRetry(() =>
+        supabase.from("macro_event_reactions").select("*").order("event_date", { ascending: false }).limit(500),
+        "EventHistory/reactions"
+      ),
+      queryWithRetry(() =>
+        supabase.from("event_release_history").select("*").order("release_date", { ascending: false }).limit(500),
+        "EventHistory/releases"
+      ),
+    ]).then(([r, rel]) => {
+      setReactions((r as any[]) || []);
+      setReleases((rel as any[]) || []);
       setLoaded(true);
     });
-  }, [cat, subcat, country]);
+  }, []);
 
   // reset subcat when category changes
   useEffect(() => { setSubcat("Alle"); }, [cat]);
 
-  const filtered = useMemo(() => {
-    if (surprise === "Alle") return events;
-    return events.filter(e => surpriseDir(e.surprise_direction) === surprise);
-  }, [events, surprise]);
+  // Filter reactions
+  const filteredReactions = useMemo(() => {
+    let data = reactions;
+    if (cat !== "Alle") data = data.filter(e => (e.event_category || "").toLowerCase() === cat);
+    if (subcat !== "Alle") data = data.filter(e => (e.event_subcategory || "").toLowerCase() === subcat);
+    if (country !== "Alle") data = data.filter(e => (e.event_country || "").toUpperCase() === country);
+    if (surprise !== "Alle") data = data.filter(e => surpriseDir(e.surprise_direction) === surprise);
+    return data;
+  }, [reactions, cat, subcat, country, surprise]);
 
-  /* ── stats ── */
+  // Filter releases
+  const filteredReleases = useMemo(() => {
+    let data = releases;
+    if (cat !== "Alle") data = data.filter(e => (e.event_category || "").toLowerCase() === cat);
+    if (country !== "Alle") data = data.filter(e => (e.country || "").toUpperCase() === country);
+    if (surprise !== "Alle") data = data.filter(e => surpriseDir(e.surprise_direction) === surprise);
+    return data;
+  }, [releases, cat, country, surprise]);
+
+  const events = activeTab === "reactions" ? filteredReactions : filteredReleases;
+
+  /* ── stats (from reactions) ── */
   const stats = useMemo(() => {
-    if (!filtered.length) return { total: 0, biggestBeat: null as any, biggestMiss: null as any, avgVix: 0 };
+    const data = filteredReactions;
+    if (!data.length) return { total: 0, biggestBeat: null as any, biggestMiss: null as any, avgVix: 0 };
     let biggestBeat: any = null;
     let biggestMiss: any = null;
     let vixSum = 0;
     let vixCount = 0;
-    filtered.forEach(e => {
-      const spx = n(e.spx_d1_chg);
-      if (spx != null) {
-        if (!biggestBeat || spx > n(biggestBeat.spx_d1_chg)!) biggestBeat = e;
-        if (!biggestMiss || spx < n(biggestMiss.spx_d1_chg)!) biggestMiss = e;
-      }
+    data.forEach(e => {
+      const dir = surpriseDir(e.surprise_direction);
+      const mag = n(e.surprise_magnitude) || 0;
+      if (dir === "beat" && (!biggestBeat || mag > (n(biggestBeat.surprise_magnitude) || 0))) biggestBeat = e;
+      if (dir === "miss" && (!biggestMiss || mag > (n(biggestMiss.surprise_magnitude) || 0))) biggestMiss = e;
       const vix = n(e.vix_d1_chg);
       if (vix != null) { vixSum += vix; vixCount++; }
     });
-    return { total: filtered.length, biggestBeat, biggestMiss, avgVix: vixCount ? vixSum / vixCount : 0 };
-  }, [filtered]);
+    return { total: data.length, biggestBeat, biggestMiss, avgVix: vixCount ? vixSum / vixCount : 0 };
+  }, [filteredReactions]);
 
   const subcatsForCat = cat !== "Alle" ? SUBCATS[cat] || [] : [];
+
+  const totalDataCount = reactions.length + releases.length;
 
   return (
     <DashboardLayout>
@@ -112,61 +134,74 @@ export default function EventHistory() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-[22px] font-bold text-foreground" style={{ fontFamily: "Syne, sans-serif" }}>Event History</h1>
-          <p className="text-[12px] text-label mt-0.5">Marktreacties op macro events — laatste 12 maanden</p>
+          <p className="text-[12px] text-label mt-0.5">Marktreacties op macro events</p>
         </div>
         <span className="bg-purple-accent/10 text-purple-accent text-[11px] font-bold px-3 py-1.5 rounded-full">
-          {filtered.length} events
+          {events.length} events
         </span>
       </div>
 
+      {/* SOURCE TABS */}
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setActiveTab("reactions")}
+          className={`px-4 py-2 text-[11px] font-semibold rounded transition-colors ${activeTab === "reactions" ? "bg-purple-accent text-white" : "bg-secondary text-label hover:text-foreground"}`}>
+          Reacties ({reactions.length})
+        </button>
+        <button onClick={() => setActiveTab("releases")}
+          className={`px-4 py-2 text-[11px] font-semibold rounded transition-colors ${activeTab === "releases" ? "bg-purple-accent text-white" : "bg-secondary text-label hover:text-foreground"}`}>
+          Releases ({releases.length})
+        </button>
+      </div>
+
+      {/* STATS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <StatCard label="Totaal Events" value={String(stats.total)} />
+        <StatCard label="Grootste Beat" value={stats.biggestBeat ? stats.biggestBeat.event_name : "—"} sub={stats.biggestBeat ? `${fmtPct(stats.biggestBeat.spx_d1_chg) || "—"} SPX D+1` : ""} color="text-bullish-text" />
+        <StatCard label="Grootste Miss" value={stats.biggestMiss ? stats.biggestMiss.event_name : "—"} sub={stats.biggestMiss ? `${fmtPct(stats.biggestMiss.spx_d1_chg) || "—"} SPX D+1` : ""} color="text-bearish-text" />
+        <StatCard label="Gem. VIX Effect" value={stats.avgVix ? `${stats.avgVix > 0 ? "+" : ""}${stats.avgVix.toFixed(2)}` : "—"} color={stats.avgVix > 0 ? "text-bearish-text" : "text-bullish-text"} />
+      </div>
+
       {/* FILTER BAR */}
-      <div className="bg-card border border-card-border rounded-lg p-4 mb-5 sticky top-0 z-20 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="bg-card border border-card-border rounded-lg p-4 mb-5 grid grid-cols-2 md:grid-cols-4 gap-3">
         <FilterSelect label="Categorie" value={cat} options={CATEGORIES} onChange={setCat} />
         <FilterSelect label="Subcategorie" value={subcat} options={["Alle", ...subcatsForCat]} onChange={setSubcat} disabled={cat === "Alle"} />
         <FilterSelect label="Verrassing" value={surprise} options={SURPRISES} onChange={setSurprise} />
         <FilterSelect label="Land" value={country} options={COUNTRIES} onChange={setCountry} />
       </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatCard label="Totaal Events" value={String(stats.total)} />
-        <StatCard label="Grootste Beat" value={stats.biggestBeat ? stats.biggestBeat.event_name : "—"} sub={stats.biggestBeat ? `SPX ${fmtPct(stats.biggestBeat.spx_d1_chg) || "—"}` : ""} color="text-bullish-text" />
-        <StatCard label="Grootste Miss" value={stats.biggestMiss ? stats.biggestMiss.event_name : "—"} sub={stats.biggestMiss ? `SPX ${fmtPct(stats.biggestMiss.spx_d1_chg) || "—"}` : ""} color="text-bearish-text" />
-        <StatCard label="Gem. VIX Effect" value={stats.avgVix ? `${stats.avgVix > 0 ? "+" : ""}${stats.avgVix.toFixed(2)}` : "—"} color={stats.avgVix > 0 ? "text-bearish-text" : "text-bullish-text"} />
-      </div>
-
-      {/* TIMELINE */}
+      {/* CONTENT */}
       {!loaded ? (
-        <div className="space-y-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}</div>
-      ) : filtered.length === 0 ? (
+        <div className="space-y-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}</div>
+      ) : totalDataCount === 0 ? (
+        /* 4. FALLBACK when truly empty */
+        <div className="text-center py-20">
+          <MailX size={40} className="mx-auto text-label mb-3" />
+          <p className="text-label text-[13px] mb-2">Event reaction data wordt automatisch aangevuld via de dagelijkse pipeline.</p>
+          <p className="text-[11px] text-label italic">Kom terug na de volgende workflow run.</p>
+        </div>
+      ) : events.length === 0 ? (
         <div className="text-center py-20">
           <MailX size={40} className="mx-auto text-label mb-3" />
           <p className="text-label text-[13px]">Geen events gevonden voor deze filters</p>
+          <p className="text-[11px] text-label italic mt-1">Probeer een ander filter of bekijk de andere tab.</p>
         </div>
-      ) : (
+      ) : activeTab === "reactions" ? (
+        /* REACTIONS: Timeline view */
         <div className="relative pl-4 md:pl-6">
-          {/* vertical timeline line */}
           <div className="absolute left-[7px] md:left-[11px] top-0 bottom-0 w-[2px] bg-card-border" />
-
-          {filtered.map((e, idx) => {
+          {filteredReactions.map((e) => {
             const isExpanded = expandedId === e.id;
             const dir = surpriseDir(e.surprise_direction);
             const badgeColor = dir === "beat" ? "bg-bullish-text" : dir === "miss" ? "bg-bearish-text" : "bg-neutral-text";
 
             return (
               <div key={e.id} className="relative mb-5">
-                {/* timeline dot */}
                 <div className={`absolute -left-4 md:-left-6 top-4 w-3 h-3 rounded-full border-2 border-background ${badgeColor}`} />
-
-                {/* date column */}
                 <div className="mb-1">
                   <span className="text-[11px] text-label font-medium">{fmtDate(e.event_date)}</span>
                   <SurprisePill direction={dir} />
                 </div>
-
-                {/* event card */}
                 <DataCard className="p-4 ml-0 md:ml-2" onClick={() => setExpandedId(isExpanded ? null : e.id)}>
-                  {/* header */}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[16px]">{FLAG[e.event_country] || "🌍"}</span>
@@ -178,7 +213,6 @@ export default function EventHistory() {
                     </div>
                   </div>
 
-                  {/* actual vs expected */}
                   <div className="flex flex-wrap gap-4 text-[12px] mb-3">
                     <div>
                       <span className="text-label mr-1">Actual:</span>
@@ -190,22 +224,18 @@ export default function EventHistory() {
                     <div><span className="text-label mr-1">Vorig:</span><span className="text-sub-text">{val(e.previous_value)}</span></div>
                   </div>
 
-                  {/* macro regime tag */}
                   {e.macro_regime && (
                     <span className="inline-block bg-secondary text-label text-[9px] font-semibold uppercase px-2 py-0.5 rounded mb-3">
                       {e.macro_regime}
                     </span>
                   )}
 
-                  {/* reaction table */}
                   <ReactionTable event={e} />
 
-                  {/* dominant reaction */}
                   {e.dominant_reaction && !isExpanded && (
                     <p className="text-[12px] text-sub-text italic mt-3 line-clamp-2">{e.dominant_reaction}</p>
                   )}
 
-                  {/* priced in badge */}
                   <div className="flex items-center gap-2 mt-3">
                     {e.was_priced_in === true && (
                       <span className="inline-flex items-center gap-1 bg-secondary text-label text-[9px] font-semibold px-2 py-0.5 rounded">
@@ -219,32 +249,19 @@ export default function EventHistory() {
                     )}
                   </div>
 
-                  {/* analyst note (always visible if present) */}
                   {e.analyst_note && (
                     <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded p-3 mt-3">
                       <p className="text-[12px] text-blue-800 dark:text-blue-300">{e.analyst_note}</p>
                     </div>
                   )}
 
-                  {/* expanded section */}
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-card-border space-y-3 animate-fade-in">
-                      {e.dominant_reaction && (
-                        <ExpandField label="Dominant Reaction" value={e.dominant_reaction} />
-                      )}
-                      {e.fx_reaction_summary && (
-                        <ExpandField label="FX Reactie" value={e.fx_reaction_summary} />
-                      )}
-                      {e.rates_reaction_summary && (
-                        <ExpandField label="Rates Reactie" value={e.rates_reaction_summary} />
-                      )}
-                      {e.equity_reaction_summary && (
-                        <ExpandField label="Equity Reactie" value={e.equity_reaction_summary} />
-                      )}
-                      {e.market_surprise && (
-                        <ExpandField label="Market Surprise" value={e.market_surprise} />
-                      )}
-                      {/* D+21 row */}
+                      {e.dominant_reaction && <ExpandField label="Dominant Reaction" value={e.dominant_reaction} />}
+                      {e.fx_reaction_summary && <ExpandField label="FX Reactie" value={e.fx_reaction_summary} />}
+                      {e.rates_reaction_summary && <ExpandField label="Rates Reactie" value={e.rates_reaction_summary} />}
+                      {e.equity_reaction_summary && <ExpandField label="Equity Reactie" value={e.equity_reaction_summary} />}
+                      {e.market_surprise && <ExpandField label="Market Surprise" value={e.market_surprise} />}
                       {(n(e.dxy_d21_chg) != null || n(e.spx_d21_chg) != null || n(e.gold_d21_chg) != null) && (
                         <div>
                           <p className="text-[9px] text-label uppercase font-semibold mb-1">D+21 Reactie</p>
@@ -263,6 +280,49 @@ export default function EventHistory() {
             );
           })}
         </div>
+      ) : (
+        /* RELEASES: Table view */
+        <DataCard className="overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-secondary">
+              <tr>
+                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Datum</th>
+                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Event</th>
+                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Land</th>
+                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Verr.</th>
+                <th className="text-[8px] text-label uppercase text-right px-3 py-2">Verwacht</th>
+                <th className="text-[8px] text-label uppercase text-right px-3 py-2">Actueel</th>
+                <th className="text-[8px] text-label uppercase text-right px-3 py-2">DXY</th>
+                <th className="text-[8px] text-label uppercase text-right px-3 py-2">US2Y</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredReleases.map((e) => {
+                const dir = surpriseDir(e.surprise_direction);
+                return (
+                  <tr key={e.id} className="border-b border-card-border hover:bg-secondary/50">
+                    <td className="text-[10px] text-sub-text px-3 py-2 font-mono">{fmtDate(e.release_date)}</td>
+                    <td className="text-[10px] text-foreground px-3 py-2 font-medium max-w-[200px] truncate">{val(e.event_name)}</td>
+                    <td className="px-3 py-2">
+                      <span className="text-[9px] font-bold">{FLAG[e.country] || ""} {val(e.country)}</span>
+                    </td>
+                    <td className="px-3 py-2"><SurprisePill direction={dir} /></td>
+                    <td className="text-[10px] text-sub-text px-3 py-2 text-right font-mono">{val(e.expected_value)}</td>
+                    <td className={`text-[10px] font-bold px-3 py-2 text-right font-mono ${dir === "beat" || dir === "positive" ? "text-bullish-text" : dir === "miss" || dir === "negative" ? "text-bearish-text" : "text-foreground"}`}>
+                      {val(e.actual_value)}
+                    </td>
+                    <td className={`text-[10px] px-3 py-2 text-right font-mono ${chgColor(e.reaction_dxy)}`}>
+                      {e.reaction_dxy != null ? fmtPct(e.reaction_dxy) || "—" : "—"}
+                    </td>
+                    <td className={`text-[10px] px-3 py-2 text-right font-mono ${chgColor(e.reaction_us2y)}`}>
+                      {e.reaction_us2y != null ? fmtBp(e.reaction_us2y) || "—" : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </DataCard>
       )}
     </DashboardLayout>
   );
@@ -301,14 +361,16 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 }
 
 function SurprisePill({ direction }: { direction: string }) {
-  const cls = direction === "beat"
+  const cls = direction === "beat" || direction === "positive"
     ? "bg-bullish-bg text-bullish-text"
-    : direction === "miss"
+    : direction === "miss" || direction === "negative"
     ? "bg-bearish-bg text-bearish-text"
     : "bg-neutral-bg text-neutral-text";
+  const label = direction === "beat" || direction === "positive" ? "BEAT"
+    : direction === "miss" || direction === "negative" ? "MISS" : "INLINE";
   return (
-    <span className={`ml-2 px-2 py-[1px] text-[9px] font-semibold uppercase rounded ${cls}`}>
-      {direction === "beat" ? "BEAT" : direction === "miss" ? "MISS" : "INLINE"}
+    <span className={`ml-2 px-2 py-[1px] text-[9px] font-semibold uppercase rounded inline-block ${cls}`}>
+      {label}
     </span>
   );
 }
@@ -317,10 +379,7 @@ function CatPill({ category }: { category: string | null }) {
   const c = (category || "").toLowerCase();
   const color = CAT_COLORS[c] || "#6B7280";
   return (
-    <span
-      className="px-2 py-[2px] text-[9px] font-semibold uppercase rounded text-white"
-      style={{ backgroundColor: color }}
-    >
+    <span className="px-2 py-[2px] text-[9px] font-semibold uppercase rounded text-white" style={{ backgroundColor: color }}>
       {category || "—"}
     </span>
   );
