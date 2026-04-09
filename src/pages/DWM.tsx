@@ -2,24 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, BiasChip, RiskChip, MarkdownBlock } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, BiasChip, RiskChip, MarkdownBlock, queryWithRetry } from "@/components/ui-helpers";
 
 const PERIODS = [
   { label: "Daily", value: "daily" },
   { label: "Weekly", value: "weekly" },
   { label: "Monthly", value: "monthly" },
 ];
-
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
 
 export default function DWM() {
   const navigate = useNavigate();
   const [activePeriod, setActivePeriod] = useState("daily");
   const [snap, setSnap] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    supabase.from("period_snapshots").select("*").eq("period_type", activePeriod).order("period_start", { ascending: false }).limit(1)
-      .then(({ data }) => setSnap(data?.[0] || null));
+    setLoaded(false);
+    queryWithRetry(() => supabase.from("period_snapshots").select("*").eq("period_type", activePeriod).order("period_start", { ascending: false }).limit(1), `DWM/period_snapshots/${activePeriod}`)
+      .then(data => { setSnap((data as any[])?.[0] || null); setLoaded(true); });
   }, [activePeriod]);
 
   const biasColor = (b: string | null) => {
@@ -27,11 +28,8 @@ export default function DWM() {
     return v === "bullish" ? "text-bullish-text" : v === "bearish" ? "text-bearish-text" : "text-neutral-text";
   };
 
-  const fxBiases: [string, any][] = FX.map(c => [c, snap?.[`${c.toLowerCase()}_bias`]]);
-
   return (
     <DashboardLayout>
-      {/* Tab Bar */}
       <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-7">
         {PERIODS.map((p) => (
           <button key={p.value} onClick={() => setActivePeriod(p.value)}
@@ -41,11 +39,10 @@ export default function DWM() {
         ))}
       </div>
 
-      {!snap ? (
+      {loaded && !snap ? (
         <div className="text-center text-label text-[13px] mt-10">Geen snapshot beschikbaar voor {activePeriod}</div>
-      ) : (
+      ) : snap && (
         <>
-          {/* BLOCK 1 - Header Strip */}
           <DataCard className="p-[16px_24px] mb-5">
             <div className="flex items-center gap-4">
               <span className="text-[16px] font-bold text-foreground">{val(snap.period_label)}</span>
@@ -58,13 +55,11 @@ export default function DWM() {
             </div>
           </DataCard>
 
-          {/* BLOCK 2 - Headline + Narrative */}
           <div className="text-[18px] font-bold text-foreground mb-3">{val(snap.headline)}</div>
           <div className="bg-secondary border border-card-border rounded-lg p-5 mb-5">
             <MarkdownBlock content={snap.summary_dashboard || snap.summary || snap.summary_micro} />
           </div>
 
-          {/* BLOCK 3 - Scenarios */}
           <div className="grid grid-cols-3 gap-3 mb-5">
             {[
               { label: "BASIS", value: snap.scenario_base, border: "border-l-neutral-bg" },
@@ -78,18 +73,16 @@ export default function DWM() {
             ))}
           </div>
 
-          {/* BLOCK 4 - FX Bias Chips */}
           <SectionLabel>FX BIAS</SectionLabel>
           <div className="grid grid-cols-8 gap-2 mb-5">
-            {fxBiases.map(([code, bias]) => (
+            {FX.map((code) => (
               <DataCard key={code} className="p-[10px_14px] text-center" onClick={() => navigate(`/currencies/${code}`)}>
                 <div className="text-[9px] text-label uppercase">{code}</div>
-                <div className={`text-[12px] font-bold mt-1 ${biasColor(bias)}`}>{val(bias)}</div>
+                <div className={`text-[12px] font-bold mt-1 ${biasColor(snap?.[`${code.toLowerCase()}_bias`])}`}>{val(snap?.[`${code.toLowerCase()}_bias`])}</div>
               </DataCard>
             ))}
           </div>
 
-          {/* BLOCK 5 - Asset Views */}
           <SectionLabel>ASSET VIEWS</SectionLabel>
           <div className="grid grid-cols-5 gap-2 mb-2">
             {[["GOLD", snap.gold_view],["OIL", snap.oil_view],["SPX", snap.spx_view],["NASDAQ", snap.nasdaq_view],["VIX", snap.vix_view]].map(([l,v]) => (
@@ -108,7 +101,6 @@ export default function DWM() {
             ))}
           </div>
 
-          {/* BLOCK 6 - Bottom */}
           <div className="grid grid-cols-2 gap-3">
             <DataCard className="p-4">
               <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-2">WAT VERANDERDE</div>

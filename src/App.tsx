@@ -13,6 +13,7 @@ import Yields from "./pages/Yields";
 import MacroData from "./pages/MacroData";
 import Market from "./pages/Market";
 import Calendar from "./pages/Calendar";
+import EventHistory from "./pages/EventHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,9 +25,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/overview" replace />} />
-          <Route path="/overview" element={<Overview />} />
+          <Route path="/" element={<Overview />} />
+          <Route path="/overview" element={<Navigate to="/" replace />} />
           <Route path="/currencies/:code" element={<Currencies />} />
+          <Route path="/currencies" element={<Navigate to="/currencies/USD" replace />} />
           <Route path="/dwm" element={<DWM />} />
           <Route path="/alignment" element={<Alignment />} />
           <Route path="/reports" element={<Reports />} />
@@ -35,6 +37,7 @@ const App = () => (
           <Route path="/macro-data" element={<MacroData />} />
           <Route path="/market" element={<Market />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/event-history" element={<EventHistory />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

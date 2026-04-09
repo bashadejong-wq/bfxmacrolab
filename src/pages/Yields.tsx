@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, MarkdownBlock } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, MarkdownBlock, fmtDate, queryWithRetry } from "@/components/ui-helpers";
 
 const curveColor = (regime: string | null) => {
   const r = (regime || "").toLowerCase();
@@ -13,7 +13,7 @@ const curveColor = (regime: string | null) => {
   return "text-neutral-text";
 };
 
-type YieldRow = { code: string; y2: any; y10: any; diff: any; s2s10s: any; };
+type YieldRow = { code: string; y2: any; y10: any; diff: any; s2s10s: any };
 
 export default function Yields() {
   const navigate = useNavigate();
@@ -22,11 +22,11 @@ export default function Yields() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from("yields_live").select("*").order("fetch_date", { ascending: false }).limit(1),
-      supabase.from("period_snapshots").select("*").eq("period_type", "daily").order("period_start", { ascending: false }).limit(1),
-    ]).then(([yRes, sRes]) => {
-      setY(yRes.data?.[0] || null);
-      setSnap(sRes.data?.[0] || null);
+      queryWithRetry(() => supabase.from("yields_live").select("*").order("fetch_date", { ascending: false }).limit(1), "Yields/yields_live"),
+      queryWithRetry(() => supabase.from("period_snapshots").select("*").eq("period_type", "daily").order("period_start", { ascending: false }).limit(1), "Yields/period_snapshots"),
+    ]).then(([yData, sData]) => {
+      setY((yData as any[])?.[0] || null);
+      setSnap((sData as any[])?.[0] || null);
     });
   }, []);
 
@@ -48,7 +48,6 @@ export default function Yields() {
 
   return (
     <DashboardLayout>
-      {/* BLOCK 1 - US Curve Strip */}
       <div className="grid grid-cols-4 gap-3 mb-5">
         <DataCard className="p-[18px_20px]">
           <div className="text-[9px] text-label uppercase">2 JAAR</div>
@@ -58,7 +57,7 @@ export default function Yields() {
           <div className="text-[9px] text-label uppercase">5 JAAR</div>
           <div className="text-[18px] font-bold text-foreground font-mono mt-1">{val(y?.us_5y, "%")}</div>
         </DataCard>
-        <DataCard className="p-[18px_20px] col-span-1">
+        <DataCard className="p-[18px_20px]">
           <div className="text-[9px] text-label uppercase">10 JAAR</div>
           <div className="text-[22px] font-bold text-foreground font-mono mt-1">{val(y?.us_10y, "%")}</div>
           <div className="text-[10px] text-label mt-1">Reëel: {val(y?.us_real_10y, "%")}</div>
@@ -69,7 +68,6 @@ export default function Yields() {
         </DataCard>
       </div>
 
-      {/* BLOCK 2 - Curve Regime */}
       <DataCard className="p-[16px_24px] mb-5">
         <div className="flex items-center justify-between">
           <span className={`text-[18px] font-extrabold ${curveColor(y?.curve_regime)}`}>{val(y?.curve_regime)}</span>
@@ -77,12 +75,8 @@ export default function Yields() {
         </div>
       </DataCard>
 
-      {/* BLOCK 3 - Spread Strip */}
       <div className="grid grid-cols-4 gap-3 mb-5">
-        {[
-          ["REËEL 10J", y?.us_real_10y], ["BREAKEVEN", y?.breakeven_10y],
-          ["2S10S", y?.us_2s10s], ["3M10Y", y?.us_3m10y],
-        ].map(([label, value]) => (
+        {[["REËEL 10J", y?.us_real_10y],["BREAKEVEN", y?.breakeven_10y],["2S10S", y?.us_2s10s],["3M10Y", y?.us_3m10y]].map(([label, value]) => (
           <DataCard key={label as string} className="p-[18px_20px]">
             <div className="text-[9px] text-label uppercase">{label}</div>
             <div className="text-[16px] font-bold text-foreground font-mono mt-1">{val(value, "%")}</div>
@@ -90,7 +84,6 @@ export default function Yields() {
         ))}
       </div>
 
-      {/* BLOCK 4 - G10 Yield Table */}
       <SectionLabel>G10 YIELDS</SectionLabel>
       <DataCard className="overflow-hidden mb-5">
         <table className="w-full">
@@ -117,11 +110,10 @@ export default function Yields() {
         </table>
       </DataCard>
 
-      {/* BLOCK 5 - Yield Narrative */}
       <div className="bg-secondary border border-card-border rounded-lg p-5">
         <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-3">YIELD ANALYSE</div>
         <MarkdownBlock content={snap?.yield_narrative} />
-        <div className="text-[9px] text-neutral-text mt-4">Bijgewerkt {val(y?.fetch_date)}</div>
+        <div className="text-[9px] text-neutral-text mt-4">Bijgewerkt {fmtDate(y?.fetch_date)}</div>
       </div>
     </DashboardLayout>
   );

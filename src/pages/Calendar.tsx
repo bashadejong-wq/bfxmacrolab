@@ -1,29 +1,29 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, val, ImpactChip, MarkdownBlock } from "@/components/ui-helpers";
+import { DataCard, val, ImpactChip, MarkdownBlock, fmtDate, fmtDateTime, queryWithRetry } from "@/components/ui-helpers";
 
 export default function Calendar() {
   const [activeTab, setActiveTab] = useState("upcoming");
   const [events, setEvents] = useState<any[]>([]);
   const [expandedId, setExpandedId] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    setLoaded(false);
     const today = new Date().toISOString().split("T")[0];
-    if (activeTab === "upcoming") {
-      supabase.from("macro_events_calendar").select("*").gte("event_date", today).order("event_datetime", { ascending: true }).limit(30)
-        .then(({ data }) => setEvents(data || []));
-    } else {
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
-      supabase.from("macro_events_calendar").select("*").lt("event_date", today).gte("event_date", weekAgo).order("event_datetime", { ascending: false }).limit(20)
-        .then(({ data }) => setEvents(data || []));
-    }
-    setExpandedId(null);
+    const fn = activeTab === "upcoming"
+      ? () => supabase.from("macro_events_calendar").select("*").gte("event_date", today).order("event_datetime", { ascending: true }).limit(30)
+      : () => {
+          const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+          return supabase.from("macro_events_calendar").select("*").lt("event_date", today).gte("event_date", weekAgo).order("event_datetime", { ascending: false }).limit(20);
+        };
+    queryWithRetry(fn, `Calendar/macro_events_calendar/${activeTab}`)
+      .then(data => { setEvents((data as any[]) || []); setExpandedId(null); setLoaded(true); });
   }, [activeTab]);
 
   return (
     <DashboardLayout>
-      {/* Tab Bar */}
       <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-7">
         {[["Upcoming","upcoming"],["Recent","recent"]].map(([label, key]) => (
           <button key={key} onClick={() => setActiveTab(key)}
@@ -33,18 +33,18 @@ export default function Calendar() {
         ))}
       </div>
 
-      {events.length === 0 ? (
+      {loaded && events.length === 0 ? (
         <div className="text-center text-label text-[13px] mt-10">
           {activeTab === "upcoming" ? "Geen aankomende events gevonden" : "Geen recente events gevonden"}
         </div>
-      ) : (
+      ) : events.length > 0 && (
         <DataCard className="overflow-hidden">
           <table className="w-full">
             <thead className="bg-secondary">
               <tr>
                 <th className="text-[9px] text-label uppercase text-left px-4 py-2">{activeTab === "upcoming" ? "Datum/Tijd" : "Datum"}</th>
                 <th className="text-[9px] text-label uppercase text-left px-4 py-2">Event</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Currency</th>
+                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Valuta</th>
                 {activeTab === "recent" && <th className="text-[9px] text-label uppercase text-left px-4 py-2">Actueel</th>}
                 <th className="text-[9px] text-label uppercase text-left px-4 py-2">Verwacht</th>
                 {activeTab === "upcoming" && <th className="text-[9px] text-label uppercase text-left px-4 py-2">Vorig</th>}
@@ -56,9 +56,9 @@ export default function Calendar() {
               {events.map((e) => {
                 const isExpanded = expandedId === e.id;
                 return (
-                  <>
-                    <tr key={e.id} className="border-b border-card-border hover:bg-secondary cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : e.id)}>
-                      <td className="text-[11px] text-sub-text px-4 py-2">{val(activeTab === "upcoming" ? e.event_datetime : e.event_date)}</td>
+                  <tbody key={e.id}>
+                    <tr className="border-b border-card-border hover:bg-secondary cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : e.id)}>
+                      <td className="text-[11px] text-sub-text px-4 py-2">{activeTab === "upcoming" ? fmtDateTime(e.event_datetime) : fmtDate(e.event_date)}</td>
                       <td className="text-[11px] text-sub-text px-4 py-2">{val(e.event_name)}</td>
                       <td className="text-[11px] text-sub-text px-4 py-2">{val(e.event_currency)}</td>
                       {activeTab === "recent" && <td className="text-[11px] text-sub-text px-4 py-2">{val(e.actual_value)}</td>}
@@ -76,7 +76,7 @@ export default function Calendar() {
                       <td className="px-4 py-2"><ImpactChip impact={e.event_impact} /></td>
                     </tr>
                     {isExpanded && (
-                      <tr key={`${e.id}-detail`}>
+                      <tr>
                         <td colSpan={activeTab === "upcoming" ? 7 : 8} className="bg-secondary px-[18px] py-[14px]">
                           {activeTab === "recent" && (
                             <div className="flex gap-6 mb-3">
@@ -95,7 +95,7 @@ export default function Calendar() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </tbody>
                 );
               })}
             </tbody>
