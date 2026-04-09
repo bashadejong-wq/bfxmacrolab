@@ -19,17 +19,56 @@ const REGIME_ICONS: Record<string, React.ElementType> = {
   energy_shock: Zap, stagflation: TrendingUp, goldilocks: Sun,
   reflation: RefreshCw, deflation: TrendingDown, mixed: GitMerge,
 };
+const REGIME_COLORS: Record<string, { bg: string; text: string }> = {
+  energy_shock: { bg: "#FFFBEB", text: "#D97706" },
+  stagflation: { bg: "#FEF2F2", text: "#DC2626" },
+  reflation: { bg: "#F0FDF4", text: "#16A34A" },
+  goldilocks: { bg: "#F0FDF4", text: "#16A34A" },
+  deflation: { bg: "#FEF2F2", text: "#DC2626" },
+  mixed: { bg: "#F5F5F5", text: "#6B7280" },
+};
+
 function getRegimeIcon(regime: string | null) {
   const r = (regime || "").toLowerCase().replace(/[\s-]/g, "_");
   for (const [k, I] of Object.entries(REGIME_ICONS)) { if (r.includes(k)) return I; }
   return GitMerge;
 }
+function getRegimeStyle(regime: string | null) {
+  const r = (regime || "").toLowerCase().replace(/[\s-]/g, "_");
+  for (const [k, s] of Object.entries(REGIME_COLORS)) { if (r.includes(k)) return s; }
+  return { bg: "#F5F5F5", text: "#6B7280" };
+}
+
+/** Replace "no specific information" reasons with a proper fallback */
+function cleanReason(code: string, bias: string | null, reason: string | null): string {
+  const r = (reason || "").toLowerCase();
+  if (!reason || reason.trim() === "" || reason === "null" || r.includes("no specific information") || r.includes("no information")) {
+    const b = (bias || "neutral").toLowerCase();
+    return `${code}: ${b} — geen divergentie vs USD gedetecteerd (low conviction)`;
+  }
+  return reason;
+}
+function cleanAssetReason(asset: string, bias: string | null, reason: string | null): string {
+  const r = (reason || "").toLowerCase();
+  if (!reason || reason.trim() === "" || reason === "null" || r.includes("no specific information") || r.includes("no information")) {
+    const b = (bias || "neutral").toLowerCase();
+    return `${asset}: ${b} — geen directe driver in dit rapport (low conviction)`;
+  }
+  return reason;
+}
 
 function StatusTag({ label, status }: { label: string; status: string | null }) {
   const s = (status || "").toLowerCase();
+  const isProcessing = s === "processing";
   const color = s === "complete" || s === "processed" ? "text-bullish-text bg-bullish-bg" :
-    s === "pending" ? "text-mixed-text bg-mixed-bg" : "text-neutral-text bg-neutral-bg";
-  return <span className={`${color} px-1.5 py-[1px] text-[8px] rounded font-semibold uppercase`}>{label}: {val(status)}</span>;
+    isProcessing ? "text-mixed-text bg-mixed-bg" :
+    s === "pending" ? "text-neutral-text bg-neutral-bg" : "text-neutral-text bg-neutral-bg";
+  return (
+    <span className={`${color} px-1.5 py-[1px] text-[8px] rounded font-semibold uppercase inline-flex items-center gap-1`}>
+      {isProcessing && <span className="w-[5px] h-[5px] rounded-full bg-mixed-text animate-pulse" />}
+      {label}: {val(status)}
+    </span>
+  );
 }
 
 export default function Reports() {
@@ -42,22 +81,11 @@ export default function Reports() {
 
   useEffect(() => {
     queryWithRetry(() =>
-      supabase.from("report_analysis").select("id,analysis_date,title,macro_regime,confidence_score,status,raw_report_id")
-        .order("created_at", { ascending: false }).limit(50),
+      supabase.from("v_reports_latest").select("*")
+        .order("report_date", { ascending: false }).limit(50),
       "Reports/list"
-    ).then(async (data) => {
-      const analyses = (data as any[]) || [];
-      // Fetch raw_reports for file_name
-      const rawIds = analyses.map(a => a.raw_report_id).filter(Boolean);
-      let rawMap: Record<number, any> = {};
-      if (rawIds.length > 0) {
-        const rawData = await queryWithRetry(() =>
-          supabase.from("raw_reports").select("id,file_name,source,report_date").in("id", rawIds),
-          "Reports/raw_reports"
-        );
-        ((rawData as any[]) || []).forEach(r => { rawMap[r.id] = r; });
-      }
-      setReports(analyses.map(a => ({ ...a, raw: rawMap[a.raw_report_id] || null })));
+    ).then((data) => {
+      setReports((data as any[]) || []);
     });
     const idParam = searchParams.get("id");
     if (idParam) setActiveReportId(Number(idParam));
@@ -71,14 +99,17 @@ export default function Reports() {
 
   useEffect(() => {
     if (!activeReportId) { setDetail(null); setBiasData([]); return; }
+    // Find analysis_id from reports list
+    const report = reports.find(r => r.id === activeReportId || r.analysis_id === activeReportId);
+    const analysisId = report?.analysis_id || activeReportId;
     Promise.all([
-      queryWithRetry(() => supabase.from("report_analysis").select("*").eq("id", activeReportId).limit(1), "Reports/detail"),
-      queryWithRetry(() => supabase.from("entity_bias").select("*").eq("context_id", activeReportId).eq("context_type", "report").order("entity_class"), "Reports/entity_bias"),
+      queryWithRetry(() => supabase.from("report_analysis").select("*").eq("id", analysisId).limit(1), "Reports/detail"),
+      queryWithRetry(() => supabase.from("entity_bias").select("*").eq("context_id", analysisId).eq("context_type", "report").order("entity_class"), "Reports/entity_bias"),
     ]).then(([d, b]) => {
       setDetail((d as any[])?.[0] || null);
       setBiasData((b as any[]) || []);
     });
-  }, [activeReportId]);
+  }, [activeReportId, reports]);
 
   const RegimeIcon = detail ? getRegimeIcon(detail.macro_regime) : GitMerge;
   const convictionPct = detail?.confidence_score ? Math.min(Math.max((detail.confidence_score / 10) * 100, 0), 100) : 0;
@@ -94,28 +125,34 @@ export default function Reports() {
             <span className="ml-auto text-[9px] text-label font-mono">{reports.length}</span>
           </div>
           {reports.length === 0 && <div className="p-5 text-center text-[11px] text-label">Nog geen rapporten gevonden</div>}
-          {reports.map((r) => (
-            <div key={r.id}
-              className={`px-5 py-3 border-b border-card-border cursor-pointer transition-colors ${
-                r.id === activeReportId ? "bg-secondary border-l-[3px] border-l-purple-accent" : "hover:bg-secondary"
-              }`}
-              onClick={() => selectReport(r.id)}
-            >
-              <div className="flex items-center gap-1.5">
-                <FileText size={11} className="text-label shrink-0" />
-                <span className="text-[11px] text-foreground font-medium leading-snug truncate flex-1">
-                  {val(r.raw?.file_name || r.title)}
-                </span>
+          {reports.map((r) => {
+            const rId = r.analysis_id || r.id;
+            const regimeStyle = getRegimeStyle(r.macro_regime);
+            return (
+              <div key={rId}
+                className={`px-5 py-3 border-b border-card-border cursor-pointer transition-colors ${
+                  rId === activeReportId ? "bg-secondary border-l-[3px] border-l-purple-accent" : "hover:bg-secondary"
+                }`}
+                onClick={() => selectReport(rId)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <FileText size={11} className="text-label shrink-0" />
+                  <span className="text-[11px] text-foreground font-medium leading-snug truncate flex-1">
+                    {val(r.title || r.summary_ultra_short || `Rapport #${rId}`)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="px-1.5 py-[1px] text-[8px] rounded uppercase font-semibold" style={{ backgroundColor: regimeStyle.bg, color: regimeStyle.text }}>
+                    {val(r.macro_regime)}
+                  </span>
+                  {r.confidence_score != null && (
+                    <span className="bg-purple-accent/10 text-purple-accent px-1.5 py-[1px] text-[8px] rounded font-mono font-bold">{r.confidence_score}/10</span>
+                  )}
+                  <span className="ml-auto text-[9px] text-label">{fmtDate(r.report_date || r.analysis_date)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="bg-neutral-bg text-neutral-text px-1.5 py-[1px] text-[8px] rounded uppercase font-semibold">{val(r.macro_regime)}</span>
-                {r.confidence_score != null && (
-                  <span className="bg-purple-accent/10 text-purple-accent px-1.5 py-[1px] text-[8px] rounded font-mono font-bold">{r.confidence_score}/10</span>
-                )}
-                <span className="ml-auto text-[9px] text-label">{fmtDate(r.analysis_date || r.raw?.report_date)}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* RIGHT PANEL — Report Detail */}
@@ -134,9 +171,14 @@ export default function Reports() {
                 <div className="text-[18px] font-bold text-foreground leading-snug">{val(detail.title)}</div>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-[11px] text-label">{fmtDate(detail.analysis_date)}</span>
-                  <span className="flex items-center gap-1 bg-neutral-bg text-neutral-text px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
-                    <RegimeIcon size={11} /> {val(detail.macro_regime)}
-                  </span>
+                  {(() => {
+                    const rs = getRegimeStyle(detail.macro_regime);
+                    return (
+                      <span className="flex items-center gap-1 px-2 py-[2px] text-[9px] rounded uppercase font-semibold" style={{ backgroundColor: rs.bg, color: rs.text }}>
+                        <RegimeIcon size={11} /> {val(detail.macro_regime)}
+                      </span>
+                    );
+                  })()}
                   <RiskChip regime={detail.risk_regime} />
                   <div className="flex items-center gap-1.5 ml-2">
                     <span className="text-[18px] font-extrabold text-purple-accent font-mono">{val(detail.confidence_score)}</span>
@@ -151,9 +193,6 @@ export default function Reports() {
 
               {/* 5. METADATA BAR */}
               <div className="flex items-center gap-2 flex-wrap mb-6">
-                {detail.raw_report_id && (
-                  <span className="text-[8px] text-label bg-neutral-bg px-1.5 py-[1px] rounded font-mono">src: {val(reports.find(r => r.id === activeReportId)?.raw?.source)}</span>
-                )}
                 <span className="text-[8px] text-label bg-neutral-bg px-1.5 py-[1px] rounded font-mono">v: {val(detail.workflow_version)}</span>
                 <StatusTag label="P1" status={detail.pass1_status} />
                 <StatusTag label="P2" status={detail.pass2_status} />
@@ -204,30 +243,42 @@ function Spacer() {
 function CompactTab({ detail }: { detail: any }) {
   return (
     <>
-      {/* Title */}
       <h2 className="text-[20px] font-bold text-foreground leading-snug mb-1">{textVal(detail.title, "—")}</h2>
       {detail.core_driver && (
         <div className="text-[13px] text-label mb-3">{detail.core_driver}</div>
       )}
 
-      {/* Summary short as intro */}
       {detail.summary_short && (
         <div className="max-w-[720px] text-[13px] text-sub-text leading-[1.6] mb-4 italic border-l-2 border-purple-accent/30 pl-4">
           {detail.summary_short}
         </div>
       )}
 
+      {/* 6. Flow chain summary */}
+      {detail.flow_chain_summary && (
+        <div className="text-[12px] text-label italic mb-4">{detail.flow_chain_summary}</div>
+      )}
+
       <Spacer />
 
-      {/* Summary micro — full paragraph */}
       <SHead icon={FileText} label="Samenvatting" />
       <Prose>
         <MarkdownBlock content={detail.summary_micro || detail.summary_short} fallback="Nog geen compacte samenvatting beschikbaar" />
       </Prose>
 
+      {/* 6. Priced-in block */}
+      {(detail.priced_in_assessment || detail.priced_in) && (
+        <>
+          <Spacer />
+          <SHead icon={Eye} label="Wat is ingeprijsd" />
+          <Prose>
+            <MarkdownBlock content={detail.priced_in_assessment || detail.priced_in} />
+          </Prose>
+        </>
+      )}
+
       <Spacer />
 
-      {/* Scenarios */}
       <SHead icon={GitMerge} label="Scenario's" />
       <div className="grid grid-cols-3 gap-4">
         {[
@@ -261,7 +312,6 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
   return (
     <>
-      {/* Summary dashboard — full */}
       <SHead icon={FileText} label="Dashboard Samenvatting" />
       <Prose>
         <MarkdownBlock content={detail.summary_dashboard || detail.summary_full} fallback="Nog geen dashboard samenvatting beschikbaar" />
@@ -269,31 +319,29 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       <Spacer />
 
-      {/* Flow chain */}
       <SHead icon={ArrowRight} label="Flow Chain" />
       <Prose><MarkdownBlock content={detail.flow_chain} /></Prose>
 
       <Spacer />
 
-      {/* CB Narrative */}
       <SHead icon={Building2} label="Central Bank Narrative" />
       <Prose><MarkdownBlock content={detail.cb_narrative} /></Prose>
 
       <Spacer />
 
-      {/* What changed */}
       <SHead icon={RefreshCw} label="What Changed" />
       <Prose><MarkdownBlock content={detail.what_changed} /></Prose>
 
       <Spacer />
 
-      {/* FX BIAS with reasons */}
+      {/* FX BIAS with cleaned reasons */}
       <SHead icon={DollarSign} label="FX Bias" />
       <div className="grid grid-cols-4 gap-3 mb-2">
         {FX_CODES.map(code => {
           const bias = detail[`${code.toLowerCase()}_bias`];
           const reason = detail[`${code.toLowerCase()}_reason`];
           const color = getBiasColor(bias);
+          const displayReason = cleanReason(code, bias, reason);
           return (
             <div key={code} className="bg-secondary border border-card-border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
@@ -301,7 +349,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
                 <span className="text-[11px] font-bold uppercase" style={{ color }}>{code}</span>
                 <span className="text-[10px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
               </div>
-              <div className="text-[11px] text-sub-text leading-snug mt-1">{textVal(reason, "—")}</div>
+              <div className="text-[11px] text-sub-text leading-snug mt-1">{displayReason}</div>
             </div>
           );
         })}
@@ -309,11 +357,12 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       <Spacer />
 
-      {/* ASSET BIAS */}
+      {/* ASSET BIAS with cleaned reasons */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ASSET BIAS</div>
       <div className="grid grid-cols-4 gap-3 mb-2">
         {ASSETS.map(({ label, bias, reason, icon: Icon }) => {
           const color = getBiasColor(bias);
+          const displayReason = cleanAssetReason(label, bias, reason);
           return (
             <div key={label} className="bg-secondary border border-card-border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
@@ -321,7 +370,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
                 <span className="text-[11px] font-bold uppercase">{label}</span>
                 <span className="text-[10px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
               </div>
-              <div className="text-[11px] text-sub-text leading-snug mt-1">{textVal(reason, "—")}</div>
+              <div className="text-[11px] text-sub-text leading-snug mt-1">{displayReason}</div>
             </div>
           );
         })}
@@ -334,6 +383,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
       <div className="grid grid-cols-2 gap-3 mb-2">
         {RATES.map(({ label, bias, reason }) => {
           const color = getBiasColor(bias);
+          const displayReason = cleanAssetReason(label, bias, reason);
           return (
             <div key={label} className="bg-secondary border border-card-border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
@@ -341,7 +391,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
                 <span className="text-[11px] font-bold uppercase">{label}</span>
                 <span className="text-[10px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
               </div>
-              <div className="text-[11px] text-sub-text leading-snug mt-1">{textVal(reason, "—")}</div>
+              <div className="text-[11px] text-sub-text leading-snug mt-1">{displayReason}</div>
             </div>
           );
         })}
@@ -349,7 +399,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       <Spacer />
 
-      {/* ENTITY BIAS TABLE */}
+      {/* ENTITY BIAS TABLE — enhanced */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ENTITY BIAS</div>
       {biasData.length === 0 ? (
         <div className="text-[11px] text-label italic">Nog geen entity bias data voor dit rapport</div>
@@ -369,15 +419,23 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
               {biasData.map((b, i) => {
                 const classKey = (b.entity_class || "").toLowerCase();
                 const ClassIcon = ASSET_CLASS_ICONS[classKey] || DollarSign;
+                const biasLower = (b.bias || "").toLowerCase();
+                const biasColor = biasLower === "bullish" ? "#16A34A" : biasLower === "bearish" ? "#DC2626" : biasLower === "mixed" ? "#D97706" : "#6B7280";
+                const driverText = textVal(b.main_driver, "—");
+                const driverDisplay = driverText === "—" && biasLower !== "neutral" ? "(zie rapport context)" : driverText;
                 return (
                   <tr key={i} className="border-b border-card-border last:border-b-0 hover:bg-secondary">
                     <td className="text-[10px] text-sub-text px-4 py-2">
                       <span className="flex items-center gap-1"><ClassIcon size={11} className="text-label" />{val(b.entity_class)}</span>
                     </td>
                     <td className="text-[10px] text-foreground font-bold px-4 py-2">{val(b.entity_code)}</td>
-                    <td className="px-4 py-2"><BiasChip bias={b.bias} /></td>
+                    <td className="px-4 py-2">
+                      <span className="px-2 py-[2px] text-[9px] rounded uppercase font-semibold" style={{ backgroundColor: biasColor + "1A", color: biasColor }}>
+                        {val(b.bias)}
+                      </span>
+                    </td>
                     <td className="text-[10px] text-sub-text px-4 py-2">{val(b.bias_strength)}</td>
-                    <td className="text-[11px] text-sub-text px-4 py-2">{textVal(b.main_driver, "—")}</td>
+                    <td className="text-[11px] text-sub-text px-4 py-2 italic">{driverDisplay}</td>
                   </tr>
                 );
               })}
@@ -391,7 +449,6 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
 /* ===================== VOLLEDIG TAB ===================== */
 function VolledigTab({ detail }: { detail: any }) {
-  // Show all sections that have content
   const sections = [
     { label: "UITGEBREIDE SAMENVATTING", value: detail.summary_detailed || detail.summary_full, icon: FileText, fallback: "Uitgebreide samenvatting nog niet beschikbaar" },
     { label: "TRADING IMPLICATIES", value: detail.trading_implications, icon: Target },
