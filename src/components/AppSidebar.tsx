@@ -1,8 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, DollarSign, Layers, GitMerge, FileText,
-  BookOpen, TrendingUp, BarChart2, Activity, CalendarDays, History,
-  Lightbulb, Grid3X3, Clock,
+  TrendingUp, BarChart2, Activity, CalendarDays, History,
+  Lightbulb,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useSidebar } from "./DashboardLayout";
@@ -10,18 +10,15 @@ import { useSidebar } from "./DashboardLayout";
 const navItems = [
   { label: "Overview", path: "/", icon: LayoutDashboard },
   { label: "Currencies", path: "/currencies", icon: DollarSign },
-  { label: "DWM", path: "/dwm", icon: Layers },
-  { label: "Alignment", path: "/alignment", icon: GitMerge },
+  { label: "Macro Analysis", path: "/dwm", icon: Layers },
+  { label: "Regime & Alignment", path: "/alignment", icon: GitMerge },
   { label: "Reports", path: "/reports", icon: FileText },
-  { label: "Brief", path: "/brief", icon: BookOpen },
   { label: "Yields", path: "/yields", icon: TrendingUp },
   { label: "Macro Data", path: "/macro-data", icon: BarChart2 },
-  { label: "Market", path: "/market", icon: Activity },
+  { label: "Live Markets", path: "/market", icon: Activity },
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
   { label: "Event History", path: "/event-history", icon: History },
   { label: "Trade Ideas", path: "/trade-ideas", icon: Lightbulb },
-  
-  { label: "Correlations", path: "/correlations", icon: Grid3X3 },
 ];
 
 const isActiveLink = (pathname: string, itemPath: string) => {
