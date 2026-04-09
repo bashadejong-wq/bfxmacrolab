@@ -1,20 +1,22 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, val, MarkdownBlock } from "@/components/ui-helpers";
+import { DataCard, val, MarkdownBlock, queryWithRetry } from "@/components/ui-helpers";
 
 export default function Brief() {
   const [activeBriefTab, setActiveBriefTab] = useState("daily");
   const [snap, setSnap] = useState<any>(null);
   const [al, setAl] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    setLoaded(false);
     if (activeBriefTab === "alignment") {
-      supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1)
-        .then(({ data }) => setAl(data?.[0] || null));
+      queryWithRetry(() => supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1), "Brief/alignment_engine")
+        .then(data => { setAl((data as any[])?.[0] || null); setLoaded(true); });
     } else {
-      supabase.from("period_snapshots").select("*").eq("period_type", activeBriefTab).order("period_start", { ascending: false }).limit(1)
-        .then(({ data }) => setSnap(data?.[0] || null));
+      queryWithRetry(() => supabase.from("period_snapshots").select("*").eq("period_type", activeBriefTab).order("period_start", { ascending: false }).limit(1), `Brief/period_snapshots/${activeBriefTab}`)
+        .then(data => { setSnap((data as any[])?.[0] || null); setLoaded(true); });
     }
   }, [activeBriefTab]);
 
@@ -24,7 +26,6 @@ export default function Brief() {
 
   return (
     <DashboardLayout>
-      {/* Tab Bar */}
       <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-7">
         {tabs.map((t) => (
           <button key={t} onClick={() => setActiveBriefTab(t)}
@@ -35,9 +36,9 @@ export default function Brief() {
       </div>
 
       {!isAlignment ? (
-        !snap ? (
+        loaded && !snap ? (
           <div className="text-center text-label text-[13px] mt-10">Geen brief beschikbaar voor {activeBriefTab}</div>
-        ) : (
+        ) : snap && (
           <>
             <div className="flex items-center gap-3 mb-4">
               <div className="text-[18px] font-bold text-foreground">{val(snap.headline)}</div>
@@ -75,24 +76,18 @@ export default function Brief() {
           </>
         )
       ) : (
-        !al ? (
-          <div className="text-center text-label text-[13px] mt-10">Laden...</div>
-        ) : (
+        loaded && !al ? (
+          <div className="text-center text-label text-[13px] mt-10">Geen data beschikbaar</div>
+        ) : al && (
           <>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="text-[22px] font-bold text-foreground uppercase">{val(al.alignment_state)}</div>
+              <span className="bg-[#F5F0FF] text-purple-accent px-2 py-[2px] text-[9px] rounded font-semibold">{val(al.conviction_score)}/10</span>
+            </div>
+
             <DataCard className="p-6 mb-5">
               <MarkdownBlock content={al.macro_story || al.summary_dashboard} />
             </DataCard>
-
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <DataCard className="p-5">
-                <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-3">FLOW KETEN</div>
-                <MarkdownBlock content={al.flow_chain} />
-              </DataCard>
-              <DataCard className="p-5">
-                <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-3">CONFLICTEN</div>
-                <MarkdownBlock content={al.conflicts} />
-              </DataCard>
-            </div>
 
             <div className="grid grid-cols-2 gap-3 mb-5">
               <DataCard className="p-5 border-l-[3px] border-l-bullish-text">

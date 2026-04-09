@@ -2,17 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, MarkdownBlock } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, MarkdownBlock, queryWithRetry } from "@/components/ui-helpers";
 
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
 
 export default function Alignment() {
   const navigate = useNavigate();
   const [al, setAl] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1)
-      .then(({ data }) => setAl(data?.[0] || null));
+    queryWithRetry(() => supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1), "Alignment/alignment_engine")
+      .then(data => { setAl((data as any[])?.[0] || null); setLoaded(true); });
   }, []);
 
   const stateColor = (s: string | null) => {
@@ -20,9 +21,11 @@ export default function Alignment() {
     return v === "aligned" ? "text-bullish-text" : v === "conflict" ? "text-bearish-text" : "text-purple-accent";
   };
 
+  if (loaded && !al) return <DashboardLayout><div className="text-center text-label text-[13px] mt-10">Geen data beschikbaar</div></DashboardLayout>;
+
   return (
     <DashboardLayout>
-      {/* BLOCK 1 - State Header */}
+      {/* STATE HEADER */}
       <DataCard className="p-6 mb-5">
         <div className="flex items-start justify-between">
           <div>
@@ -39,7 +42,24 @@ export default function Alignment() {
         </div>
       </DataCard>
 
-      {/* BLOCK 2 - Timeframe Comparison */}
+      {/* NARRATIVE */}
+      <div className="bg-secondary border border-card-border rounded-lg p-5 mb-5">
+        <MarkdownBlock content={al?.summary_dashboard || al?.summary_micro || al?.macro_story} fallback="—" />
+      </div>
+
+      {/* WAT TE DOEN / VERMIJD */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <DataCard className="p-4 border-l-[3px] border-l-bullish-text">
+          <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-2">WAT TE DOEN</div>
+          <div className="text-[11px] text-sub-text leading-relaxed">{val(al?.what_to_do)}</div>
+        </DataCard>
+        <DataCard className="p-4 border-l-[3px] border-l-bearish-text">
+          <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-2">VERMIJD</div>
+          <div className="text-[11px] text-sub-text leading-relaxed">{val(al?.what_to_avoid)}</div>
+        </DataCard>
+      </div>
+
+      {/* TIMEFRAME */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <DataCard className="p-4">
           <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-2">DAILY VS WEEKLY</div>
@@ -51,11 +71,13 @@ export default function Alignment() {
         </DataCard>
       </div>
 
-      {/* BLOCK 3 - 4 Macro Pillars */}
+      {/* 4 PILLARS */}
       <div className="grid grid-cols-4 gap-3 mb-5">
         {[
-          ["GROEI", al?.growth_alignment], ["INFLATIE", al?.inflation_alignment],
-          ["CENTRALE BANK", al?.cb_alignment_narrative], ["LIQUIDITEIT", al?.liquidity_alignment],
+          ["GROEI", al?.growth_alignment || al?.growth_view],
+          ["INFLATIE", al?.inflation_alignment || al?.inflation_view],
+          ["CENTRALE BANK", al?.cb_alignment_narrative || al?.cb_view],
+          ["LIQUIDITEIT", al?.liquidity_alignment || al?.liquidity_view],
         ].map(([label, value]) => (
           <DataCard key={label as string} className="p-4">
             <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-2">{label}</div>
@@ -64,7 +86,7 @@ export default function Alignment() {
         ))}
       </div>
 
-      {/* BLOCK 4 - Conviction / Vermijd */}
+      {/* CONVICTION */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <DataCard className="p-4 border-l-[3px] border-l-bullish-text">
           <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-2">HOOG CONVICTION</div>
@@ -76,7 +98,7 @@ export default function Alignment() {
         </DataCard>
       </div>
 
-      {/* BLOCK 5 - 8 Currency Views */}
+      {/* CURRENCY VIEWS */}
       <SectionLabel>CURRENCY VIEWS</SectionLabel>
       <div className="grid grid-cols-4 gap-3 mb-5">
         {FX.map((c) => (
@@ -87,7 +109,7 @@ export default function Alignment() {
         ))}
       </div>
 
-      {/* BLOCK 6 - Scenarios */}
+      {/* SCENARIOS */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         {[
           { label: "BASIS", value: al?.scenario_base, border: "border-l-neutral-bg" },
@@ -101,7 +123,7 @@ export default function Alignment() {
         ))}
       </div>
 
-      {/* BLOCK 7 - Watchpoints + Implications */}
+      {/* BOTTOM */}
       <div className="grid grid-cols-2 gap-3">
         <DataCard className="p-5">
           <div className="text-[9px] text-label uppercase tracking-[0.08em] mb-3">KEY WATCHPOINTS</div>
