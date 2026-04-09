@@ -1131,6 +1131,7 @@ export type Database = {
       raw_reports: {
         Row: {
           created_at: string | null
+          drive_file_id: string | null
           drive_link: string | null
           file_name: string | null
           id: number
@@ -1144,6 +1145,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          drive_file_id?: string | null
           drive_link?: string | null
           file_name?: string | null
           id?: number
@@ -1157,6 +1159,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          drive_file_id?: string | null
           drive_link?: string | null
           file_name?: string | null
           id?: number
