@@ -2,9 +2,35 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/components/ui-helpers";
-import { BarChart2 } from "lucide-react";
+import {
+  TrendingUp, Activity, BarChart2, Users, Percent,
+  Flame, Eye, Droplets, DollarSign, MoreHorizontal
+} from "lucide-react";
 
 const COUNTRIES = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF","CNY","SEK"];
+
+const KPI_ICONS: Record<string, React.ElementType> = {
+  BBP: TrendingUp, CPI: Activity, PMI: BarChart2, WERKLOOSHEID: Users, BELEIDSRENTE: Percent,
+};
+
+const CAT_ICONS: Record<string, React.ElementType> = {
+  employment: Users, growth: TrendingUp, inflation: Flame,
+  leading: Eye, liquidity: Droplets, money_markets: DollarSign,
+};
+function catIcon(cat: string) {
+  const k = cat.toLowerCase().replace(/\s+/g, "_");
+  for (const [key, Icon] of Object.entries(CAT_ICONS)) { if (k.includes(key)) return Icon; }
+  return MoreHorizontal;
+}
+
+function trendColor(current: any, prev: any) {
+  if (current == null || prev == null) return "";
+  const c = Number(current), p = Number(prev);
+  if (isNaN(c) || isNaN(p)) return "";
+  if (c > p) return "text-bullish-text";
+  if (c < p) return "text-bearish-text";
+  return "text-label";
+}
 
 export default function MacroData() {
   const [activeCountry, setActiveCountry] = useState("USD");
@@ -13,11 +39,16 @@ export default function MacroData() {
 
   useEffect(() => {
     setLoaded(false);
-    queryWithRetry(() => supabase.from("macro_dashboard_indicators").select("*").eq("country_code", activeCountry).order("category", { ascending: true }), `MacroData/macro_dashboard_indicators/${activeCountry}`)
-      .then(data => { setIndicators((data as any[]) || []); setLoaded(true); });
+    queryWithRetry(() =>
+      supabase.from("macro_dashboard_indicators").select("*")
+        .eq("country_code", activeCountry)
+        .order("category").order("indicator_name"),
+      `MacroData/${activeCountry}`
+    ).then(data => { setIndicators((data as any[]) || []); setLoaded(true); });
   }, [activeCountry]);
 
-  const findByKey = (keywords: string[]) => indicators.find(ind => keywords.some(k => (ind.indicator_key || "").toLowerCase().includes(k)));
+  const findByKey = (keywords: string[]) =>
+    indicators.find(ind => keywords.some(k => (ind.indicator_key || "").toLowerCase().includes(k)));
 
   const kpis = [
     { label: "BBP", item: findByKey(["gdp"]) },
@@ -29,67 +60,103 @@ export default function MacroData() {
 
   const grouped = useMemo(() => {
     const groups: Record<string, any[]> = {};
-    indicators.forEach((ind) => { const cat = ind.category || "Overig"; if (!groups[cat]) groups[cat] = []; groups[cat].push(ind); });
+    indicators.forEach(ind => {
+      const cat = ind.category || "other";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(ind);
+    });
     return groups;
   }, [indicators]);
 
+  const catOrder = ["employment","growth","inflation","leading","liquidity","money_markets","other"];
+  const sortedCats = Object.keys(grouped).sort((a, b) => {
+    const ai = catOrder.indexOf(a.toLowerCase()); const bi = catOrder.indexOf(b.toLowerCase());
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
   return (
     <DashboardLayout>
-      <div className="mb-8">
-        <select value={activeCountry} onChange={(e) => setActiveCountry(e.target.value)}
-          className="bg-card border border-card-border rounded-lg px-4 py-2.5 text-foreground text-[13px]">
-          {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-5 gap-4 mb-8">
-        {kpis.map((kpi) => (
-          <DataCard key={kpi.label} className="p-5">
-            <div className="flex items-center gap-1 mb-1">
-              <BarChart2 size={12} className="text-label" />
-              <span className="text-[0.65rem] text-label uppercase">{kpi.label}</span>
-            </div>
-            <div className="text-[22px] font-extrabold text-foreground font-mono mt-1">{val(kpi.item?.latest)}</div>
-          </DataCard>
+      {/* Country selector */}
+      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-8">
+        {COUNTRIES.map(c => (
+          <button key={c} onClick={() => setActiveCountry(c)}
+            className={`px-4 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
+              c === activeCountry ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
+            }`}>{c}</button>
         ))}
       </div>
 
+      {/* Top KPI cards */}
+      <div className="grid grid-cols-5 gap-4 mb-8">
+        {kpis.map(kpi => {
+          const Icon = KPI_ICONS[kpi.label] || BarChart2;
+          const color = trendColor(kpi.item?.latest, kpi.item?.t_minus_1);
+          return (
+            <DataCard key={kpi.label} className="p-5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon size={14} className="text-label" />
+                <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">{kpi.label}</span>
+              </div>
+              <div className={`text-[22px] font-extrabold font-mono mt-1 ${color || "text-foreground"}`}>
+                {val(kpi.item?.latest)}
+              </div>
+              {kpi.item?.unit && <div className="text-[9px] text-label mt-0.5">{kpi.item.unit}</div>}
+            </DataCard>
+          );
+        })}
+      </div>
+
+      <hr className="border-card-border mb-6" />
+
+      {/* Data table */}
       {loaded && indicators.length === 0 ? (
-        <div className="text-center text-label text-[13px] mt-10">Geen data voor {activeCountry}</div>
+        <div className="text-center text-label text-[14px] mt-10">Geen macro data beschikbaar voor deze selectie</div>
       ) : indicators.length > 0 && (
         <DataCard className="overflow-hidden">
           <table className="w-full">
-            <thead className="bg-secondary">
-              <tr>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Indicator</th>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2">T-3</th>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2">T-2</th>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2">T-1</th>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2 font-bold">Huidig</th>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Gem.</th>
-                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Datum</th>
+            <thead>
+              <tr className="bg-secondary">
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">Indicator</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">T-3</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">T-2</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">T-1</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide font-bold">Huidig</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">Gem.</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">Datum</th>
               </tr>
             </thead>
-            <tbody>
-              {Object.entries(grouped).map(([category, items]) => (
-                <tbody key={`grp-${category}`}>
-                  <tr className="bg-secondary">
-                    <td colSpan={7} className="px-5 py-2 text-[0.65rem] text-purple-accent uppercase font-bold tracking-[0.1em]">{category}</td>
+            {sortedCats.map(category => {
+              const CatIcon = catIcon(category);
+              const items = grouped[category];
+              return (
+                <tbody key={category}>
+                  {/* Category header row */}
+                  <tr>
+                    <td colSpan={7} className="px-5 py-2 bg-[#F7F7F8]">
+                      <div className="flex items-center gap-1.5">
+                        <CatIcon size={13} className="text-purple-accent" />
+                        <span className="text-[0.65rem] text-purple-accent uppercase font-bold tracking-[0.1em]">{category}</span>
+                      </div>
+                    </td>
                   </tr>
-                  {items.map((ind: any, i: number) => (
-                    <tr key={`${category}-${i}`} className="border-b border-card-border hover:bg-secondary">
-                      <td className="text-[11px] text-sub-text px-5 py-2.5">{val(ind.indicator_name)}</td>
-                      <td className="text-[11px] text-sub-text font-mono px-5 py-2.5">{val(ind.t_minus_3)}</td>
-                      <td className="text-[11px] text-sub-text font-mono px-5 py-2.5">{val(ind.t_minus_2)}</td>
-                      <td className="text-[11px] text-sub-text font-mono px-5 py-2.5">{val(ind.t_minus_1)}</td>
-                      <td className="text-[11px] text-foreground font-mono font-bold px-5 py-2.5">{val(ind.latest)}</td>
-                      <td className="text-[11px] text-sub-text font-mono px-5 py-2.5">{val(ind.mean_7c)}</td>
-                      <td className="text-[11px] text-sub-text px-5 py-2.5">{fmtDate(ind.latest_date)}</td>
-                    </tr>
-                  ))}
+                  {items.map((ind: any, i: number) => {
+                    const color = trendColor(ind.latest, ind.t_minus_1);
+                    return (
+                      <tr key={`${category}-${i}`}
+                        className={`border-b border-card-border ${i % 2 === 1 ? "bg-[#FAFAFA]" : "bg-card"}`}>
+                        <td className="text-[11px] text-sub-text px-5 py-2">{val(ind.indicator_name)}</td>
+                        <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_3)}</td>
+                        <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_2)}</td>
+                        <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_1)}</td>
+                        <td className={`text-[12px] font-mono font-bold px-5 py-2 ${color || "text-foreground"}`}>{val(ind.latest)}</td>
+                        <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.mean_7c)}</td>
+                        <td className="text-[11px] text-label px-5 py-2">{fmtDate(ind.latest_date)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
-              ))}
-            </tbody>
+              );
+            })}
           </table>
         </DataCard>
       )}
