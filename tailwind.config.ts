@@ -39,12 +39,15 @@ export default {
         "bearish-text": "hsl(var(--bearish-text))",
         "warning-bg": "hsl(var(--warning-bg))",
         "warning-text": "hsl(var(--warning-text))",
+        "mixed-bg": "hsl(var(--mixed-bg))",
+        "mixed-text": "hsl(var(--mixed-text))",
         "neutral-bg": "hsl(var(--neutral-bg))",
         "neutral-text": "hsl(var(--neutral-text))",
         "live-green": "hsl(var(--live-green))",
         "purple-accent": "hsl(var(--purple-accent))",
       },
       fontFamily: {
+        sans: ["'Inter'", "-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "Roboto", "sans-serif"],
         mono: ["'SF Mono'", "'Fira Code'", "'Fira Mono'", "Menlo", "monospace"],
       },
       borderRadius: {
