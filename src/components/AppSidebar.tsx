@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, DollarSign, Layers, GitMerge, FileText,
-  TrendingUp, BarChart2, Activity, CalendarDays, History,
+  TrendingUp, BarChart2, CalendarDays, History,
   Lightbulb,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
@@ -13,9 +13,8 @@ const navItems = [
   { label: "Macro Analysis", path: "/dwm", icon: Layers },
   { label: "Regime & Alignment", path: "/alignment", icon: GitMerge },
   { label: "Reports", path: "/reports", icon: FileText },
-  { label: "Yields", path: "/yields", icon: TrendingUp },
+  { label: "Markets & Yields", path: "/markets", icon: TrendingUp },
   { label: "Macro Data", path: "/macro-data", icon: BarChart2 },
-  { label: "Live Markets", path: "/market", icon: Activity },
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
   { label: "Event History", path: "/event-history", icon: History },
   { label: "Trade Ideas", path: "/trade-ideas", icon: Lightbulb },
@@ -42,7 +41,6 @@ export function AppSidebar() {
         borderRight: "1px solid #2A2A2A",
       }}
     >
-      {/* Logo */}
       <div className="pt-6 pb-5 flex items-center gap-2.5 overflow-hidden"
         style={{ paddingLeft: collapsed ? 0 : 16, paddingRight: collapsed ? 0 : 16, justifyContent: collapsed ? "center" : "flex-start" }}>
         <div className="w-5 h-5 rounded-sm rotate-45 flex-shrink-0" style={{ background: "#7C3AED" }} />
@@ -54,7 +52,6 @@ export function AppSidebar() {
         )}
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 overflow-y-auto flex flex-col gap-1"
         style={{ padding: collapsed ? "4px 6px" : "4px 8px" }}>
         {navItems.map((item) => {
@@ -85,7 +82,6 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Bottom: live + toggle */}
       <div className="pb-4 flex flex-col gap-3" style={{ paddingLeft: collapsed ? 0 : 16, paddingRight: collapsed ? 0 : 16 }}>
         <div className="flex items-center gap-2" style={{ justifyContent: collapsed ? "center" : "flex-start" }}>
           <div className="w-[6px] h-[6px] rounded-full bg-live-green animate-pulse-dot" />

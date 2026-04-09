@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, SectionLabel, val, textVal, fmtDate, queryWithRetry } from "@/components/ui-helpers";
-import { TrendingUp, TrendingDown, Minus, Percent, DollarSign, Activity, AlertTriangle, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Percent, Activity, AlertTriangle, Clock } from "lucide-react";
 
-/* Curve shape inline SVG glyph — 40x20 */
 function CurveGlyph({ regime }: { regime: string | null }) {
   const r = (regime || "").toLowerCase();
   let d = "M4 10 L36 10";
@@ -75,7 +73,7 @@ function daysSince(dateStr: string | null): number {
   return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function Yields() {
+export default function YieldsContent() {
   const navigate = useNavigate();
   const [y, setY] = useState<any>(null);
   const [pattern, setPattern] = useState<any>(null);
@@ -95,8 +93,8 @@ export default function Yields() {
     });
   }, []);
 
-  if (loaded && !y) return <DashboardLayout><div className="text-center text-label text-[13px] mt-10">Nog geen yield data beschikbaar</div></DashboardLayout>;
-  if (!y) return <DashboardLayout><div className="text-center text-label text-[13px] mt-10">Laden...</div></DashboardLayout>;
+  if (loaded && !y) return <div className="text-center text-label text-[13px] mt-10">Nog geen yield data beschikbaar</div>;
+  if (!y) return <div className="text-center text-label text-[13px] mt-10">Laden...</div>;
 
   const p = pattern || {};
   const d = delta || {};
@@ -104,28 +102,11 @@ export default function Yields() {
   const cColor = curveIconColor(y.curve_regime);
   const staleAge = daysSince(y.fetch_date);
 
-  // Regime labels for key metrics
   const regimeLabel = (key: string): string | null => {
-    if (key === "2s10s") {
-      const v = y.us_2s10s;
-      if (v == null) return null;
-      return Number(v) > 0 ? "steepening" : Number(v) < 0 ? "inverted" : "flat";
-    }
-    if (key === "real") {
-      const v = y.us_real_10y;
-      if (v == null) return null;
-      return Number(v) > 2 ? "restrictive" : Number(v) > 1 ? "tight" : "accommodative";
-    }
-    if (key === "be") {
-      const v = y.breakeven_10y;
-      if (v == null) return null;
-      return Number(v) > 2.5 ? "elevated" : Number(v) > 2 ? "anchored" : "low";
-    }
-    if (key === "3m10y") {
-      const v = y.us_3m10y || y.us_10y3m;
-      if (v == null) return null;
-      return Number(v) > 0 ? "normal" : "inverted";
-    }
+    if (key === "2s10s") { const v = y.us_2s10s; if (v == null) return null; return Number(v) > 0 ? "steepening" : Number(v) < 0 ? "inverted" : "flat"; }
+    if (key === "real") { const v = y.us_real_10y; if (v == null) return null; return Number(v) > 2 ? "restrictive" : Number(v) > 1 ? "tight" : "accommodative"; }
+    if (key === "be") { const v = y.breakeven_10y; if (v == null) return null; return Number(v) > 2.5 ? "elevated" : Number(v) > 2 ? "anchored" : "low"; }
+    if (key === "3m10y") { const v = y.us_3m10y || y.us_10y3m; if (v == null) return null; return Number(v) > 0 ? "normal" : "inverted"; }
     return null;
   };
 
@@ -140,12 +121,10 @@ export default function Yields() {
     { code: "CHF", y2: y.chf_2y, y10: y.chf_10y, diff: y.diff_chf_10y, s2s10s: y.chf_2s10s, pat: p.chf_yield_pattern, fxImpl: p.chf_fx_implication, d10: null, d2: null },
   ];
 
-  // Top 3 extreme spreads
   const spreads = rows.filter(r => r.diff !== null).map(r => ({ code: r.code, diff: Number(r.diff), fxImpl: r.fxImpl })).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, 3);
 
   return (
-    <DashboardLayout>
-      {/* 4. DATE INDICATOR */}
+    <>
       <div className="flex items-center gap-2 mb-4">
         <Clock size={12} className="text-label" />
         <span className="text-[10px] text-label">Bijgewerkt: {fmtDate(y.fetch_date)}</span>
@@ -157,7 +136,6 @@ export default function Yields() {
         )}
       </div>
 
-      {/* 1. US TREASURY CURVE */}
       <SectionLabel>US TREASURY CURVE</SectionLabel>
       <div className="grid grid-cols-4 gap-3 mb-4">
         {[
@@ -182,15 +160,12 @@ export default function Yields() {
 
       <hr className="border-card-border mb-4" />
 
-      {/* CURVE REGIME BANNER */}
       <DataCard className="px-4 py-3 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
           <CurveIcon size={18} className={cColor} />
           <span className={`text-[18px] font-extrabold uppercase ${cColor}`}>{val(y.curve_regime)}</span>
           <CurveGlyph regime={y.curve_regime} />
-          {(y.curve_signal || p.curve_signal) && (
-            <PatternBadge pattern={y.curve_signal || p.curve_signal} />
-          )}
+          {(y.curve_signal || p.curve_signal) && <PatternBadge pattern={y.curve_signal || p.curve_signal} />}
         </div>
         {(y.curve_interpretation || p.curve_interpretation) && (
           <div className="text-[12px] text-sub-text leading-relaxed mt-2 max-w-[720px]">{y.curve_interpretation || p.curve_interpretation}</div>
@@ -199,7 +174,6 @@ export default function Yields() {
 
       <hr className="border-card-border mb-4" />
 
-      {/* 3. KEY METRICS with delta + regime label */}
       <SectionLabel>KEY METRICS</SectionLabel>
       <div className="grid grid-cols-4 gap-3 mb-4">
         {[
@@ -226,7 +200,6 @@ export default function Yields() {
 
       <hr className="border-card-border mb-4" />
 
-      {/* G10 YIELDS TABLE — enhanced */}
       <SectionLabel>G10 YIELDS</SectionLabel>
       <DataCard className="overflow-hidden mb-4">
         <table className="w-full">
@@ -245,9 +218,7 @@ export default function Yields() {
           <tbody>
             {rows.map(r => (
               <tr key={r.code} className="border-b border-card-border last:border-b-0 hover:bg-secondary cursor-pointer" onClick={() => navigate(`/currencies/${r.code}`)}>
-                <td className="px-4 py-2">
-                  <span className="text-[11px] text-purple-accent font-bold">{r.code}</span>
-                </td>
+                <td className="px-4 py-2"><span className="text-[11px] text-purple-accent font-bold">{r.code}</span></td>
                 <td className="text-[11px] text-sub-text font-mono px-4 py-2">{val(r.y2, "%")}</td>
                 <td className="text-[11px] text-sub-text font-mono px-4 py-2">{val(r.y10, "%")}</td>
                 <td className="px-4 py-2"><DeltaBp value={r.d10} /></td>
@@ -265,10 +236,7 @@ export default function Yields() {
 
       <hr className="border-card-border mb-4" />
 
-      {/* YIELD ANALYSE — structured */}
       <SectionLabel>YIELD ANALYSE</SectionLabel>
-
-      {/* Section 1: Curve Regime */}
       <DataCard className="px-4 py-3 mb-3 border-l-[3px] border-l-purple-accent">
         <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">CURVE REGIME</div>
         <div className="flex items-center gap-2 mb-1.5">
@@ -280,7 +248,6 @@ export default function Yields() {
         </div>
       </DataCard>
 
-      {/* Section 2: Real Yield */}
       <DataCard className="px-4 py-3 mb-3">
         <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">REAL YIELD SIGNAAL</div>
         <div className="grid grid-cols-3 gap-4">
@@ -307,7 +274,6 @@ export default function Yields() {
         </div>
       </DataCard>
 
-      {/* Section 3: USD Differential Overview */}
       {spreads.length > 0 && (
         <DataCard className="px-4 py-3 mb-3">
           <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">USD DIFFERENTIAL — TOP 3 EXTREMEN</div>
@@ -328,6 +294,6 @@ export default function Yields() {
       )}
 
       <div className="text-[9px] text-label mt-2">Bijgewerkt {fmtDate(y.fetch_date)}</div>
-    </DashboardLayout>
+    </>
   );
 }
