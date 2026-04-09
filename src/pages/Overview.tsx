@@ -113,22 +113,20 @@ export default function Overview() {
   const navigate = useNavigate();
   const [cockpit, setCockpit] = useState<any>(null);
   const [market, setMarket] = useState<any>(null);
-  const [fxRanking, setFxRanking] = useState<any[]>([]);
+  
   const [events, setEvents] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const [ck, md, fx, e, r] = await Promise.all([
+    const [ck, md, e, r] = await Promise.all([
       queryWithRetry(() => supabase.from("v_overview_cockpit").select("*").limit(1), "Overview/cockpit"),
       queryWithRetry(() => supabase.from("v_market_delta").select("*").limit(1), "Overview/market_delta"),
-      queryWithRetry(() => supabase.from("v_fx_currency_ranking").select("*").order("rank_position", { ascending: true }).limit(8), "Overview/fx_ranking"),
       queryWithRetry(() => supabase.from("macro_events_calendar").select("*").gte("event_date", new Date().toISOString().split("T")[0]).in("event_impact", ["high", "medium"]).order("event_datetime", { ascending: true }).limit(6), "Overview/events"),
       queryWithRetry(() => supabase.from("report_analysis").select("id,analysis_date,title,macro_regime,confidence_score").order("analysis_date", { ascending: false }).limit(5), "Overview/reports"),
     ]);
     setCockpit((ck as any[])?.[0] || null);
     setMarket((md as any[])?.[0] || null);
-    setFxRanking((fx as any[]) || []);
     setEvents((e as any[]) || []);
     setReports((r as any[]) || []);
     setLoaded(true);
