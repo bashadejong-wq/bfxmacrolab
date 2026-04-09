@@ -162,11 +162,12 @@ export function SurpriseChip({ direction, score }: { direction: string | null; s
 }
 
 /** Data card wrapper */
-export function DataCard({ children, className = "", onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+export function DataCard({ children, className = "", onClick, style }: { children: ReactNode; className?: string; onClick?: () => void; style?: React.CSSProperties }) {
   return (
     <div
       className={`bg-card border border-card-border rounded-lg ${onClick ? "cursor-pointer hover:border-purple-accent/30 transition-colors" : ""} ${className}`}
       onClick={onClick}
+      style={style}
     >
       {children}
     </div>
