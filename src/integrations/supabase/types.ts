@@ -1264,6 +1264,13 @@ export type Database = {
             foreignKeyName: "macro_event_reactions_report_analysis_id_fkey"
             columns: ["report_analysis_id"]
             isOneToOne: false
+            referencedRelation: "v_reports_latest"
+            referencedColumns: ["analysis_id"]
+          },
+          {
+            foreignKeyName: "macro_event_reactions_report_analysis_id_fkey"
+            columns: ["report_analysis_id"]
+            isOneToOne: false
             referencedRelation: "v_reports_with_source"
             referencedColumns: ["id"]
           },
@@ -2319,6 +2326,13 @@ export type Database = {
             referencedRelation: "raw_reports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "report_analysis_raw_report_id_fkey"
+            columns: ["raw_report_id"]
+            isOneToOne: false
+            referencedRelation: "v_reports_latest"
+            referencedColumns: ["id"]
+          },
         ]
       }
       report_trade_ideas: {
@@ -2392,6 +2406,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "report_analysis"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_trade_ideas_report_analysis_id_fkey"
+            columns: ["report_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "v_reports_latest"
+            referencedColumns: ["analysis_id"]
           },
           {
             foreignKeyName: "report_trade_ideas_report_analysis_id_fkey"
@@ -2956,6 +2977,234 @@ export type Database = {
         }
         Relationships: []
       }
+      v_dwm_latest: {
+        Row: {
+          aud_bias: string | null
+          biggest_shifts: string | null
+          cad_bias: string | null
+          capital_rotation: string | null
+          cb_boe_direction: string | null
+          cb_boe_stance: string | null
+          cb_boj_direction: string | null
+          cb_boj_stance: string | null
+          cb_ecb_direction: string | null
+          cb_ecb_stance: string | null
+          cb_fed_direction: string | null
+          cb_fed_stance: string | null
+          cb_narrative: string | null
+          central_bank_bias: string | null
+          chf_bias: string | null
+          conviction_score: number | null
+          copper_view: string | null
+          core_driver: string | null
+          curve_view: string | null
+          divergence_themes: string | null
+          dominant_flow: string | null
+          eur_bias: string | null
+          flow_chain: string | null
+          gbp_bias: string | null
+          gold_view: string | null
+          growth_bias: string | null
+          growth_narrative: string | null
+          headline: string | null
+          high_conviction_next_month: string | null
+          inflation_bias: string | null
+          inflation_narrative: string | null
+          jpy_bias: string | null
+          key_developments: string | null
+          liquidity_bias: string | null
+          macro_regime: string | null
+          market_sensitivity_summary: string | null
+          nasdaq_view: string | null
+          natgas_view: string | null
+          next_watchpoints: string | null
+          next_week_focus: string | null
+          nzd_bias: string | null
+          oil_view: string | null
+          period_end: string | null
+          period_label: string | null
+          period_start: string | null
+          period_type: string | null
+          priced_in_assessment: string | null
+          qe_qt_overview: string | null
+          real_yield_view: string | null
+          risk_on_off_bias: string | null
+          risk_regime: string | null
+          risk_sentiment: string | null
+          scenario_base: string | null
+          scenario_downside: string | null
+          scenario_upside: string | null
+          silver_view: string | null
+          spx_view: string | null
+          strongest_theme: string | null
+          structural_changes: string | null
+          summary: string | null
+          summary_dashboard: string | null
+          summary_micro: string | null
+          trading_implications: string | null
+          us_10y_view: string | null
+          us_2y_view: string | null
+          usd_bias: string | null
+          vix_view: string | null
+          weakest_theme: string | null
+          what_changed: string | null
+          what_to_watch: string | null
+          what_to_watch_next: string | null
+          yield_narrative: string | null
+          yield_signal: string | null
+        }
+        Insert: {
+          aud_bias?: string | null
+          biggest_shifts?: string | null
+          cad_bias?: string | null
+          capital_rotation?: string | null
+          cb_boe_direction?: string | null
+          cb_boe_stance?: string | null
+          cb_boj_direction?: string | null
+          cb_boj_stance?: string | null
+          cb_ecb_direction?: string | null
+          cb_ecb_stance?: string | null
+          cb_fed_direction?: string | null
+          cb_fed_stance?: string | null
+          cb_narrative?: string | null
+          central_bank_bias?: string | null
+          chf_bias?: string | null
+          conviction_score?: number | null
+          copper_view?: string | null
+          core_driver?: string | null
+          curve_view?: string | null
+          divergence_themes?: string | null
+          dominant_flow?: string | null
+          eur_bias?: string | null
+          flow_chain?: string | null
+          gbp_bias?: string | null
+          gold_view?: string | null
+          growth_bias?: string | null
+          growth_narrative?: string | null
+          headline?: string | null
+          high_conviction_next_month?: string | null
+          inflation_bias?: string | null
+          inflation_narrative?: string | null
+          jpy_bias?: string | null
+          key_developments?: string | null
+          liquidity_bias?: string | null
+          macro_regime?: string | null
+          market_sensitivity_summary?: string | null
+          nasdaq_view?: string | null
+          natgas_view?: string | null
+          next_watchpoints?: string | null
+          next_week_focus?: string | null
+          nzd_bias?: string | null
+          oil_view?: string | null
+          period_end?: string | null
+          period_label?: string | null
+          period_start?: string | null
+          period_type?: string | null
+          priced_in_assessment?: string | null
+          qe_qt_overview?: string | null
+          real_yield_view?: string | null
+          risk_on_off_bias?: string | null
+          risk_regime?: string | null
+          risk_sentiment?: string | null
+          scenario_base?: string | null
+          scenario_downside?: string | null
+          scenario_upside?: string | null
+          silver_view?: string | null
+          spx_view?: string | null
+          strongest_theme?: string | null
+          structural_changes?: string | null
+          summary?: string | null
+          summary_dashboard?: string | null
+          summary_micro?: string | null
+          trading_implications?: string | null
+          us_10y_view?: string | null
+          us_2y_view?: string | null
+          usd_bias?: string | null
+          vix_view?: string | null
+          weakest_theme?: string | null
+          what_changed?: string | null
+          what_to_watch?: string | null
+          what_to_watch_next?: string | null
+          yield_narrative?: string | null
+          yield_signal?: string | null
+        }
+        Update: {
+          aud_bias?: string | null
+          biggest_shifts?: string | null
+          cad_bias?: string | null
+          capital_rotation?: string | null
+          cb_boe_direction?: string | null
+          cb_boe_stance?: string | null
+          cb_boj_direction?: string | null
+          cb_boj_stance?: string | null
+          cb_ecb_direction?: string | null
+          cb_ecb_stance?: string | null
+          cb_fed_direction?: string | null
+          cb_fed_stance?: string | null
+          cb_narrative?: string | null
+          central_bank_bias?: string | null
+          chf_bias?: string | null
+          conviction_score?: number | null
+          copper_view?: string | null
+          core_driver?: string | null
+          curve_view?: string | null
+          divergence_themes?: string | null
+          dominant_flow?: string | null
+          eur_bias?: string | null
+          flow_chain?: string | null
+          gbp_bias?: string | null
+          gold_view?: string | null
+          growth_bias?: string | null
+          growth_narrative?: string | null
+          headline?: string | null
+          high_conviction_next_month?: string | null
+          inflation_bias?: string | null
+          inflation_narrative?: string | null
+          jpy_bias?: string | null
+          key_developments?: string | null
+          liquidity_bias?: string | null
+          macro_regime?: string | null
+          market_sensitivity_summary?: string | null
+          nasdaq_view?: string | null
+          natgas_view?: string | null
+          next_watchpoints?: string | null
+          next_week_focus?: string | null
+          nzd_bias?: string | null
+          oil_view?: string | null
+          period_end?: string | null
+          period_label?: string | null
+          period_start?: string | null
+          period_type?: string | null
+          priced_in_assessment?: string | null
+          qe_qt_overview?: string | null
+          real_yield_view?: string | null
+          risk_on_off_bias?: string | null
+          risk_regime?: string | null
+          risk_sentiment?: string | null
+          scenario_base?: string | null
+          scenario_downside?: string | null
+          scenario_upside?: string | null
+          silver_view?: string | null
+          spx_view?: string | null
+          strongest_theme?: string | null
+          structural_changes?: string | null
+          summary?: string | null
+          summary_dashboard?: string | null
+          summary_micro?: string | null
+          trading_implications?: string | null
+          us_10y_view?: string | null
+          us_2y_view?: string | null
+          usd_bias?: string | null
+          vix_view?: string | null
+          weakest_theme?: string | null
+          what_changed?: string | null
+          what_to_watch?: string | null
+          what_to_watch_next?: string | null
+          yield_narrative?: string | null
+          yield_signal?: string | null
+        }
+        Relationships: []
+      }
       v_fx_currency_ranking: {
         Row: {
           bias: string | null
@@ -2987,6 +3236,22 @@ export type Database = {
           snapshot_date: string | null
           summary_short: string | null
           what_to_watch_next: string | null
+        }
+        Relationships: []
+      }
+      v_g8_consensus: {
+        Row: {
+          avg_confidence: number | null
+          bearish_count: number | null
+          bullish_count: number | null
+          consensus_bias: string | null
+          conviction_pct: number | null
+          currency_code: string | null
+          entity_label: string | null
+          latest_date: string | null
+          neutral_count: number | null
+          rank_position: number | null
+          total_reports: number | null
         }
         Relationships: []
       }
@@ -3228,6 +3493,195 @@ export type Database = {
         }
         Relationships: []
       }
+      v_market_delta: {
+        Row: {
+          audusd: number | null
+          audusd_delta: number | null
+          audusd_prev: number | null
+          copper: number | null
+          copper_delta: number | null
+          copper_prev: number | null
+          credit_regime: string | null
+          dxy: number | null
+          dxy_delta: number | null
+          dxy_pct: number | null
+          dxy_prev: number | null
+          eurusd: number | null
+          eurusd_delta: number | null
+          eurusd_pct: number | null
+          eurusd_prev: number | null
+          gbpusd: number | null
+          gbpusd_delta: number | null
+          gbpusd_pct: number | null
+          gbpusd_prev: number | null
+          gold: number | null
+          gold_delta: number | null
+          gold_pct: number | null
+          gold_prev: number | null
+          gold_real_yield_note: string | null
+          hy_delta: number | null
+          hy_prev: number | null
+          hy_spread: number | null
+          natgas: number | null
+          natgas_delta: number | null
+          natgas_prev: number | null
+          ndx: number | null
+          ndx_delta: number | null
+          ndx_pct: number | null
+          ndx_prev: number | null
+          nzdusd: number | null
+          nzdusd_delta: number | null
+          nzdusd_prev: number | null
+          oil_brent: number | null
+          oil_brent_prev: number | null
+          oil_delta: number | null
+          oil_pct: number | null
+          prev_date: string | null
+          silver: number | null
+          silver_delta: number | null
+          silver_prev: number | null
+          spx: number | null
+          spx_delta: number | null
+          spx_pct: number | null
+          spx_prev: number | null
+          today_date: string | null
+          usdcad: number | null
+          usdcad_delta: number | null
+          usdcad_prev: number | null
+          usdchf: number | null
+          usdchf_delta: number | null
+          usdchf_prev: number | null
+          usdjpy: number | null
+          usdjpy_delta: number | null
+          usdjpy_pct: number | null
+          usdjpy_prev: number | null
+          vix: number | null
+          vix_delta: number | null
+          vix_prev: number | null
+          vix_regime: string | null
+          vix_term_structure: string | null
+        }
+        Relationships: []
+      }
+      v_overview_cockpit: {
+        Row: {
+          alignment_date: string | null
+          alignment_state: string | null
+          aud_view: string | null
+          breakeven_10y: number | null
+          cad_view: string | null
+          cb_view: string | null
+          chf_view: string | null
+          conflicts: string | null
+          conviction_score: number | null
+          core_driver: string | null
+          credit_regime: string | null
+          currency_ranking: string | null
+          curve_interpretation: string | null
+          curve_signal: string | null
+          daily_headline: string | null
+          daily_vs_weekly: string | null
+          daily_what_changed: string | null
+          daily_what_to_watch: string | null
+          dxy: number | null
+          dxy_trade_weighted: number | null
+          eur_view: string | null
+          flow_chain: string | null
+          gbp_view: string | null
+          gold: number | null
+          growth_view: string | null
+          high_conviction_assets: string | null
+          high_conviction_next_month: string | null
+          hy_spread: number | null
+          inflation_view: string | null
+          jpy_view: string | null
+          key_developments: string | null
+          liquidity_regime: string | null
+          liquidity_view: string | null
+          low_conviction_assets: string | null
+          macro_regime: string | null
+          macro_story: string | null
+          market_date: string | null
+          monthly_headline: string | null
+          ndx: number | null
+          next_week_focus: string | null
+          nzd_view: string | null
+          oil_brent: number | null
+          oil_wti: number | null
+          priced_in_assessment: string | null
+          risk_regime: string | null
+          risk_sentiment: string | null
+          scenario_base: string | null
+          scenario_downside: string | null
+          scenario_upside: string | null
+          spx: number | null
+          strongest_theme: string | null
+          summary: string | null
+          summary_dashboard: string | null
+          summary_micro: string | null
+          us_10y: number | null
+          us_2s10s: number | null
+          us_2y: number | null
+          us_real_yield_10y: number | null
+          usd_view: string | null
+          vix: number | null
+          vix_regime: string | null
+          weekly_headline: string | null
+          weekly_vs_monthly: string | null
+          what_to_avoid: string | null
+          what_to_do: string | null
+          yield_curve_regime: string | null
+          yield_view: string | null
+        }
+        Relationships: []
+      }
+      v_reports_latest: {
+        Row: {
+          analysis_id: number | null
+          aud_bias: string | null
+          cad_bias: string | null
+          cb_boj_stance: string | null
+          cb_ecb_stance: string | null
+          cb_fed_stance: string | null
+          chf_bias: string | null
+          confidence_score: number | null
+          core_driver: string | null
+          eur_bias: string | null
+          flow_chain: string | null
+          flow_chain_summary: string | null
+          forward_implications: string | null
+          gbp_bias: string | null
+          gold_bias: string | null
+          id: number | null
+          jpy_bias: string | null
+          macro_regime: string | null
+          nzd_bias: string | null
+          oil_bias: string | null
+          pass1_status: string | null
+          pass2_status: string | null
+          priced_in: string | null
+          report_date: string | null
+          report_type: string | null
+          risk_regime: string | null
+          scenario_base: string | null
+          scenario_downside: string | null
+          scenario_upside: string | null
+          source: string | null
+          spx_bias: string | null
+          status: string | null
+          summary_dashboard: string | null
+          summary_short: string | null
+          summary_ultra_short: string | null
+          title: string | null
+          trading_implications: string | null
+          usd_bias: string | null
+          validation_status: string | null
+          what_changed: string | null
+          what_stands_out: string | null
+          yield_signal: string | null
+        }
+        Relationships: []
+      }
       v_reports_with_source: {
         Row: {
           analysis_date: string | null
@@ -3269,6 +3723,112 @@ export type Database = {
           what_changed: string | null
           why_it_matters: string | null
           yield_curve_narrative: string | null
+        }
+        Relationships: []
+      }
+      v_upcoming_events: {
+        Row: {
+          consensus: number | null
+          days_until: number | null
+          event_currency: string | null
+          event_date: string | null
+          event_datetime: string | null
+          event_group: string | null
+          event_impact: string | null
+          event_importance: string | null
+          event_name: string | null
+          event_status: string | null
+          expected_value: number | null
+          id: number | null
+          impact_score: number | null
+          interpretation: string | null
+          market_impact_narrative: string | null
+          previous_value: number | null
+          region: string | null
+        }
+        Insert: {
+          consensus?: number | null
+          days_until?: never
+          event_currency?: string | null
+          event_date?: string | null
+          event_datetime?: string | null
+          event_group?: string | null
+          event_impact?: string | null
+          event_importance?: string | null
+          event_name?: string | null
+          event_status?: string | null
+          expected_value?: number | null
+          id?: number | null
+          impact_score?: never
+          interpretation?: string | null
+          market_impact_narrative?: string | null
+          previous_value?: number | null
+          region?: string | null
+        }
+        Update: {
+          consensus?: number | null
+          days_until?: never
+          event_currency?: string | null
+          event_date?: string | null
+          event_datetime?: string | null
+          event_group?: string | null
+          event_impact?: string | null
+          event_importance?: string | null
+          event_name?: string | null
+          event_status?: string | null
+          expected_value?: number | null
+          id?: number | null
+          impact_score?: never
+          interpretation?: string | null
+          market_impact_narrative?: string | null
+          previous_value?: number | null
+          region?: string | null
+        }
+        Relationships: []
+      }
+      v_yield_delta: {
+        Row: {
+          aud_10y: number | null
+          aud_2y: number | null
+          breakeven_10y: number | null
+          cad_10y: number | null
+          cad_2y: number | null
+          chf_10y: number | null
+          curve_interpretation: string | null
+          curve_regime: string | null
+          curve_signal: string | null
+          eur_10y: number | null
+          eur_10y_delta_bp: number | null
+          eur_10y_prev: number | null
+          eur_2y: number | null
+          eur_2y_delta_bp: number | null
+          eur_2y_prev: number | null
+          eur_diff_delta_bp: number | null
+          fedfunds: number | null
+          gbp_10y: number | null
+          gbp_10y_delta_bp: number | null
+          gbp_10y_prev: number | null
+          gbp_2y: number | null
+          gbp_2y_delta_bp: number | null
+          gbp_2y_prev: number | null
+          gbp_diff_delta_bp: number | null
+          jpy_10y: number | null
+          jpy_10y_delta_bp: number | null
+          jpy_10y_prev: number | null
+          jpy_diff_delta_bp: number | null
+          nzd_10y: number | null
+          prev_date: string | null
+          today_date: string | null
+          us_10y: number | null
+          us_10y_delta_bp: number | null
+          us_10y_prev: number | null
+          us_2s10s: number | null
+          us_2s10s_delta_bp: number | null
+          us_2s10s_prev: number | null
+          us_2y: number | null
+          us_2y_delta_bp: number | null
+          us_2y_prev: number | null
+          us_real_yield_10y: number | null
         }
         Relationships: []
       }
