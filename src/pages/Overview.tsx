@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, ImpactChip, MarkdownBlock, fmtDate, fmtDateTime, queryWithRetry, getBiasColor, getBiasBackground } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, ImpactChip, fmtDate, fmtDateTime, queryWithRetry } from "@/components/ui-helpers";
 import {
   Zap, TrendingUp, TrendingDown, Sun, RefreshCw, GitMerge, HelpCircle,
   Shield, AlertTriangle, AlertOctagon, ShieldAlert, ShieldCheck,
