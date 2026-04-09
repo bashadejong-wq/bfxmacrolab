@@ -7,8 +7,9 @@ import {
   GitMerge, CheckCircle, XCircle, TrendingUp, AlertTriangle,
   DollarSign, BookOpen, Star, Eye, Target, GitCommit,
   Flame, Building2, Droplets, ChevronRight, ChevronDown, ChevronUp,
-  Shield, ArrowRightLeft
+  Shield, ArrowRightLeft, Clock
 } from "lucide-react";
+import RegimeTimelineContent from "@/components/content/RegimeTimelineContent";
 
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
 
@@ -92,14 +93,47 @@ export default function Alignment() {
   const [al, setAl] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
   const [storyOpen, setStoryOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"alignment" | "timeline">("alignment");
 
   useEffect(() => {
     queryWithRetry(() => supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1), "Alignment/alignment_engine")
       .then(data => { setAl((data as any[])?.[0] || null); setLoaded(true); });
   }, []);
 
-  if (loaded && !al) return <DashboardLayout><div className="text-center text-label text-[13px] mt-10">Nog geen data beschikbaar</div></DashboardLayout>;
-  if (!al) return <DashboardLayout><div className="text-center text-label text-[13px] mt-10">Laden...</div></DashboardLayout>;
+  return (
+    <DashboardLayout>
+      {/* Tab bar */}
+      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-5">
+        {[
+          { key: "alignment" as const, label: "Alignment", icon: GitMerge },
+          { key: "timeline" as const, label: "Regime Timeline", icon: Clock },
+        ].map(t => {
+          const Icon = t.icon;
+          return (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-1.5 px-5 py-2.5 text-[11px] font-semibold border-b-2 transition-colors ${
+                t.key === activeTab ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
+              }`}>
+              <Icon size={14} />{t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === "timeline" ? (
+        <RegimeTimelineContent />
+      ) : (
+        <>
+          {loaded && !al ? <div className="text-center text-label text-[13px] mt-10">Nog geen data beschikbaar</div> : !al ? <div className="text-center text-label text-[13px] mt-10">Laden...</div> : (
+            <AlignmentContent al={al} navigate={navigate} storyOpen={storyOpen} setStoryOpen={setStoryOpen} />
+          )}
+        </>
+      )}
+    </DashboardLayout>
+  );
+}
+
+function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; navigate: any; storyOpen: boolean; setStoryOpen: (v: boolean) => void }) {
 
   const stateColor = alignmentBorder(al.alignment_state);
   const stateBg = alignmentBg(al.alignment_state);
