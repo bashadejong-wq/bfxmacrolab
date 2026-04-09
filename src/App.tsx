@@ -17,8 +17,6 @@ import EventHistory from "./pages/EventHistory";
 import TradeIdeas from "./pages/TradeIdeas";
 import RegimeTimeline from "./pages/RegimeTimeline";
 import Correlations from "./pages/Correlations";
-
-import Correlations from "./pages/Correlations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
