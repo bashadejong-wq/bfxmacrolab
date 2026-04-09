@@ -24,10 +24,45 @@ const RISK_COLORS: Record<string, string> = {
 
 const ALIGNMENT_COLORS: Record<string, string> = {
   aligned: "bg-bullish-bg text-bullish-text",
-  mixed: "bg-mixed-bg text-mixed-text",
+  mixed: "bg-amber-100 text-amber-700",
   conflicted: "bg-bearish-bg text-bearish-text",
   transitioning: "bg-mixed-bg text-mixed-text",
 };
+
+function parseCurrencyRanking(raw: string | null): { rank: number; code: string; bias: string; conviction: string }[] {
+  if (!raw) return [];
+  return raw.split("|").map(part => {
+    const m = part.trim().match(/^(\d+)\.\s*(\w+)\s*\((\w+),\s*(\w+)\)$/);
+    if (!m) return null;
+    return { rank: Number(m[1]), code: m[2], bias: m[3].toLowerCase(), conviction: m[4].toLowerCase() };
+  }).filter(Boolean) as any[];
+}
+
+function parseHighConviction(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw.split("|").map(s => s.trim()).filter(s => s.length > 0);
+}
+
+function parseSummaryDashboard(raw: string | null): { header: string; body: string }[] {
+  if (!raw) return [];
+  const sections: { header: string; body: string }[] = [];
+  const lines = raw.split("\n");
+  let current: { header: string; body: string } | null = null;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed === trimmed.toUpperCase() && trimmed.length > 2 && !trimmed.includes(".")) {
+      if (current) sections.push(current);
+      current = { header: trimmed, body: "" };
+    } else if (current) {
+      current.body += (current.body ? "\n" : "") + trimmed;
+    } else {
+      current = { header: "", body: trimmed };
+    }
+  }
+  if (current) sections.push(current);
+  return sections;
+}
 
 function getStepColor(value: string | null): string {
   const v = (value || "").toLowerCase();
