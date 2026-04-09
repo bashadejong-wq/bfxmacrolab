@@ -3272,6 +3272,74 @@ export type Database = {
         }
         Relationships: []
       }
+      v_yield_pattern_intelligence: {
+        Row: {
+          aud_10y: number | null
+          aud_2s10s: number | null
+          aud_2y: number | null
+          aud_fx_implication: string | null
+          aud_spread_vs_usd: number | null
+          aud_yield_pattern: string | null
+          breakeven_10y: number | null
+          cad_10y: number | null
+          cad_2s10s: number | null
+          cad_2y: number | null
+          cad_fx_implication: string | null
+          cad_spread_vs_usd: number | null
+          cad_yield_pattern: string | null
+          chf_10y: number | null
+          chf_2s10s: number | null
+          chf_2y: number | null
+          chf_fx_implication: string | null
+          chf_spread_vs_usd: number | null
+          curve_interpretation: string | null
+          curve_regime: string | null
+          curve_signal: string | null
+          diff_aud_10y: number | null
+          diff_cad_10y: number | null
+          diff_chf_10y: number | null
+          diff_eur_10y: number | null
+          diff_gbp_10y: number | null
+          diff_jpy_10y: number | null
+          diff_nzd_10y: number | null
+          eur_10y: number | null
+          eur_2s10s: number | null
+          eur_2y: number | null
+          eur_30y: number | null
+          eur_5y: number | null
+          eur_fx_implication: string | null
+          eur_spread_vs_usd: number | null
+          eur_yield_pattern: string | null
+          fedfunds: number | null
+          fetch_date: string | null
+          gbp_10y: number | null
+          gbp_2s10s: number | null
+          gbp_2y: number | null
+          gbp_30y: number | null
+          gbp_fx_implication: string | null
+          gbp_spread_vs_usd: number | null
+          gbp_yield_pattern: string | null
+          jpy_10y: number | null
+          jpy_2s10s: number | null
+          jpy_2y: number | null
+          jpy_30y: number | null
+          jpy_fx_implication: string | null
+          jpy_spread_vs_usd: number | null
+          jpy_yield_pattern: string | null
+          nzd_10y: number | null
+          nzd_2s10s: number | null
+          nzd_2y: number | null
+          nzd_spread_vs_usd: number | null
+          us_10y: number | null
+          us_2s10s: number | null
+          us_2y: number | null
+          us_30y: number | null
+          us_3m10y: number | null
+          us_5y: number | null
+          us_real_yield_10y: number | null
+        }
+        Relationships: []
+      }
       yield_curve_regime: {
         Row: {
           aud_10y: number | null
