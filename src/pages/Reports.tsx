@@ -184,15 +184,51 @@ export default function Reports() {
   );
 }
 
+/* ---- Shared prose wrapper ---- */
+function Prose({ children }: { children: React.ReactNode }) {
+  return <div className="max-w-[720px] text-[14px] text-sub-text leading-[1.7]">{children}</div>;
+}
+function SHead({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <Icon size={15} className="text-label" />
+      <span className="text-[0.7rem] text-label uppercase tracking-[0.08em] font-semibold">{label}</span>
+    </div>
+  );
+}
+function Spacer() {
+  return <hr className="border-card-border my-7" />;
+}
+
 /* ===================== COMPACT TAB ===================== */
 function CompactTab({ detail }: { detail: any }) {
   return (
     <>
-      <div className="max-w-[680px] text-[13px] text-sub-text leading-[1.7] mb-6">
+      {/* Title */}
+      <h2 className="text-[20px] font-bold text-foreground leading-snug mb-1">{textVal(detail.title, "—")}</h2>
+      {detail.core_driver && (
+        <div className="text-[13px] text-label mb-3">{detail.core_driver}</div>
+      )}
+
+      {/* Summary short as intro */}
+      {detail.summary_short && (
+        <div className="max-w-[720px] text-[13px] text-sub-text leading-[1.6] mb-4 italic border-l-2 border-purple-accent/30 pl-4">
+          {detail.summary_short}
+        </div>
+      )}
+
+      <Spacer />
+
+      {/* Summary micro — full paragraph */}
+      <SHead icon={FileText} label="Samenvatting" />
+      <Prose>
         <MarkdownBlock content={detail.summary_micro || detail.summary_short} fallback="Nog geen compacte samenvatting beschikbaar" />
-      </div>
-      <hr className="border-card-border mb-5" />
-      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">SCENARIO'S</div>
+      </Prose>
+
+      <Spacer />
+
+      {/* Scenarios */}
+      <SHead icon={GitMerge} label="Scenario's" />
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "BASIS", value: detail.scenario_base, borderColor: "#6B7280" },
@@ -201,7 +237,7 @@ function CompactTab({ detail }: { detail: any }) {
         ].map(s => (
           <div key={s.label} className="bg-secondary border border-card-border rounded-lg p-4" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
             <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2 font-medium">{s.label}</div>
-            <div className="text-[11px] text-sub-text leading-relaxed">{textVal(s.value)}</div>
+            <div className="text-[13px] text-sub-text leading-[1.7]"><MarkdownBlock content={s.value} /></div>
           </div>
         ))}
       </div>
@@ -225,16 +261,35 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
   return (
     <>
-      {/* Summary */}
-      <div className="max-w-[680px] text-[13px] text-sub-text leading-[1.7] mb-6">
+      {/* Summary dashboard — full */}
+      <SHead icon={FileText} label="Dashboard Samenvatting" />
+      <Prose>
         <MarkdownBlock content={detail.summary_dashboard || detail.summary_full} fallback="Nog geen dashboard samenvatting beschikbaar" />
-      </div>
+      </Prose>
 
-      <hr className="border-card-border mb-5" />
+      <Spacer />
 
-      {/* FX BIAS */}
-      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">FX BIAS</div>
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      {/* Flow chain */}
+      <SHead icon={ArrowRight} label="Flow Chain" />
+      <Prose><MarkdownBlock content={detail.flow_chain} /></Prose>
+
+      <Spacer />
+
+      {/* CB Narrative */}
+      <SHead icon={Building2} label="Central Bank Narrative" />
+      <Prose><MarkdownBlock content={detail.cb_narrative} /></Prose>
+
+      <Spacer />
+
+      {/* What changed */}
+      <SHead icon={RefreshCw} label="What Changed" />
+      <Prose><MarkdownBlock content={detail.what_changed} /></Prose>
+
+      <Spacer />
+
+      {/* FX BIAS with reasons */}
+      <SHead icon={DollarSign} label="FX Bias" />
+      <div className="grid grid-cols-4 gap-3 mb-2">
         {FX_CODES.map(code => {
           const bias = detail[`${code.toLowerCase()}_bias`];
           const reason = detail[`${code.toLowerCase()}_reason`];
@@ -243,50 +298,56 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
             <div key={code} className="bg-secondary border border-card-border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <DollarSign size={12} className="text-label" />
-                <span className="text-[10px] font-bold uppercase" style={{ color }}>{code}</span>
-                <span className="text-[9px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
+                <span className="text-[11px] font-bold uppercase" style={{ color }}>{code}</span>
+                <span className="text-[10px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
               </div>
-              <div className="text-[10px] text-label leading-snug">{val(reason)}</div>
+              <div className="text-[11px] text-sub-text leading-snug mt-1">{textVal(reason, "—")}</div>
             </div>
           );
         })}
       </div>
 
+      <Spacer />
+
       {/* ASSET BIAS */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ASSET BIAS</div>
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-2">
         {ASSETS.map(({ label, bias, reason, icon: Icon }) => {
           const color = getBiasColor(bias);
           return (
             <div key={label} className="bg-secondary border border-card-border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon size={12} className="text-label" />
-                <span className="text-[10px] font-bold uppercase">{label}</span>
-                <span className="text-[9px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
+                <span className="text-[11px] font-bold uppercase">{label}</span>
+                <span className="text-[10px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
               </div>
-              <div className="text-[10px] text-label leading-snug">{val(reason)}</div>
+              <div className="text-[11px] text-sub-text leading-snug mt-1">{textVal(reason, "—")}</div>
             </div>
           );
         })}
       </div>
 
+      <Spacer />
+
       {/* RATES */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">RENTES</div>
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-2">
         {RATES.map(({ label, bias, reason }) => {
           const color = getBiasColor(bias);
           return (
             <div key={label} className="bg-secondary border border-card-border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Percent size={12} className="text-label" />
-                <span className="text-[10px] font-bold uppercase">{label}</span>
-                <span className="text-[9px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
+                <span className="text-[11px] font-bold uppercase">{label}</span>
+                <span className="text-[10px] font-semibold uppercase ml-auto" style={{ color }}>{val(bias)}</span>
               </div>
-              <div className="text-[10px] text-label leading-snug">{val(reason)}</div>
+              <div className="text-[11px] text-sub-text leading-snug mt-1">{textVal(reason, "—")}</div>
             </div>
           );
         })}
       </div>
+
+      <Spacer />
 
       {/* ENTITY BIAS TABLE */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ENTITY BIAS</div>
@@ -316,7 +377,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
                     <td className="text-[10px] text-foreground font-bold px-4 py-2">{val(b.entity_code)}</td>
                     <td className="px-4 py-2"><BiasChip bias={b.bias} /></td>
                     <td className="text-[10px] text-sub-text px-4 py-2">{val(b.bias_strength)}</td>
-                    <td className="text-[10px] text-sub-text px-4 py-2 max-w-[200px] truncate">{val(b.main_driver)}</td>
+                    <td className="text-[11px] text-sub-text px-4 py-2">{textVal(b.main_driver, "—")}</td>
                   </tr>
                 );
               })}
@@ -330,30 +391,48 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
 /* ===================== VOLLEDIG TAB ===================== */
 function VolledigTab({ detail }: { detail: any }) {
+  // Show all sections that have content
   const sections = [
     { label: "UITGEBREIDE SAMENVATTING", value: detail.summary_detailed || detail.summary_full, icon: FileText, fallback: "Uitgebreide samenvatting nog niet beschikbaar" },
-    { label: "CENTRALE BANK NARRATIEF", value: detail.cb_narrative, icon: Building2 },
-    { label: "FLOW CHAIN", value: detail.flow_chain, icon: ArrowRight },
     { label: "TRADING IMPLICATIES", value: detail.trading_implications, icon: Target },
     { label: "KEY WATCHPOINTS", value: detail.key_watchpoints, icon: Eye },
-    { label: "WAT VERANDERDE", value: detail.what_changed, icon: RefreshCw },
     { label: "FORWARD IMPLICATIONS", value: detail.forward_implications, icon: ArrowRightLeft },
-  ];
+    { label: "WAT VERANDERDE", value: detail.what_changed, icon: RefreshCw },
+    { label: "CENTRALE BANK NARRATIEF", value: detail.cb_narrative, icon: Building2 },
+    { label: "FLOW CHAIN", value: detail.flow_chain, icon: ArrowRight },
+    { label: "YIELD SIGNAL", value: detail.yield_signal, icon: Percent },
+    { label: "YIELD CURVE", value: detail.yield_curve_narrative, icon: Percent },
+    { label: "YIELD DIFFERENTIALS", value: detail.yield_differentials_view, icon: Percent },
+    { label: "YIELD FX IMPLICATIE", value: detail.yield_fx_implication, icon: DollarSign },
+    { label: "TERM PREMIUM", value: detail.term_premium_narrative, icon: Percent },
+    { label: "PRICED-IN ASSESSMENT", value: detail.priced_in_assessment || detail.priced_in, icon: Eye },
+    { label: "MARKET SENSITIVITY", value: detail.market_sensitivity, icon: Zap },
+    { label: "TRANSMISSION MECHANISM", value: detail.transmission_mechanism, icon: ArrowRight },
+    { label: "WHY IT MATTERS", value: detail.why_it_matters, icon: Target },
+    { label: "WHAT STANDS OUT", value: detail.what_stands_out, icon: Eye },
+    { label: "COMMODITY ANALYSIS", value: detail.commodity_analysis, icon: Package },
+    { label: "EQUITY RISK VIEW", value: detail.equity_risk_view, icon: BarChart2 },
+    { label: "CROSS CURRENCY VIEW", value: detail.cross_currency_view, icon: DollarSign },
+    { label: "CURRENCY DEEP ANALYSIS", value: detail.currency_deep_analysis, icon: DollarSign },
+    { label: "KEY POINTS", value: detail.key_points, icon: FileText },
+    { label: "IMPORTANT TODAY", value: detail.important_today || detail.important_for_today, icon: Zap },
+    { label: "IMPORTANT THIS WEEK", value: detail.important_this_week, icon: Eye },
+    { label: "IMPORTANT THIS MONTH", value: detail.important_this_month, icon: Eye },
+  ].filter(s => s.value && String(s.value).trim() !== "" && s.value !== "null");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {sections.map(({ label, value, icon: Icon, fallback }) => (
         <div key={label}>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Icon size={14} className="text-label" />
-            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">{label}</span>
-          </div>
-          <div className="max-w-[720px] text-[12px] text-sub-text leading-[1.7]">
+          <SHead icon={Icon} label={label} />
+          <Prose>
             <MarkdownBlock content={value} fallback={fallback || "Nog geen analyse beschikbaar"} />
-          </div>
-          <hr className="border-card-border mt-5" />
+          </Prose>
         </div>
       ))}
+      {sections.length === 0 && (
+        <div className="text-[13px] text-label italic">Geen volledige analyse beschikbaar voor dit rapport</div>
+      )}
     </div>
   );
 }
