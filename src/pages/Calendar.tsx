@@ -140,7 +140,7 @@ export default function Calendar() {
                 <>
                   {/* Date separator */}
                   <tr key={`sep-${group.date}`}>
-                    <td colSpan={colCount} className="bg-[#F7F7F8] px-4 py-1.5">
+                    <td colSpan={colCount} className="bg-secondary px-4 py-1.5">
                       <span className="text-[10px] text-label font-semibold uppercase tracking-wide">{group.label}</span>
                     </td>
                   </tr>

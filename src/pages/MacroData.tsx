@@ -132,7 +132,7 @@ export default function MacroData() {
                 <tbody key={category}>
                   {/* Category header row */}
                   <tr>
-                    <td colSpan={7} className="px-5 py-2 bg-[#F7F7F8]">
+                    <td colSpan={7} className="px-5 py-2 bg-secondary">
                       <div className="flex items-center gap-1.5">
                         <CatIcon size={13} className="text-purple-accent" />
                         <span className="text-[0.65rem] text-purple-accent uppercase font-bold tracking-[0.1em]">{category}</span>
@@ -143,7 +143,7 @@ export default function MacroData() {
                     const color = trendColor(ind.latest, ind.t_minus_1);
                     return (
                       <tr key={`${category}-${i}`}
-                        className={`border-b border-card-border ${i % 2 === 1 ? "bg-[#FAFAFA]" : "bg-card"}`}>
+                        className={`border-b border-card-border ${i % 2 === 1 ? "bg-secondary/50" : "bg-card"}`}>
                         <td className="text-[11px] text-sub-text px-5 py-2">{val(ind.indicator_name)}</td>
                         <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_3)}</td>
                         <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_2)}</td>
