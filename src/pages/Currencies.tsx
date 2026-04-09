@@ -45,17 +45,6 @@ function SensitivityPill({ type, value }: { type: string; value: string | null }
   );
 }
 
-function ConvictionBar({ pct }: { pct: number | null }) {
-  const p = pct ?? 0;
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-[60px] h-[3px] rounded-full bg-[#E5E7EB] overflow-hidden">
-        <div className="h-full rounded-full bg-purple-accent transition-all" style={{ width: `${Math.min(p, 100)}%` }} />
-      </div>
-      <span className="text-[9px] font-mono text-label">{p > 0 ? `${p}%` : "—"}</span>
-    </div>
-  );
-}
 
 export default function Currencies() {
   const { code } = useParams();
