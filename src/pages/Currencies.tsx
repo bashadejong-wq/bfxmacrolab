@@ -3,9 +3,57 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, SectionLabel, val, textVal, BiasChip, ConfidenceChip, MarkdownBlock, LabelValue, fmtDate, queryWithRetry, getBiasColor, getBiasBackground } from "@/components/ui-helpers";
-import { DollarSign, Star, TrendingUp, TrendingDown, Minus, Shield } from "lucide-react";
+import { DollarSign, Star, TrendingUp, TrendingDown, Minus, Shield, AlertTriangle, Eye, Zap, Activity } from "lucide-react";
 
 const CURRENCIES = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
+
+const SENSITIVITY_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  vix: { bg: "#FFFBEB", color: "#D97706", label: "VIX" },
+  oil: { bg: "#FFF7ED", color: "#EA580C", label: "OLIE" },
+  gold: { bg: "#FAF5FF", color: "#7C3AED", label: "GOUD" },
+  equity: { bg: "#FEF2F2", color: "#DC2626", label: "AANDELEN" },
+  commodity: { bg: "#F5F5F5", color: "#6B7280", label: "COMMODITIES" },
+};
+
+function ScoreBar({ score, label }: { score: number | null; label: string }) {
+  const s = score ?? 0;
+  const pct = Math.min(Math.max((s / 10) * 100, 0), 100);
+  const color = s >= 7 ? "#16A34A" : s >= 4 ? "#D97706" : "#DC2626";
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[8px] text-label uppercase tracking-wider font-medium">{label}</span>
+        <span className="text-[11px] font-mono font-bold" style={{ color }}>{s > 0 ? s : "—"}</span>
+      </div>
+      <div className="w-full h-[3px] rounded-full bg-[#E5E7EB] overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+}
+
+function SensitivityPill({ type, value }: { type: string; value: string | null }) {
+  const style = SENSITIVITY_STYLES[type] || SENSITIVITY_STYLES.commodity;
+  const v = (value || "").toLowerCase();
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-2 rounded-md" style={{ backgroundColor: style.bg }}>
+      <span className="text-[9px] font-bold uppercase" style={{ color: style.color }}>{style.label}</span>
+      <span className="text-[10px] font-semibold uppercase" style={{ color: style.color }}>{val(value)}</span>
+    </div>
+  );
+}
+
+function ConvictionBar({ pct }: { pct: number | null }) {
+  const p = pct ?? 0;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-[60px] h-[3px] rounded-full bg-[#E5E7EB] overflow-hidden">
+        <div className="h-full rounded-full bg-purple-accent transition-all" style={{ width: `${Math.min(p, 100)}%` }} />
+      </div>
+      <span className="text-[9px] font-mono text-label">{p > 0 ? `${p}%` : "—"}</span>
+    </div>
+  );
+}
 
 export default function Currencies() {
   const { code } = useParams();
@@ -13,8 +61,10 @@ export default function Currencies() {
   const activeCurrency = (code || "USD").toUpperCase();
 
   const [snap, setSnap] = useState<any>(null);
+  const [ranking, setRanking] = useState<any>(null);
   const [biasHistory, setBiasHistory] = useState<any[]>([]);
-  const [consensus, setConsensus] = useState<any[]>([]);
+  const [g8Consensus, setG8Consensus] = useState<any[]>([]);
+  const [yieldData, setYieldData] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -25,172 +75,274 @@ export default function Currencies() {
         `Currencies/snap/${activeCurrency}`
       ),
       queryWithRetry(
+        () => supabase.from("v_fx_currency_ranking").select("*").eq("currency_code", activeCurrency).limit(1),
+        `Currencies/ranking/${activeCurrency}`
+      ),
+      queryWithRetry(
         () => supabase.from("entity_bias").select("*").eq("entity_code", activeCurrency).order("snap_date", { ascending: false }).limit(5),
         `Currencies/entity_bias/${activeCurrency}`
       ),
       queryWithRetry(
-        () => supabase.from("fx_consensus").select("*").in("entity_code", CURRENCIES).order("conviction_pct", { ascending: false }),
-        "Currencies/fx_consensus"
+        () => supabase.from("v_g8_consensus").select("*").order("rank_position", { ascending: true }),
+        "Currencies/g8_consensus"
       ),
-    ]).then(([s, b, c]) => {
+      queryWithRetry(
+        () => supabase.from("v_yield_pattern_intelligence").select("*").limit(1),
+        "Currencies/yield_pattern"
+      ),
+    ]).then(([s, r, b, g, y]) => {
       setSnap((s as any[])?.[0] || null);
+      setRanking((r as any[])?.[0] || null);
       setBiasHistory((b as any[]) || []);
-      setConsensus((c as any[]) || []);
+      setG8Consensus((g as any[]) || []);
+      setYieldData((y as any[])?.[0] || null);
       setLoaded(true);
     });
   }, [activeCurrency]);
 
-  // Derive bias: prefer snap.bias, fallback to latest entity_bias
-  const effectiveBias = snap?.bias || biasHistory[0]?.bias || null;
-  const latestEntityBias = biasHistory[0];
+  const effectiveBias = ranking?.bias || snap?.bias || biasHistory[0]?.bias || null;
+  const r = ranking; // alias
+  const ccy = activeCurrency.toLowerCase();
+
+  // Yield fields mapped per currency
+  const yieldInfo = yieldData ? {
+    y2: yieldData[`${ccy}_2y`],
+    y10: yieldData[`${ccy}_10y`],
+    spread: yieldData[`${ccy}_spread_vs_usd`] ?? yieldData[`diff_${ccy}_10y`],
+    pattern: yieldData[`${ccy}_yield_pattern`],
+    fxImpl: yieldData[`${ccy}_fx_implication`],
+    s2s10s: yieldData[`${ccy}_2s10s`],
+  } : {};
+
+  // Fallback for yields from snap
+  const y2 = yieldInfo.y2 ?? snap?.yield_2y;
+  const y10 = yieldInfo.y10 ?? snap?.yield_10y;
+  const spreadVsUsd = yieldInfo.spread ?? snap?.rate_diff_vs_usd;
+  const yieldPattern = yieldInfo.pattern ?? r?.currency_yield_regime ?? snap?.currency_yield_regime;
+  const fxImplication = yieldInfo.fxImpl;
+
+  const spreadColor = (v: any) => {
+    if (v == null || v === "—") return "#6B7280";
+    const n = typeof v === "number" ? v : parseFloat(v);
+    if (isNaN(n)) return "#6B7280";
+    return n > 0 ? "#16A34A" : n < 0 ? "#DC2626" : "#6B7280";
+  };
+
+  const fallbackEmpty = (v: any, fallback: string) => {
+    if (!v || v === "" || v === "null" || v === "undefined" || (typeof v === "string" && v.trim() === "")) return fallback;
+    return v;
+  };
 
   return (
     <DashboardLayout>
       {/* Currency tabs */}
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-7">
+      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-5">
         {CURRENCIES.map((c) => (
           <button key={c} onClick={() => navigate(`/currencies/${c}`)}
-            className={`px-4 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
+            className={`px-4 py-2.5 text-[11px] font-semibold border-b-2 transition-colors ${
               c === activeCurrency ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
             }`}>{c}</button>
         ))}
       </div>
 
-      {loaded && !snap ? (
+      {loaded && !snap && !ranking ? (
         <div className="text-center text-label text-[13px] mt-10">
           Nog geen snapshot beschikbaar voor {activeCurrency}
-          {latestEntityBias?.snap_date && (
-            <div className="text-[11px] text-neutral-text mt-1">Laatste entity bias: {fmtDate(latestEntityBias.snap_date)}</div>
-          )}
         </div>
-      ) : snap && (
+      ) : (snap || ranking) && (
         <>
-          {/* HERO */}
-          <DataCard className="p-5 mb-4">
-            <div className="grid grid-cols-3 items-center">
-              <BiasChip bias={effectiveBias} size="lg" />
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2">
-                  <DollarSign size={20} className="text-purple-accent" />
-                  <span className="text-[42px] font-black text-foreground tracking-tight">{activeCurrency}</span>
+          {/* 1. CURRENCY HEADER — improved */}
+          <DataCard className="px-4 py-3 mb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <DollarSign size={18} className="text-purple-accent" />
+                  <span className="text-[32px] font-black text-foreground tracking-tight">{activeCurrency}</span>
                 </div>
-                <div className="text-[10px] text-label">{fmtDate(snap.snapshot_date)}</div>
+                <BiasChip bias={effectiveBias} />
+                {r?.confidence && (
+                  <span className="bg-secondary text-label px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
+                    conviction: {r.confidence}
+                  </span>
+                )}
+                {r?.rank_position && (
+                  <span className="bg-purple-accent/10 text-purple-accent px-2 py-[2px] text-[9px] rounded font-mono font-bold">
+                    #{r.rank_position} / 8
+                  </span>
+                )}
               </div>
-              <div className="text-right">
-                <div className="text-[0.65rem] text-label uppercase tracking-[0.08em]">BETROUWBAARHEID</div>
-                <div className="mt-1"><ConfidenceChip confidence={snap.confidence} /></div>
+              <div className="text-[10px] text-label">{fmtDate(r?.snapshot_date || snap?.snapshot_date)}</div>
+            </div>
+            {(r?.main_driver || snap?.main_driver) && (
+              <div className="flex items-center gap-2 mt-2 border-t border-card-border pt-2">
+                <Shield size={11} className="text-purple-accent shrink-0" />
+                <span className="text-[11px] text-foreground font-semibold">Driver: {r?.main_driver || snap?.main_driver}</span>
               </div>
-            </div>
-            {/* Main driver + summary */}
-            <div className="border-t border-card-border mt-4 pt-4">
-              {snap.main_driver && (
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield size={12} className="text-purple-accent shrink-0" />
-                  <span className="text-[11px] text-foreground font-semibold">{snap.main_driver}</span>
-                </div>
-              )}
-              <div className="text-[11px] text-sub-text italic leading-relaxed">{textVal(snap.summary_short || snap.what_to_watch_next)}</div>
-            </div>
+            )}
+            {snap?.summary_short && (
+              <div className="text-[11px] text-sub-text italic leading-relaxed mt-1.5 max-w-[720px]">{snap.summary_short}</div>
+            )}
           </DataCard>
 
-          {/* MACRO FUNDAMENTALS */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <DataCard className="p-5">
-              <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-3">GROEI</div>
-              <div className="grid grid-cols-2 gap-4">
-                <LabelValue label="Nu" value={snap.growth_now} />
-                <LabelValue label="Verwachting" value={snap.growth_expectation} />
-              </div>
-            </DataCard>
-            <DataCard className="p-5">
-              <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-3">INFLATIE</div>
-              <div className="grid grid-cols-2 gap-4">
-                <LabelValue label="Nu" value={snap.inflation_now} />
-                <LabelValue label="Verwachting" value={snap.inflation_expectation} />
-              </div>
-            </DataCard>
-          </div>
-
-          {/* CENTRALE BANK */}
-          <DataCard className="p-5 mb-4">
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-3">CENTRALE BANK</div>
-            <div className="grid grid-cols-3 gap-4">
-              <LabelValue label="STANCE" value={snap.cb_stance} />
-              <LabelValue label="RICHTING" value={snap.cb_direction} />
-              <LabelValue label="QE/QT" value={snap.cb_qe_qt} />
-            </div>
-          </DataCard>
-
-          {/* YIELDS */}
-          <DataCard className="p-5 mb-4">
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-3">YIELDS</div>
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <div className="text-[0.65rem] text-label uppercase">2J RENTE</div>
-                <div className="text-[16px] font-bold text-foreground font-mono mt-1">{val(snap.yield_2y, "%")}</div>
-              </div>
-              <div>
-                <div className="text-[0.65rem] text-label uppercase">10J RENTE</div>
-                <div className="text-[16px] font-bold text-foreground font-mono mt-1">{val(snap.yield_10y, "%")}</div>
-              </div>
-              <div>
-                <div className="text-[0.65rem] text-label uppercase">SPREAD VS USD</div>
-                <div className="text-[16px] font-bold text-foreground font-mono mt-1">{activeCurrency === "USD" ? "—" : val(snap.rate_diff_vs_usd, "%")}</div>
-              </div>
-              <div>
-                <div className="text-[0.65rem] text-label uppercase">CURVE REGIME</div>
-                <div className="text-[16px] font-bold text-foreground font-mono mt-1">{val(snap.currency_yield_regime)}</div>
-              </div>
-            </div>
-          </DataCard>
-
-          {/* SENSITIVITY */}
-          <DataCard className="p-5 mb-4">
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-3">SENSITIVITY</div>
-            <div className="grid grid-cols-5 gap-4">
-              {[
-                ["VIX", snap.vix_sensitivity],
-                ["OLIE", snap.oil_sensitivity],
-                ["GOUD", snap.gold_sensitivity],
-                ["AANDELEN", snap.equity_sensitivity],
-                ["COMMODITIES", snap.commodity_sensitivity],
-              ].map(([label, value]) => (
-                <div key={label as string}>
-                  <div className="text-[0.65rem] text-label uppercase">{label}</div>
-                  <div className="text-[11px] text-foreground mt-1">{val(value)}</div>
-                </div>
-              ))}
-            </div>
-          </DataCard>
-
-          {/* TIMEFRAME BIAS */}
-          <SectionLabel>TIMEFRAME BIAS</SectionLabel>
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          {/* 2. MACRO PILLARS — score-based */}
+          <SectionLabel>MACRO PILLARS</SectionLabel>
+          <div className="grid grid-cols-4 gap-3 mb-3">
             {[
-              ["KORTE TERMIJN", snap.short_term_bias],
-              ["MIDDELLANG", snap.medium_term_bias],
-              ["HOGE TF", snap.higher_tf_bias],
-            ].map(([label, value]) => (
-              <DataCard key={label as string} className="p-5 text-center">
-                <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2">{label}</div>
-                <BiasChip bias={value as string} />
+              { label: "GROEI", score: r?.score_growth, direction: snap?.growth_now || snap?.growth_expectation, narrative: snap?.growth_now ? `Nu: ${snap.growth_now}` : null },
+              { label: "INFLATIE", score: r?.score_inflation, direction: snap?.inflation_now || snap?.inflation_expectation, narrative: snap?.inflation_now ? `Nu: ${snap.inflation_now}` : null },
+              { label: "CENTRALE BANK", score: r?.score_cb, direction: r?.cb_stance || snap?.cb_stance, narrative: r?.cb_direction || snap?.cb_direction ? `Richting: ${r?.cb_direction || snap?.cb_direction}` : null },
+              { label: "LIQUIDITEIT", score: r?.score_liquidity, direction: snap?.liquidity_conditions || snap?.liquidity_impact, narrative: null },
+            ].map(({ label, score, direction, narrative }) => (
+              <DataCard key={label} className="px-3 py-3">
+                <ScoreBar score={score} label={label} />
+                {direction && <div className="text-[10px] text-sub-text mt-1.5 truncate">{val(direction)}</div>}
+                {narrative && <div className="text-[9px] text-label mt-0.5">{narrative}</div>}
               </DataCard>
             ))}
           </div>
 
-          {/* MONITORING */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <DataCard className="p-5 border-l-[3px] border-l-purple-accent">
-              <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2">TE MONITOREN</div>
-              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(snap.what_to_watch_next)}</div>
+          {/* Macro fundamentals text */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <DataCard className="px-3 py-3">
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">GROEI</div>
+              <div className="grid grid-cols-2 gap-3">
+                <LabelValue label="Nu" value={snap?.growth_now} />
+                <LabelValue label="Verwachting" value={snap?.growth_expectation} />
+              </div>
             </DataCard>
-            <DataCard className="p-5 border-l-[3px] border-l-bearish-text">
-              <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2">INVALIDATIE</div>
-              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(snap.invalidation_risk)}</div>
+            <DataCard className="px-3 py-3">
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">INFLATIE</div>
+              <div className="grid grid-cols-2 gap-3">
+                <LabelValue label="Nu" value={snap?.inflation_now} />
+                <LabelValue label="Verwachting" value={snap?.inflation_expectation} />
+              </div>
             </DataCard>
-            <DataCard className="p-5 border-l-[3px] border-l-bullish-text">
-              <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2">VANDAAG</div>
-              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(snap.important_for_today)}</div>
+          </div>
+
+          {/* 3. CENTRALE BANK — improved */}
+          <DataCard className="px-3 py-3 mb-3">
+            <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">CENTRALE BANK</div>
+            <div className="grid grid-cols-5 gap-3">
+              <div>
+                <div className="text-[8px] text-label uppercase">STANCE</div>
+                <div className="text-[12px] font-bold text-foreground mt-0.5">{val(r?.cb_stance || snap?.cb_stance)}</div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">RICHTING</div>
+                <div className="text-[12px] font-bold text-foreground mt-0.5">{val(r?.cb_direction || snap?.cb_direction)}</div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">QE/QT</div>
+                <div className="text-[12px] font-bold text-foreground mt-0.5">{val(snap?.cb_qe_qt)}</div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">SPREAD VS USD</div>
+                <div className="text-[12px] font-bold font-mono mt-0.5" style={{ color: spreadColor(r?.rate_diff_vs_usd ?? snap?.rate_diff_vs_usd) }}>
+                  {activeCurrency === "USD" ? "—" : val(r?.rate_diff_vs_usd ?? snap?.rate_diff_vs_usd, "%")}
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">CARRY BIAS</div>
+                <div className="mt-0.5"><BiasChip bias={r?.carry_bias || snap?.carry_bias} /></div>
+              </div>
+            </div>
+          </DataCard>
+
+          {/* 4. YIELDS — improved with pattern intelligence */}
+          <DataCard className="px-3 py-3 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[8px] text-label uppercase tracking-wider font-medium">YIELDS</span>
+              {yieldPattern && (
+                <span className="bg-purple-accent/10 text-purple-accent px-2 py-[1px] text-[8px] rounded font-mono font-bold uppercase">
+                  {yieldPattern}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <div className="text-[8px] text-label uppercase">2J RENTE</div>
+                <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(y2, "%")}</div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">10J RENTE</div>
+                <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(y10, "%")}</div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">SPREAD VS USD</div>
+                <div className="text-[16px] font-bold font-mono mt-0.5" style={{ color: spreadColor(spreadVsUsd) }}>
+                  {activeCurrency === "USD" ? "—" : spreadVsUsd != null ? `${Number(spreadVsUsd) > 0 ? "+" : ""}${spreadVsUsd}%` : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] text-label uppercase">2S10S</div>
+                <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(yieldInfo.s2s10s)}</div>
+              </div>
+            </div>
+            {fxImplication && (
+              <div className="text-[11px] text-sub-text italic mt-2 border-t border-card-border pt-2 leading-relaxed">
+                {fxImplication}
+              </div>
+            )}
+          </DataCard>
+
+          {/* 5. TIMEFRAME BIAS — improved with drivers */}
+          <SectionLabel>TIMEFRAME BIAS</SectionLabel>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            {[
+              { label: "KORTE TERMIJN", value: r?.short_term_bias || snap?.short_term_bias },
+              { label: "MIDDELLANG", value: r?.medium_term_bias || snap?.medium_term_bias },
+              { label: "HOGE TF", value: r?.higher_tf_bias || snap?.higher_tf_bias },
+            ].map(({ label, value }) => {
+              const biasVal = (value || "neutral").toLowerCase();
+              const driver = r?.main_driver || snap?.main_driver;
+              return (
+                <DataCard key={label} className="px-3 py-3 text-center">
+                  <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">{label}</div>
+                  <BiasChip bias={value as string} />
+                  {driver && <div className="text-[9px] text-label mt-1.5 truncate">— {driver}</div>}
+                </DataCard>
+              );
+            })}
+          </div>
+
+          {/* 6. SENSITIVITY — badge-style */}
+          <SectionLabel>SENSITIVITY</SectionLabel>
+          <div className="flex flex-wrap gap-2 mb-3">
+            <SensitivityPill type="vix" value={snap?.vix_sensitivity} />
+            <SensitivityPill type="oil" value={snap?.oil_sensitivity} />
+            <SensitivityPill type="gold" value={snap?.gold_sensitivity} />
+            <SensitivityPill type="equity" value={snap?.equity_sensitivity} />
+            <SensitivityPill type="commodity" value={snap?.commodity_sensitivity} />
+          </div>
+
+          {/* 8. MONITORING CARDS — improved with fallbacks */}
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <DataCard className="px-3 py-3 border-l-[3px] border-l-purple-accent">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Eye size={11} className="text-purple-accent" />
+                <span className="text-[8px] text-label uppercase tracking-wider font-medium">TE MONITOREN</span>
+              </div>
+              <div className="text-[11px] text-sub-text leading-relaxed">
+                {fallbackEmpty(r?.what_to_watch_next || snap?.what_to_watch_next, "Volg yield differential en CB communicatie")}
+              </div>
+            </DataCard>
+            <DataCard className="px-3 py-3 border-l-[3px] border-l-bearish-text">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <AlertTriangle size={11} className="text-bearish-text" />
+                <span className="text-[8px] text-label uppercase tracking-wider font-medium">INVALIDATIE</span>
+              </div>
+              <div className="text-[11px] text-sub-text leading-relaxed">
+                {fallbackEmpty(r?.invalidation_risk || snap?.invalidation_risk, "Geen specifiek invalidatieniveau — volg yield differential en CB communicatie")}
+              </div>
+            </DataCard>
+            <DataCard className="px-3 py-3 border-l-[3px] border-l-bullish-text">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Zap size={11} className="text-bullish-text" />
+                <span className="text-[8px] text-label uppercase tracking-wider font-medium">VANDAAG</span>
+              </div>
+              <div className="text-[11px] text-sub-text leading-relaxed">
+                {fallbackEmpty(r?.important_for_today || snap?.important_for_today, "Geen specifiek dagelijks signaal — volg macro kalender")}
+              </div>
             </DataCard>
           </div>
 
@@ -198,25 +350,25 @@ export default function Currencies() {
           {biasHistory.length > 0 && (
             <>
               <SectionLabel>RECENTE BIAS SIGNALEN</SectionLabel>
-              <DataCard className="overflow-hidden mb-8">
+              <DataCard className="overflow-hidden mb-3">
                 <table className="w-full">
                   <thead className="bg-secondary">
                     <tr>
-                      <th className="text-[9px] text-label uppercase text-left px-5 py-2">Datum</th>
-                      <th className="text-[9px] text-label uppercase text-left px-5 py-2">Bias</th>
-                      <th className="text-[9px] text-label uppercase text-left px-5 py-2">Strength</th>
-                      <th className="text-[9px] text-label uppercase text-left px-5 py-2">Conv.</th>
-                      <th className="text-[9px] text-label uppercase text-left px-5 py-2">Driver</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Datum</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Strength</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conv.</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Driver</th>
                     </tr>
                   </thead>
                   <tbody>
                     {biasHistory.map((b, i) => (
                       <tr key={i} className="border-b border-card-border hover:bg-secondary">
-                        <td className="text-[11px] text-sub-text px-5 py-2.5">{fmtDate(b.snap_date)}</td>
-                        <td className="px-5 py-2.5"><BiasChip bias={b.bias} /></td>
-                        <td className="text-[11px] text-sub-text px-5 py-2.5">{val(b.bias_strength)}</td>
-                        <td className="text-[11px] text-sub-text px-5 py-2.5">{val(b.confidence)}</td>
-                        <td className="text-[11px] text-sub-text px-5 py-2.5 max-w-[200px] truncate">{val(b.main_driver)}</td>
+                        <td className="text-[10px] text-sub-text px-4 py-2">{fmtDate(b.snap_date)}</td>
+                        <td className="px-4 py-2"><BiasChip bias={b.bias} /></td>
+                        <td className="text-[10px] text-sub-text px-4 py-2">{val(b.bias_strength)}</td>
+                        <td className="text-[10px] text-sub-text px-4 py-2">{val(b.confidence)}</td>
+                        <td className="text-[10px] text-sub-text px-4 py-2 max-w-[200px]">{val(b.main_driver)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -226,48 +378,49 @@ export default function Currencies() {
           )}
 
           {/* ANALYSE */}
-          <div className="bg-secondary border border-card-border rounded-lg p-5 mb-8">
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-3">ANALYSE</div>
-            <MarkdownBlock content={snap.summary_detailed || snap.summary_short} />
-          </div>
+          {(snap?.summary_detailed || snap?.summary_short) && (
+            <div className="bg-secondary border border-card-border rounded-lg px-4 py-3 mb-3">
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">ANALYSE</div>
+              <div className="max-w-[720px] text-[14px] text-sub-text leading-[1.7]">
+                <MarkdownBlock content={snap.summary_detailed || snap.summary_short} />
+              </div>
+            </div>
+          )}
 
-          {/* G8 CONSENSUS */}
+          {/* 7. G8 CONSENSUS — improved */}
           <SectionLabel>G8 CONSENSUS</SectionLabel>
           <DataCard className="overflow-hidden">
             <table className="w-full">
               <thead className="bg-secondary">
                 <tr>
-                  <th className="text-[9px] text-label uppercase text-left px-5 py-2">Code</th>
-                  <th className="text-[9px] text-label uppercase text-left px-5 py-2">Bias</th>
-                  <th className="text-[9px] text-label uppercase text-left px-5 py-2">Conviction</th>
-                  <th className="text-[9px] text-label uppercase text-left px-5 py-2">Bullish</th>
-                  <th className="text-[9px] text-label uppercase text-left px-5 py-2">Bearish</th>
-                  <th className="text-[9px] text-label uppercase text-left px-5 py-2">Totaal</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Code</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bullish</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bearish</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Totaal</th>
                 </tr>
               </thead>
               <tbody>
-                {consensus.map((c) => {
-                  const isActive = c.entity_code === activeCurrency;
-                  const top3 = consensus.slice(0, 3).map(x => x.entity_code);
-                  const isTop3 = top3.includes(c.entity_code);
+                {g8Consensus.map((c, i) => {
+                  const isActive = c.currency_code === activeCurrency;
                   return (
-                    <tr key={c.entity_code}
+                    <tr key={c.currency_code || i}
                       className={`border-b border-card-border cursor-pointer hover:bg-secondary transition-colors ${
                         isActive ? "bg-secondary border-l-[3px] border-l-purple-accent" : ""
                       }`}
-                      onClick={() => navigate(`/currencies/${c.entity_code}`)}
+                      onClick={() => navigate(`/currencies/${c.currency_code}`)}
                     >
-                      <td className="text-[11px] font-bold px-5 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          {isTop3 && <Star size={10} className="text-mixed-text fill-mixed-text" />}
-                          <span className="text-purple-accent">{c.entity_code}</span>
-                        </div>
+                      <td className="text-[10px] font-mono text-label px-4 py-2">{c.rank_position || i + 1}</td>
+                      <td className="text-[10px] font-bold px-4 py-2">
+                        <span className="text-purple-accent">{c.currency_code}</span>
                       </td>
-                      <td className="px-5 py-2.5"><BiasChip bias={c.consensus_bias} /></td>
-                      <td className="text-[11px] text-sub-text px-5 py-2.5">{val(c.conviction_pct, "%")}</td>
-                      <td className="text-[11px] text-sub-text px-5 py-2.5">{c.bullish_count ?? 0}</td>
-                      <td className="text-[11px] text-sub-text px-5 py-2.5">{c.bearish_count ?? 0}</td>
-                      <td className="text-[11px] text-sub-text px-5 py-2.5">{c.total_count ?? 0}</td>
+                      <td className="px-4 py-2"><BiasChip bias={c.consensus_bias} /></td>
+                      <td className="px-4 py-2"><ConvictionBar pct={c.conviction_pct} /></td>
+                      <td className="text-[10px] text-bullish-text font-mono px-4 py-2">{c.bullish_count ?? 0}</td>
+                      <td className="text-[10px] text-bearish-text font-mono px-4 py-2">{c.bearish_count ?? 0}</td>
+                      <td className="text-[10px] text-sub-text font-mono px-4 py-2">{c.total_reports ?? 0}</td>
                     </tr>
                   );
                 })}
