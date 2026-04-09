@@ -300,24 +300,75 @@ export default function Overview() {
         </>
       )}
 
-      {/* 5. FX RANKING */}
-      <SectionLabel>FX RANKING</SectionLabel>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {fxRanking.map((fx) => {
-          const biasColor = getBiasColor(fx.bias);
-          const biasBg = getBiasBackground(fx.bias);
-          return (
-            <div key={fx.currency_code} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-card-border" style={{ backgroundColor: biasBg }}>
-              <span className="text-[10px] font-mono text-label font-bold">{fx.rank_position}</span>
-              <span className="text-[11px] font-bold" style={{ color: biasColor }}>{fx.currency_code}</span>
-              <span className="text-[9px] uppercase font-semibold" style={{ color: biasColor }}>{(fx.bias || "neutral").toLowerCase()}</span>
-              {fx.confidence && (
-                <span className="text-[7px] text-label uppercase bg-secondary px-1 py-[0px] rounded">{fx.confidence}</span>
-              )}
+      {/* 5. CURRENCY RANKING (parsed from cockpit) */}
+      <SectionLabel>CURRENCY RANKING</SectionLabel>
+      <DataCard className="overflow-hidden mb-3">
+        <table className="w-full">
+          <thead className="bg-secondary">
+            <tr>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
+              const biasColor = fx.bias === "bullish" ? "bg-bullish-bg text-bullish-text" : fx.bias === "bearish" ? "bg-bearish-bg text-bearish-text" : "bg-neutral-bg text-neutral-text";
+              return (
+                <tr key={fx.rank} className="border-b border-card-border last:border-0">
+                  <td className="text-[11px] font-mono font-bold text-label px-4 py-2">{fx.rank}</td>
+                  <td className="text-[12px] font-bold text-foreground px-4 py-2">{fx.code}</td>
+                  <td className="px-4 py-2"><span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasColor}`}>{fx.bias}</span></td>
+                  <td className="text-[10px] text-sub-text px-4 py-2 uppercase">{fx.conviction}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </DataCard>
+
+      {/* HIGH CONVICTION TRADES */}
+      {parseHighConviction(a?.high_conviction_assets).length > 0 && (
+        <>
+          <SectionLabel>HIGH CONVICTION TRADES</SectionLabel>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {parseHighConviction(a?.high_conviction_assets).map((idea, i) => {
+              const isLong = idea.toLowerCase().startsWith("long");
+              const isShort = idea.toLowerCase().startsWith("short");
+              const borderColor = isLong ? "border-l-bullish-text" : isShort ? "border-l-bearish-text" : "border-l-label";
+              const icon = isLong ? <TrendingUp size={13} className="text-bullish-text" /> : isShort ? <TrendingDown size={13} className="text-bearish-text" /> : <Minus size={13} className="text-label" />;
+              const parts = idea.split("—").map(s => s.trim());
+              return (
+                <DataCard key={i} className={`px-4 py-3 border-l-[3px] ${borderColor}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {icon}
+                    <span className="text-[12px] font-bold text-foreground">{parts[0]}</span>
+                  </div>
+                  {parts[1] && <div className="text-[10px] text-sub-text leading-relaxed">{parts[1]}</div>}
+                </DataCard>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* SUMMARY DASHBOARD */}
+      {parseSummaryDashboard(a?.summary_dashboard).length > 0 && (
+        <>
+          <SectionLabel>DAILY SUMMARY</SectionLabel>
+          <DataCard className="px-4 py-3 mb-3">
+            <div className="space-y-3">
+              {parseSummaryDashboard(a?.summary_dashboard).map((section, i) => (
+                <div key={i}>
+                  {section.header && <div className="text-[9px] text-label uppercase tracking-wider font-bold mb-0.5">{section.header}</div>}
+                  <div className="text-[11px] text-sub-text leading-relaxed">{section.body}</div>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          </DataCard>
+        </>
+      )}
 
       {/* TABLES */}
       <div className="grid grid-cols-2 gap-3">
