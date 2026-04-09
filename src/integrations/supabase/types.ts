@@ -264,6 +264,144 @@ export type Database = {
           },
         ]
       }
+      asset_master: {
+        Row: {
+          asset_class: string
+          asset_code: string
+          asset_group: string
+          carry_role: string | null
+          color_bearish: string | null
+          color_bullish: string | null
+          color_hex: string | null
+          commodity_driven: boolean | null
+          correlated_with: string[] | null
+          country: string | null
+          created_at: string | null
+          currency_code: string | null
+          description_en: string | null
+          description_nl: string | null
+          display_order: number | null
+          dollar_sensitivity: string | null
+          icon: string | null
+          id: number
+          inflation_sensitivity: string | null
+          inverse_of: string[] | null
+          is_active: boolean | null
+          label_en: string
+          label_nl: string
+          rate_sensitive: boolean | null
+          region: string | null
+          risk_sensitivity: string | null
+          safe_haven: boolean | null
+          subcategory: string
+          ticker_common: string | null
+          ticker_eodhd: string | null
+        }
+        Insert: {
+          asset_class: string
+          asset_code: string
+          asset_group: string
+          carry_role?: string | null
+          color_bearish?: string | null
+          color_bullish?: string | null
+          color_hex?: string | null
+          commodity_driven?: boolean | null
+          correlated_with?: string[] | null
+          country?: string | null
+          created_at?: string | null
+          currency_code?: string | null
+          description_en?: string | null
+          description_nl?: string | null
+          display_order?: number | null
+          dollar_sensitivity?: string | null
+          icon?: string | null
+          id?: number
+          inflation_sensitivity?: string | null
+          inverse_of?: string[] | null
+          is_active?: boolean | null
+          label_en: string
+          label_nl: string
+          rate_sensitive?: boolean | null
+          region?: string | null
+          risk_sensitivity?: string | null
+          safe_haven?: boolean | null
+          subcategory: string
+          ticker_common?: string | null
+          ticker_eodhd?: string | null
+        }
+        Update: {
+          asset_class?: string
+          asset_code?: string
+          asset_group?: string
+          carry_role?: string | null
+          color_bearish?: string | null
+          color_bullish?: string | null
+          color_hex?: string | null
+          commodity_driven?: boolean | null
+          correlated_with?: string[] | null
+          country?: string | null
+          created_at?: string | null
+          currency_code?: string | null
+          description_en?: string | null
+          description_nl?: string | null
+          display_order?: number | null
+          dollar_sensitivity?: string | null
+          icon?: string | null
+          id?: number
+          inflation_sensitivity?: string | null
+          inverse_of?: string[] | null
+          is_active?: boolean | null
+          label_en?: string
+          label_nl?: string
+          rate_sensitive?: boolean | null
+          region?: string | null
+          risk_sensitivity?: string | null
+          safe_haven?: boolean | null
+          subcategory?: string
+          ticker_common?: string | null
+          ticker_eodhd?: string | null
+        }
+        Relationships: []
+      }
+      category_taxonomy: {
+        Row: {
+          category: string
+          color_hex: string | null
+          description: string | null
+          display_label: string
+          display_label_nl: string | null
+          icon: string | null
+          id: number
+          sort_order: number | null
+          subcategory: string
+          table_name: string
+        }
+        Insert: {
+          category: string
+          color_hex?: string | null
+          description?: string | null
+          display_label: string
+          display_label_nl?: string | null
+          icon?: string | null
+          id?: number
+          sort_order?: number | null
+          subcategory: string
+          table_name: string
+        }
+        Update: {
+          category?: string
+          color_hex?: string | null
+          description?: string | null
+          display_label?: string
+          display_label_nl?: string | null
+          icon?: string | null
+          id?: number
+          sort_order?: number | null
+          subcategory?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       currency_macro_snapshots: {
         Row: {
           bias: string | null
@@ -473,6 +611,7 @@ export type Database = {
       }
       entity_bias: {
         Row: {
+          asset_group: string | null
           bias: string
           bias_strength: string | null
           carry_bias: string | null
@@ -488,10 +627,13 @@ export type Database = {
           main_driver: string | null
           note: string | null
           rate_diff: string | null
+          region: string | null
           snap_date: string
+          subcategory: string | null
           yield_support: string | null
         }
         Insert: {
+          asset_group?: string | null
           bias: string
           bias_strength?: string | null
           carry_bias?: string | null
@@ -507,10 +649,13 @@ export type Database = {
           main_driver?: string | null
           note?: string | null
           rate_diff?: string | null
+          region?: string | null
           snap_date: string
+          subcategory?: string | null
           yield_support?: string | null
         }
         Update: {
+          asset_group?: string | null
           bias?: string
           bias_strength?: string | null
           carry_bias?: string | null
@@ -526,8 +671,97 @@ export type Database = {
           main_driver?: string | null
           note?: string | null
           rate_diff?: string | null
+          region?: string | null
           snap_date?: string
+          subcategory?: string | null
           yield_support?: string | null
+        }
+        Relationships: []
+      }
+      event_release_history: {
+        Row: {
+          actual_value: number | null
+          analyst_note: string | null
+          country: string
+          created_at: string | null
+          currency: string
+          data_source: string | null
+          event_category: string
+          event_name: string
+          expected_value: number | null
+          id: number
+          previous_value: number | null
+          reaction_audusd: number | null
+          reaction_dxy: number | null
+          reaction_eurusd: number | null
+          reaction_gbpusd: number | null
+          reaction_gold: number | null
+          reaction_oil: number | null
+          reaction_spx: number | null
+          reaction_us10y: number | null
+          reaction_us2y: number | null
+          reaction_usdcad: number | null
+          reaction_usdjpy: number | null
+          release_date: string
+          surprise_direction: string | null
+          surprise_size: number | null
+          unit: string | null
+        }
+        Insert: {
+          actual_value?: number | null
+          analyst_note?: string | null
+          country: string
+          created_at?: string | null
+          currency: string
+          data_source?: string | null
+          event_category: string
+          event_name: string
+          expected_value?: number | null
+          id?: number
+          previous_value?: number | null
+          reaction_audusd?: number | null
+          reaction_dxy?: number | null
+          reaction_eurusd?: number | null
+          reaction_gbpusd?: number | null
+          reaction_gold?: number | null
+          reaction_oil?: number | null
+          reaction_spx?: number | null
+          reaction_us10y?: number | null
+          reaction_us2y?: number | null
+          reaction_usdcad?: number | null
+          reaction_usdjpy?: number | null
+          release_date: string
+          surprise_direction?: string | null
+          surprise_size?: number | null
+          unit?: string | null
+        }
+        Update: {
+          actual_value?: number | null
+          analyst_note?: string | null
+          country?: string
+          created_at?: string | null
+          currency?: string
+          data_source?: string | null
+          event_category?: string
+          event_name?: string
+          expected_value?: number | null
+          id?: number
+          previous_value?: number | null
+          reaction_audusd?: number | null
+          reaction_dxy?: number | null
+          reaction_eurusd?: number | null
+          reaction_gbpusd?: number | null
+          reaction_gold?: number | null
+          reaction_oil?: number | null
+          reaction_spx?: number | null
+          reaction_us10y?: number | null
+          reaction_us2y?: number | null
+          reaction_usdcad?: number | null
+          reaction_usdjpy?: number | null
+          release_date?: string
+          surprise_direction?: string | null
+          surprise_size?: number | null
+          unit?: string | null
         }
         Relationships: []
       }
@@ -675,6 +909,366 @@ export type Database = {
         }
         Relationships: []
       }
+      macro_economic_releases: {
+        Row: {
+          actual_num: number | null
+          actual_raw: string | null
+          category: string | null
+          country: string | null
+          created_at: string | null
+          currency: string | null
+          dedupe_hash: string | null
+          event_date: string | null
+          event_datetime_utc: string | null
+          event_impact: string | null
+          event_name: string
+          event_status: string | null
+          event_time_raw: string | null
+          event_type: string | null
+          event_url: string | null
+          forecast_num: number | null
+          forecast_raw: string | null
+          id: number
+          importance: string | null
+          importance_score: number | null
+          indicator_code: string | null
+          notes: string | null
+          previous_num: number | null
+          previous_raw: string | null
+          raw_payload: Json | null
+          reference_period: string | null
+          region: string | null
+          revised_num: number | null
+          revised_raw: string | null
+          source_event_id: string | null
+          source_name: string | null
+          source_provider: string
+          source_url: string | null
+          subcategory: string | null
+          surprise_direction: string | null
+          surprise_magnitude: string | null
+          surprise_score: number | null
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_num?: number | null
+          actual_raw?: string | null
+          category?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          dedupe_hash?: string | null
+          event_date?: string | null
+          event_datetime_utc?: string | null
+          event_impact?: string | null
+          event_name: string
+          event_status?: string | null
+          event_time_raw?: string | null
+          event_type?: string | null
+          event_url?: string | null
+          forecast_num?: number | null
+          forecast_raw?: string | null
+          id?: number
+          importance?: string | null
+          importance_score?: number | null
+          indicator_code?: string | null
+          notes?: string | null
+          previous_num?: number | null
+          previous_raw?: string | null
+          raw_payload?: Json | null
+          reference_period?: string | null
+          region?: string | null
+          revised_num?: number | null
+          revised_raw?: string | null
+          source_event_id?: string | null
+          source_name?: string | null
+          source_provider?: string
+          source_url?: string | null
+          subcategory?: string | null
+          surprise_direction?: string | null
+          surprise_magnitude?: string | null
+          surprise_score?: number | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_num?: number | null
+          actual_raw?: string | null
+          category?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          dedupe_hash?: string | null
+          event_date?: string | null
+          event_datetime_utc?: string | null
+          event_impact?: string | null
+          event_name?: string
+          event_status?: string | null
+          event_time_raw?: string | null
+          event_type?: string | null
+          event_url?: string | null
+          forecast_num?: number | null
+          forecast_raw?: string | null
+          id?: number
+          importance?: string | null
+          importance_score?: number | null
+          indicator_code?: string | null
+          notes?: string | null
+          previous_num?: number | null
+          previous_raw?: string | null
+          raw_payload?: Json | null
+          reference_period?: string | null
+          region?: string | null
+          revised_num?: number | null
+          revised_raw?: string | null
+          source_event_id?: string | null
+          source_name?: string | null
+          source_provider?: string
+          source_url?: string | null
+          subcategory?: string | null
+          surprise_direction?: string | null
+          surprise_magnitude?: string | null
+          surprise_score?: number | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      macro_event_reactions: {
+        Row: {
+          actual_value: string | null
+          analyst_note: string | null
+          created_at: string | null
+          data_source: string | null
+          dominant_reaction: string | null
+          dxy_d0: number | null
+          dxy_d1_chg: number | null
+          dxy_d21_chg: number | null
+          dxy_d3_chg: number | null
+          dxy_d5_chg: number | null
+          equity_reaction_summary: string | null
+          event_category: string
+          event_country: string
+          event_date: string
+          event_name: string
+          event_region: string | null
+          event_subcategory: string | null
+          expected_value: string | null
+          fx_reaction_summary: string | null
+          gold_d0: number | null
+          gold_d1_chg: number | null
+          gold_d21_chg: number | null
+          gold_d3_chg: number | null
+          gold_d5_chg: number | null
+          id: number
+          indicator_type: string | null
+          macro_regime: string | null
+          market_surprise: string | null
+          oil_d0: number | null
+          oil_d1_chg: number | null
+          oil_d21_chg: number | null
+          oil_d3_chg: number | null
+          oil_d5_chg: number | null
+          previous_value: string | null
+          rates_reaction_summary: string | null
+          report_analysis_id: number | null
+          risk_sentiment: string | null
+          spx_d0: number | null
+          spx_d1_chg: number | null
+          spx_d21_chg: number | null
+          spx_d3_chg: number | null
+          spx_d5_chg: number | null
+          surprise_direction: string | null
+          surprise_magnitude: string | null
+          us10y_d0: number | null
+          us10y_d1_chg: number | null
+          us10y_d21_chg: number | null
+          us10y_d3_chg: number | null
+          us10y_d5_chg: number | null
+          us2y_d0: number | null
+          us2y_d1_chg: number | null
+          us2y_d21_chg: number | null
+          us2y_d3_chg: number | null
+          us2y_d5_chg: number | null
+          usdeur_d0: number | null
+          usdeur_d1_chg: number | null
+          usdeur_d21_chg: number | null
+          usdeur_d3_chg: number | null
+          usdeur_d5_chg: number | null
+          usdjpy_d0: number | null
+          usdjpy_d1_chg: number | null
+          usdjpy_d21_chg: number | null
+          usdjpy_d3_chg: number | null
+          usdjpy_d5_chg: number | null
+          vix_d0: number | null
+          vix_d1_chg: number | null
+          vix_d21_chg: number | null
+          vix_d3_chg: number | null
+          vix_d5_chg: number | null
+          was_priced_in: boolean | null
+        }
+        Insert: {
+          actual_value?: string | null
+          analyst_note?: string | null
+          created_at?: string | null
+          data_source?: string | null
+          dominant_reaction?: string | null
+          dxy_d0?: number | null
+          dxy_d1_chg?: number | null
+          dxy_d21_chg?: number | null
+          dxy_d3_chg?: number | null
+          dxy_d5_chg?: number | null
+          equity_reaction_summary?: string | null
+          event_category: string
+          event_country: string
+          event_date: string
+          event_name: string
+          event_region?: string | null
+          event_subcategory?: string | null
+          expected_value?: string | null
+          fx_reaction_summary?: string | null
+          gold_d0?: number | null
+          gold_d1_chg?: number | null
+          gold_d21_chg?: number | null
+          gold_d3_chg?: number | null
+          gold_d5_chg?: number | null
+          id?: number
+          indicator_type?: string | null
+          macro_regime?: string | null
+          market_surprise?: string | null
+          oil_d0?: number | null
+          oil_d1_chg?: number | null
+          oil_d21_chg?: number | null
+          oil_d3_chg?: number | null
+          oil_d5_chg?: number | null
+          previous_value?: string | null
+          rates_reaction_summary?: string | null
+          report_analysis_id?: number | null
+          risk_sentiment?: string | null
+          spx_d0?: number | null
+          spx_d1_chg?: number | null
+          spx_d21_chg?: number | null
+          spx_d3_chg?: number | null
+          spx_d5_chg?: number | null
+          surprise_direction?: string | null
+          surprise_magnitude?: string | null
+          us10y_d0?: number | null
+          us10y_d1_chg?: number | null
+          us10y_d21_chg?: number | null
+          us10y_d3_chg?: number | null
+          us10y_d5_chg?: number | null
+          us2y_d0?: number | null
+          us2y_d1_chg?: number | null
+          us2y_d21_chg?: number | null
+          us2y_d3_chg?: number | null
+          us2y_d5_chg?: number | null
+          usdeur_d0?: number | null
+          usdeur_d1_chg?: number | null
+          usdeur_d21_chg?: number | null
+          usdeur_d3_chg?: number | null
+          usdeur_d5_chg?: number | null
+          usdjpy_d0?: number | null
+          usdjpy_d1_chg?: number | null
+          usdjpy_d21_chg?: number | null
+          usdjpy_d3_chg?: number | null
+          usdjpy_d5_chg?: number | null
+          vix_d0?: number | null
+          vix_d1_chg?: number | null
+          vix_d21_chg?: number | null
+          vix_d3_chg?: number | null
+          vix_d5_chg?: number | null
+          was_priced_in?: boolean | null
+        }
+        Update: {
+          actual_value?: string | null
+          analyst_note?: string | null
+          created_at?: string | null
+          data_source?: string | null
+          dominant_reaction?: string | null
+          dxy_d0?: number | null
+          dxy_d1_chg?: number | null
+          dxy_d21_chg?: number | null
+          dxy_d3_chg?: number | null
+          dxy_d5_chg?: number | null
+          equity_reaction_summary?: string | null
+          event_category?: string
+          event_country?: string
+          event_date?: string
+          event_name?: string
+          event_region?: string | null
+          event_subcategory?: string | null
+          expected_value?: string | null
+          fx_reaction_summary?: string | null
+          gold_d0?: number | null
+          gold_d1_chg?: number | null
+          gold_d21_chg?: number | null
+          gold_d3_chg?: number | null
+          gold_d5_chg?: number | null
+          id?: number
+          indicator_type?: string | null
+          macro_regime?: string | null
+          market_surprise?: string | null
+          oil_d0?: number | null
+          oil_d1_chg?: number | null
+          oil_d21_chg?: number | null
+          oil_d3_chg?: number | null
+          oil_d5_chg?: number | null
+          previous_value?: string | null
+          rates_reaction_summary?: string | null
+          report_analysis_id?: number | null
+          risk_sentiment?: string | null
+          spx_d0?: number | null
+          spx_d1_chg?: number | null
+          spx_d21_chg?: number | null
+          spx_d3_chg?: number | null
+          spx_d5_chg?: number | null
+          surprise_direction?: string | null
+          surprise_magnitude?: string | null
+          us10y_d0?: number | null
+          us10y_d1_chg?: number | null
+          us10y_d21_chg?: number | null
+          us10y_d3_chg?: number | null
+          us10y_d5_chg?: number | null
+          us2y_d0?: number | null
+          us2y_d1_chg?: number | null
+          us2y_d21_chg?: number | null
+          us2y_d3_chg?: number | null
+          us2y_d5_chg?: number | null
+          usdeur_d0?: number | null
+          usdeur_d1_chg?: number | null
+          usdeur_d21_chg?: number | null
+          usdeur_d3_chg?: number | null
+          usdeur_d5_chg?: number | null
+          usdjpy_d0?: number | null
+          usdjpy_d1_chg?: number | null
+          usdjpy_d21_chg?: number | null
+          usdjpy_d3_chg?: number | null
+          usdjpy_d5_chg?: number | null
+          vix_d0?: number | null
+          vix_d1_chg?: number | null
+          vix_d21_chg?: number | null
+          vix_d3_chg?: number | null
+          vix_d5_chg?: number | null
+          was_priced_in?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "macro_event_reactions_report_analysis_id_fkey"
+            columns: ["report_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "report_analysis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "macro_event_reactions_report_analysis_id_fkey"
+            columns: ["report_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "v_reports_with_source"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       macro_events_calendar: {
         Row: {
           actual_value: number | null
@@ -696,6 +1290,7 @@ export type Database = {
           gold_reaction: string | null
           id: number
           importance_score: number | null
+          indicator_group: string | null
           interpretation: string | null
           market_impact_narrative: string | null
           message: string | null
@@ -706,6 +1301,7 @@ export type Database = {
           release_status: string | null
           report_id: number | null
           revision: string | null
+          subcategory: string | null
           surprise_color: string | null
           surprise_direction: string | null
           surprise_magnitude: string | null
@@ -732,6 +1328,7 @@ export type Database = {
           gold_reaction?: string | null
           id?: never
           importance_score?: number | null
+          indicator_group?: string | null
           interpretation?: string | null
           market_impact_narrative?: string | null
           message?: string | null
@@ -742,6 +1339,7 @@ export type Database = {
           release_status?: string | null
           report_id?: number | null
           revision?: string | null
+          subcategory?: string | null
           surprise_color?: string | null
           surprise_direction?: string | null
           surprise_magnitude?: string | null
@@ -768,6 +1366,7 @@ export type Database = {
           gold_reaction?: string | null
           id?: never
           importance_score?: number | null
+          indicator_group?: string | null
           interpretation?: string | null
           market_impact_narrative?: string | null
           message?: string | null
@@ -778,11 +1377,87 @@ export type Database = {
           release_status?: string | null
           report_id?: number | null
           revision?: string | null
+          subcategory?: string | null
           surprise_color?: string | null
           surprise_direction?: string | null
           surprise_magnitude?: string | null
           surprise_score?: number | null
           yields_reaction?: string | null
+        }
+        Relationships: []
+      }
+      macro_news_events: {
+        Row: {
+          article_url: string | null
+          category: string | null
+          country: string | null
+          created_at: string | null
+          currency: string | null
+          dedupe_hash: string | null
+          headline: string
+          id: number
+          impact_level: string | null
+          published_at_utc: string | null
+          published_date: string | null
+          raw_payload: Json | null
+          region: string | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          source_name: string | null
+          source_news_id: string | null
+          source_provider: string
+          source_url: string | null
+          summary: string | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          article_url?: string | null
+          category?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          dedupe_hash?: string | null
+          headline: string
+          id?: number
+          impact_level?: string | null
+          published_at_utc?: string | null
+          published_date?: string | null
+          raw_payload?: Json | null
+          region?: string | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          source_name?: string | null
+          source_news_id?: string | null
+          source_provider?: string
+          source_url?: string | null
+          summary?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          article_url?: string | null
+          category?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          dedupe_hash?: string | null
+          headline?: string
+          id?: number
+          impact_level?: string | null
+          published_at_utc?: string | null
+          published_date?: string | null
+          raw_payload?: Json | null
+          region?: string | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          source_name?: string | null
+          source_news_id?: string | null
+          source_provider?: string
+          source_url?: string | null
+          summary?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1217,6 +1892,7 @@ export type Database = {
           de2y_reason: string | null
           dow_bias: string | null
           dow_reason: string | null
+          driver_subcategory: string | null
           driver_type: string | null
           equity_risk_view: string | null
           eur_bias: string | null
@@ -1278,6 +1954,7 @@ export type Database = {
           priced_in_assessment: string | null
           qe_qt_overview: string | null
           raw_report_id: number | null
+          regime_subcategory: string | null
           retry_count: number | null
           risk_regime: string | null
           risk_sentiment: string | null
@@ -1369,6 +2046,7 @@ export type Database = {
           de2y_reason?: string | null
           dow_bias?: string | null
           dow_reason?: string | null
+          driver_subcategory?: string | null
           driver_type?: string | null
           equity_risk_view?: string | null
           eur_bias?: string | null
@@ -1430,6 +2108,7 @@ export type Database = {
           priced_in_assessment?: string | null
           qe_qt_overview?: string | null
           raw_report_id?: number | null
+          regime_subcategory?: string | null
           retry_count?: number | null
           risk_regime?: string | null
           risk_sentiment?: string | null
@@ -1521,6 +2200,7 @@ export type Database = {
           de2y_reason?: string | null
           dow_bias?: string | null
           dow_reason?: string | null
+          driver_subcategory?: string | null
           driver_type?: string | null
           equity_risk_view?: string | null
           eur_bias?: string | null
@@ -1582,6 +2262,7 @@ export type Database = {
           priced_in_assessment?: string | null
           qe_qt_overview?: string | null
           raw_report_id?: number | null
+          regime_subcategory?: string | null
           retry_count?: number | null
           risk_regime?: string | null
           risk_sentiment?: string | null
