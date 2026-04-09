@@ -8,9 +8,8 @@ import Currencies from "./pages/Currencies";
 import DWM from "./pages/DWM";
 import Alignment from "./pages/Alignment";
 import Reports from "./pages/Reports";
-import Yields from "./pages/Yields";
+import Markets from "./pages/Markets";
 import MacroData from "./pages/MacroData";
-import Market from "./pages/Market";
 import Calendar from "./pages/Calendar";
 import EventHistory from "./pages/EventHistory";
 import TradeIdeas from "./pages/TradeIdeas";
@@ -33,9 +32,10 @@ const App = () => (
           <Route path="/brief" element={<Navigate to="/dwm" replace />} />
           <Route path="/alignment" element={<Alignment />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/yields" element={<Yields />} />
+          <Route path="/markets" element={<Markets />} />
+          <Route path="/yields" element={<Navigate to="/markets" replace />} />
+          <Route path="/market" element={<Navigate to="/markets" replace />} />
           <Route path="/macro-data" element={<MacroData />} />
-          <Route path="/market" element={<Market />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/event-history" element={<EventHistory />} />
           <Route path="/trade-ideas" element={<TradeIdeas />} />
