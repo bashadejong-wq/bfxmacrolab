@@ -2956,6 +2956,40 @@ export type Database = {
         }
         Relationships: []
       }
+      v_fx_currency_ranking: {
+        Row: {
+          bias: string | null
+          bias_score: number | null
+          carry_bias: string | null
+          cb_direction: string | null
+          cb_stance: string | null
+          composite_score: number | null
+          confidence: string | null
+          confidence_weight: number | null
+          currency_code: string | null
+          currency_macro_regime: string | null
+          currency_risk_regime: string | null
+          currency_yield_regime: string | null
+          higher_tf_bias: string | null
+          important_for_today: string | null
+          invalidation_risk: string | null
+          main_driver: string | null
+          medium_term_bias: string | null
+          overall_score: number | null
+          rank_position: number | null
+          rate_diff_vs_usd: string | null
+          score_cb: number | null
+          score_flows: number | null
+          score_growth: number | null
+          score_inflation: number | null
+          score_liquidity: number | null
+          short_term_bias: string | null
+          snapshot_date: string | null
+          summary_short: string | null
+          what_to_watch_next: string | null
+        }
+        Relationships: []
+      }
       v_latest_alignment: {
         Row: {
           alignment_date: string | null
