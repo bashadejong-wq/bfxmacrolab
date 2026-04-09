@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -11,7 +11,7 @@ import {
   Layers, ArrowRight, ChevronRight
 } from "lucide-react";
 
-const BriefPage = lazy(() => import("./Brief"));
+import { BriefContent as BriefInline } from "./Brief";
 
 const PERIODS = [
   { label: "Daily", value: "daily", icon: CalendarDays },
@@ -159,9 +159,7 @@ export default function DWM() {
       </div>
 
       {activePeriod === "brief" ? (
-        <Suspense fallback={<div className="text-center text-label text-[13px] mt-10">Laden...</div>}>
-          <BriefInline />
-        </Suspense>
+        <BriefInline />
       ) : loaded && !snap ? (
         <div className="text-center text-label text-[13px] mt-10">Nog geen snapshot beschikbaar voor {activePeriod}</div>
       ) : !loaded ? (
