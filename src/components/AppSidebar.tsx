@@ -5,8 +5,6 @@ import {
   Lightbulb, Grid3X3, Clock,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
-  ChevronLeft, ChevronRight,
-} from "lucide-react";
 import { useSidebar } from "./DashboardLayout";
 
 const navItems = [
