@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/components/ui-helpers";
+import { Sparkline } from "@/components/Sparkline";
 import {
   TrendingUp, Activity, BarChart2, Users, Percent,
   Flame, Eye, Droplets, DollarSign, MoreHorizontal
@@ -117,6 +118,7 @@ export default function MacroData() {
             <thead>
               <tr className="bg-secondary">
                 <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">Indicator</th>
+                <th className="text-[9px] text-label uppercase text-center px-3 py-2.5 tracking-wide">Trend</th>
                 <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">T-3</th>
                 <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">T-2</th>
                 <th className="text-[9px] text-label uppercase text-left px-5 py-2.5 tracking-wide">T-1</th>
@@ -132,7 +134,7 @@ export default function MacroData() {
                 <tbody key={category}>
                   {/* Category header row */}
                   <tr>
-                    <td colSpan={7} className="px-5 py-2 bg-secondary">
+                    <td colSpan={8} className="px-5 py-2 bg-secondary">
                       <div className="flex items-center gap-1.5">
                         <CatIcon size={13} className="text-purple-accent" />
                         <span className="text-[0.65rem] text-purple-accent uppercase font-bold tracking-[0.1em]">{category}</span>
@@ -144,7 +146,10 @@ export default function MacroData() {
                     return (
                       <tr key={`${category}-${i}`}
                         className={`border-b border-card-border ${i % 2 === 1 ? "bg-secondary/50" : "bg-card"}`}>
-                        <td className="text-[11px] text-sub-text px-5 py-2">{val(ind.indicator_name)}</td>
+                         <td className="text-[11px] text-sub-text px-5 py-2">{val(ind.indicator_name)}</td>
+                        <td className="px-3 py-2 text-center">
+                          <Sparkline values={[ind.t_minus_6, ind.t_minus_5, ind.t_minus_4, ind.t_minus_3, ind.t_minus_2, ind.t_minus_1, ind.latest]} />
+                        </td>
                         <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_3)}</td>
                         <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_2)}</td>
                         <td className="text-[11px] text-label font-mono px-5 py-2">{val(ind.t_minus_1)}</td>

@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, DollarSign, Layers, GitMerge, FileText,
   BookOpen, TrendingUp, BarChart2, Activity, CalendarDays, History,
+  Lightbulb, Newspaper, Grid3X3,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useSidebar } from "./DashboardLayout";
@@ -18,6 +19,9 @@ const navItems = [
   { label: "Market", path: "/market", icon: Activity },
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
   { label: "Event History", path: "/event-history", icon: History },
+  { label: "Trade Ideas", path: "/trade-ideas", icon: Lightbulb },
+  { label: "Weekly Digest", path: "/weekly-digest", icon: Newspaper },
+  { label: "Correlations", path: "/correlations", icon: Grid3X3 },
 ];
 
 const isActiveLink = (pathname: string, itemPath: string) => {
