@@ -13,23 +13,26 @@ export default function Overview() {
   const [reports, setReports] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const load = useCallback(async () => {
+    const [a, m, c, e, r] = await Promise.all([
+      queryWithRetry(() => supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1), "Overview/alignment_engine"),
+      queryWithRetry(() => supabase.from("market_data_live").select("*").order("fetch_date", { ascending: false }).limit(1), "Overview/market_data_live"),
+      queryWithRetry(() => supabase.from("fx_consensus").select("*").in("entity_code", ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"]).order("conviction_pct", { ascending: false }).order("total_count", { ascending: false }).limit(3), "Overview/fx_consensus"),
+      queryWithRetry(() => supabase.from("macro_events_calendar").select("*").gte("event_date", new Date().toISOString().split("T")[0]).in("event_impact", ["high","medium"]).order("event_datetime", { ascending: true }).limit(6), "Overview/macro_events_calendar"),
+      queryWithRetry(() => supabase.from("report_analysis").select("id,analysis_date,title,macro_regime,confidence_score").order("analysis_date", { ascending: false }).limit(5), "Overview/report_analysis"),
+    ]);
+    setAlignment((a as any[])?.[0] || null);
+    setMarket((m as any[])?.[0] || null);
+    setConsensus((c as any[]) || []);
+    setEvents((e as any[]) || []);
+    setReports((r as any[]) || []);
+    setLoaded(true);
+  }, []);
+
   useEffect(() => {
-    const load = async () => {
-      const [a, m, c, e, r] = await Promise.all([
-        queryWithRetry(() => supabase.from("alignment_engine").select("*").order("alignment_date", { ascending: false }).limit(1), "Overview/alignment_engine"),
-        queryWithRetry(() => supabase.from("market_data_live").select("*").order("fetch_date", { ascending: false }).limit(1), "Overview/market_data_live"),
-        queryWithRetry(() => supabase.from("fx_consensus").select("*").in("entity_code", ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"]).order("conviction_pct", { ascending: false }).order("total_count", { ascending: false }).limit(3), "Overview/fx_consensus"),
-        queryWithRetry(() => supabase.from("macro_events_calendar").select("*").gte("event_date", new Date().toISOString().split("T")[0]).in("event_impact", ["high","medium"]).order("event_datetime", { ascending: true }).limit(6), "Overview/macro_events_calendar"),
-        queryWithRetry(() => supabase.from("report_analysis").select("id,analysis_date,title,macro_regime,confidence_score").order("analysis_date", { ascending: false }).limit(5), "Overview/report_analysis"),
-      ]);
-      setAlignment((a as any[])?.[0] || null);
-      setMarket((m as any[])?.[0] || null);
-      setConsensus((c as any[]) || []);
-      setEvents((e as any[]) || []);
-      setReports((r as any[]) || []);
-      setLoaded(true);
-    };
     load();
+    const interval = setInterval(load, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const vixColor = (regime: string | null) => {
