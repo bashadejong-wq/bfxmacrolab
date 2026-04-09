@@ -1,255 +1,382 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, ImpactChip, MarkdownBlock, fmtDate, queryWithRetry } from "@/components/ui-helpers";
-import { Zap, Activity, Minus, ArrowUp, ArrowDown, CheckCircle, XCircle } from "lucide-react";
+import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/components/ui-helpers";
+import { ChevronDown, ChevronUp, Zap, Check, MailX } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const PERIODS = [
-  { label: "1W", days: 7 }, { label: "1M", days: 30 }, { label: "3M", days: 90 }, { label: "6M", days: 180 },
-];
-const CURRENCIES_ALL = ["ALL","USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF","CNY"];
-const IMPACTS = ["ALL","HIGH","MEDIUM","LOW"];
-const SURPRISES = ["ALL","BEAT","MISS","IN LINE"];
+/* ── constants ─────────────────────────────────────────── */
+const CATEGORIES = ["Alle", "inflation", "jobs", "central_bank", "growth", "geopolitical"];
+const SUBCATS: Record<string, string[]> = {
+  inflation: ["cpi", "core_cpi", "pce", "ppi"],
+  jobs: ["nfp", "unemployment", "wages", "jobless_claims"],
+  central_bank: ["fomc", "ecb", "boj", "boe", "rate_decision", "speech", "minutes"],
+  growth: ["gdp", "pmi", "ism", "retail_sales"],
+  geopolitical: ["trade", "fiscal", "conflict"],
+};
+const SURPRISES = ["Alle", "beat", "miss", "inline"];
+const COUNTRIES = ["Alle", "US", "EU", "UK", "JP", "CN", "Global"];
 
-const impactIcon = (impact: string | null) => {
-  const i = (impact || "").toLowerCase();
-  if (i === "high") return <Zap size={13} className="text-bearish-text" />;
-  if (i === "medium") return <Activity size={13} className="text-mixed-text" />;
-  return <Minus size={13} className="text-neutral-text" />;
+const CAT_COLORS: Record<string, string> = {
+  inflation: "#F97316",
+  jobs: "#2563EB",
+  central_bank: "#DC2626",
+  growth: "#16A34A",
+  geopolitical: "#8B5CF6",
+};
+
+const FLAG: Record<string, string> = {
+  US: "🇺🇸", EU: "🇪🇺", UK: "🇬🇧", JP: "🇯🇵", CN: "🇨🇳", AU: "🇦🇺", Global: "🌍",
+};
+
+/* ── helpers ────────────────────────────────────────────── */
+const n = (v: any) => (v == null || v === "" ? null : Number(v));
+const fmtPct = (v: any) => {
+  const num = n(v);
+  if (num == null) return null;
+  return num > 0 ? `+${num.toFixed(2)}%` : `${num.toFixed(2)}%`;
+};
+const fmtBp = (v: any) => {
+  const num = n(v);
+  if (num == null) return null;
+  return num > 0 ? `+${num.toFixed(1)} bp` : `${num.toFixed(1)} bp`;
+};
+const chgColor = (v: any) => {
+  const num = n(v);
+  if (num == null) return "text-label";
+  return num > 0 ? "text-bullish-text" : num < 0 ? "text-bearish-text" : "text-label";
 };
 
 const surpriseDir = (d: string | null) => (d || "").toLowerCase();
-const isBeat = (d: string | null) => { const v = surpriseDir(d); return v === "positive" || v === "beat"; };
-const isMiss = (d: string | null) => { const v = surpriseDir(d); return v === "negative" || v === "miss"; };
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick}
-      className={`px-3 py-1 text-[10px] uppercase font-semibold rounded-full transition-colors ${
-        active ? "bg-purple-accent text-white" : "bg-secondary text-label hover:text-foreground"
-      }`}>{children}</button>
-  );
-}
-
-function SurpriseBadge({ direction, score }: { direction: string | null; score: any }) {
-  if (isBeat(direction)) return (
-    <span className="inline-flex items-center gap-1 bg-bullish-bg text-bullish-text px-2 py-[2px] text-[9px] rounded font-semibold uppercase">
-      <ArrowUp size={11} /> BEAT {score != null && <span className="text-[8px] opacity-80">{score}</span>}
-    </span>
-  );
-  if (isMiss(direction)) return (
-    <span className="inline-flex items-center gap-1 bg-bearish-bg text-bearish-text px-2 py-[2px] text-[9px] rounded font-semibold uppercase">
-      <ArrowDown size={11} /> MISS {score != null && <span className="text-[8px] opacity-80">{score}</span>}
-    </span>
-  );
-  return (
-    <span className="inline-flex items-center gap-1 bg-neutral-bg text-neutral-text px-2 py-[2px] text-[9px] rounded font-semibold uppercase">
-      <Minus size={11} /> IN LINE
-    </span>
-  );
-}
-
+/* ── component ──────────────────────────────────────────── */
 export default function EventHistory() {
   const [events, setEvents] = useState<any[]>([]);
-  const [expandedId, setExpandedId] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
-  const [period, setPeriod] = useState("3M");
-  const [currency, setCurrency] = useState("ALL");
-  const [impact, setImpact] = useState("ALL");
-  const [surprise, setSurprise] = useState("ALL");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const periodDays = PERIODS.find(p => p.label === period)?.days || 90;
-  const fromDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - periodDays); return d.toISOString().split("T")[0]; }, [periodDays]);
+  // filters
+  const [cat, setCat] = useState("Alle");
+  const [subcat, setSubcat] = useState("Alle");
+  const [surprise, setSurprise] = useState("Alle");
+  const [country, setCountry] = useState("Alle");
 
   useEffect(() => {
     setLoaded(false);
     const fn = async () => {
-      let q = supabase.from("macro_events_calendar").select("*")
-        .eq("event_status", "released")
-        .gte("event_date", fromDate)
-        .order("event_datetime", { ascending: false })
-        .limit(500);
-      if (currency !== "ALL") q = q.eq("event_currency", currency);
-      if (impact !== "ALL") q = q.ilike("event_impact", impact);
+      let q = supabase.from("macro_event_reactions").select("*").order("event_date", { ascending: false }).limit(500);
+      if (cat !== "Alle") q = q.eq("event_category", cat);
+      if (subcat !== "Alle") q = q.eq("event_subcategory", subcat);
+      if (country !== "Alle") q = q.ilike("event_country", country);
       return q;
     };
-    queryWithRetry(fn, "EventHistory/macro_events_calendar").then(data => { setEvents((data as any[]) || []); setExpandedId(null); setLoaded(true); });
-  }, [fromDate, currency, impact]);
+    queryWithRetry(fn, "EventHistory").then(data => {
+      setEvents((data as any[]) || []);
+      setExpandedId(null);
+      setLoaded(true);
+    });
+  }, [cat, subcat, country]);
+
+  // reset subcat when category changes
+  useEffect(() => { setSubcat("Alle"); }, [cat]);
 
   const filtered = useMemo(() => {
-    if (surprise === "ALL") return events;
-    return events.filter(e => {
-      if (surprise === "BEAT") return isBeat(e.surprise_direction);
-      if (surprise === "MISS") return isMiss(e.surprise_direction);
-      return !isBeat(e.surprise_direction) && !isMiss(e.surprise_direction);
-    });
+    if (surprise === "Alle") return events;
+    return events.filter(e => surpriseDir(e.surprise_direction) === surprise);
   }, [events, surprise]);
 
+  /* ── stats ── */
   const stats = useMemo(() => {
-    const beat = filtered.filter(e => isBeat(e.surprise_direction)).length;
-    const miss = filtered.filter(e => isMiss(e.surprise_direction)).length;
-    return { total: filtered.length, beat, miss, inline: filtered.length - beat - miss };
+    if (!filtered.length) return { total: 0, biggestBeat: null as any, biggestMiss: null as any, avgVix: 0 };
+    let biggestBeat: any = null;
+    let biggestMiss: any = null;
+    let vixSum = 0;
+    let vixCount = 0;
+    filtered.forEach(e => {
+      const spx = n(e.spx_d1_chg);
+      if (spx != null) {
+        if (!biggestBeat || spx > n(biggestBeat.spx_d1_chg)!) biggestBeat = e;
+        if (!biggestMiss || spx < n(biggestMiss.spx_d1_chg)!) biggestMiss = e;
+      }
+      const vix = n(e.vix_d1_chg);
+      if (vix != null) { vixSum += vix; vixCount++; }
+    });
+    return { total: filtered.length, biggestBeat, biggestMiss, avgVix: vixCount ? vixSum / vixCount : 0 };
   }, [filtered]);
 
-  const perCurrency = useMemo(() => {
-    const map: Record<string, { beat: number; miss: number; inline: number }> = {};
-    filtered.forEach(e => {
-      const cur = e.event_currency || "?";
-      if (!map[cur]) map[cur] = { beat: 0, miss: 0, inline: 0 };
-      if (isBeat(e.surprise_direction)) map[cur].beat++;
-      else if (isMiss(e.surprise_direction)) map[cur].miss++;
-      else map[cur].inline++;
-    });
-    return Object.entries(map).sort((a, b) => (b[1].beat + b[1].miss + b[1].inline) - (a[1].beat + a[1].miss + a[1].inline));
-  }, [filtered]);
+  const subcatsForCat = cat !== "Alle" ? SUBCATS[cat] || [] : [];
 
   return (
     <DashboardLayout>
+      {/* HEADER */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[22px] font-bold text-foreground" style={{ fontFamily: "Syne, sans-serif" }}>Event History</h1>
+          <p className="text-[12px] text-label mt-0.5">Marktreacties op macro events — laatste 12 maanden</p>
+        </div>
+        <span className="bg-purple-accent/10 text-purple-accent text-[11px] font-bold px-3 py-1.5 rounded-full">
+          {filtered.length} events
+        </span>
+      </div>
+
       {/* FILTER BAR */}
-      <div className="bg-card border border-card-border rounded-lg p-4 mb-6 flex flex-wrap gap-5 items-end">
-        <div>
-          <div className="text-[9px] text-label uppercase tracking-wide mb-1.5 font-medium">Periode</div>
-          <div className="flex gap-1">{PERIODS.map(p => <Pill key={p.label} active={period === p.label} onClick={() => setPeriod(p.label)}>{p.label}</Pill>)}</div>
-        </div>
-        <div>
-          <div className="text-[9px] text-label uppercase tracking-wide mb-1.5 font-medium">Valuta</div>
-          <div className="flex gap-1 flex-wrap">{CURRENCIES_ALL.map(c => <Pill key={c} active={currency === c} onClick={() => setCurrency(c)}>{c}</Pill>)}</div>
-        </div>
-        <div>
-          <div className="text-[9px] text-label uppercase tracking-wide mb-1.5 font-medium">Impact</div>
-          <div className="flex gap-1">{IMPACTS.map(i => <Pill key={i} active={impact === i} onClick={() => setImpact(i)}>{i}</Pill>)}</div>
-        </div>
-        <div>
-          <div className="text-[9px] text-label uppercase tracking-wide mb-1.5 font-medium">Verrassing</div>
-          <div className="flex gap-1">{SURPRISES.map(s => <Pill key={s} active={surprise === s} onClick={() => setSurprise(s)}>{s}</Pill>)}</div>
-        </div>
+      <div className="bg-card border border-card-border rounded-lg p-4 mb-5 sticky top-0 z-20 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <FilterSelect label="Categorie" value={cat} options={CATEGORIES} onChange={setCat} />
+        <FilterSelect label="Subcategorie" value={subcat} options={["Alle", ...subcatsForCat]} onChange={setSubcat} disabled={cat === "Alle"} />
+        <FilterSelect label="Verrassing" value={surprise} options={SURPRISES} onChange={setSurprise} />
+        <FilterSelect label="Land" value={country} options={COUNTRIES} onChange={setCountry} />
       </div>
 
-      {/* SUMMARY COUNTERS */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <DataCard className="p-4 text-center">
-          <div className="text-[9px] text-label uppercase font-medium">Totaal</div>
-          <div className="text-[24px] font-extrabold text-foreground font-mono mt-1">{stats.total}</div>
-        </DataCard>
-        <DataCard className="p-4 text-center">
-          <div className="flex items-center justify-center gap-1"><CheckCircle size={12} className="text-bullish-text" /><span className="text-[9px] text-label uppercase font-medium">Beat</span></div>
-          <div className="text-[24px] font-extrabold text-bullish-text font-mono mt-1">{stats.beat}</div>
-        </DataCard>
-        <DataCard className="p-4 text-center">
-          <div className="flex items-center justify-center gap-1"><XCircle size={12} className="text-bearish-text" /><span className="text-[9px] text-label uppercase font-medium">Miss</span></div>
-          <div className="text-[24px] font-extrabold text-bearish-text font-mono mt-1">{stats.miss}</div>
-        </DataCard>
-        <DataCard className="p-4 text-center">
-          <div className="flex items-center justify-center gap-1"><Minus size={12} className="text-neutral-text" /><span className="text-[9px] text-label uppercase font-medium">In Line</span></div>
-          <div className="text-[24px] font-extrabold text-neutral-text font-mono mt-1">{stats.inline}</div>
-        </DataCard>
+      {/* STATS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Totaal Events" value={String(stats.total)} />
+        <StatCard label="Grootste Beat" value={stats.biggestBeat ? stats.biggestBeat.event_name : "—"} sub={stats.biggestBeat ? `SPX ${fmtPct(stats.biggestBeat.spx_d1_chg) || "—"}` : ""} color="text-bullish-text" />
+        <StatCard label="Grootste Miss" value={stats.biggestMiss ? stats.biggestMiss.event_name : "—"} sub={stats.biggestMiss ? `SPX ${fmtPct(stats.biggestMiss.spx_d1_chg) || "—"}` : ""} color="text-bearish-text" />
+        <StatCard label="Gem. VIX Effect" value={stats.avgVix ? `${stats.avgVix > 0 ? "+" : ""}${stats.avgVix.toFixed(2)}` : "—"} color={stats.avgVix > 0 ? "text-bearish-text" : "text-bullish-text"} />
       </div>
 
-      {/* BEAT/MISS RATIO BAR (when filtering by currency) */}
-      {currency !== "ALL" && stats.total > 0 && (
-        <div className="mb-6">
-          <div className="text-[9px] text-label uppercase font-medium mb-1.5">Beat / Miss ratio — {currency}</div>
-          <div className="flex h-3 rounded-full overflow-hidden bg-neutral-bg">
-            {stats.beat > 0 && <div className="bg-bullish-text" style={{ width: `${(stats.beat / stats.total) * 100}%` }} />}
-            {stats.inline > 0 && <div className="bg-neutral-text/30" style={{ width: `${(stats.inline / stats.total) * 100}%` }} />}
-            {stats.miss > 0 && <div className="bg-bearish-text" style={{ width: `${(stats.miss / stats.total) * 100}%` }} />}
-          </div>
-          <div className="flex justify-between text-[9px] mt-1">
-            <span className="text-bullish-text font-semibold">{Math.round((stats.beat / stats.total) * 100)}% beat</span>
-            <span className="text-bearish-text font-semibold">{Math.round((stats.miss / stats.total) * 100)}% miss</span>
-          </div>
+      {/* TIMELINE */}
+      {!loaded ? (
+        <div className="space-y-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20">
+          <MailX size={40} className="mx-auto text-label mb-3" />
+          <p className="text-label text-[13px]">Geen events gevonden voor deze filters</p>
         </div>
-      )}
+      ) : (
+        <div className="relative pl-4 md:pl-6">
+          {/* vertical timeline line */}
+          <div className="absolute left-[7px] md:left-[11px] top-0 bottom-0 w-[2px] bg-card-border" />
 
-      {/* TABLE */}
-      {loaded && filtered.length === 0 ? (
-        <div className="text-center text-label text-[13px] mt-10">Geen historische events gevonden voor deze selectie</div>
-      ) : filtered.length > 0 && (
-        <DataCard className="overflow-hidden mb-8">
-          <table className="w-full">
-            <thead className="bg-secondary">
-              <tr>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Datum</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Event</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Valuta</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Verwacht</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Actueel</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Verrassing</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2.5">Impact</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((e, idx) => {
-                const isExp = expandedId === e.id;
-                return (
-                  <>
-                    <tr key={e.id}
-                      className={`border-b border-card-border cursor-pointer transition-colors hover:bg-secondary/50 ${idx % 2 === 1 ? "bg-secondary/30" : ""}`}
-                      onClick={() => setExpandedId(isExp ? null : e.id)}>
-                      <td className="text-[11px] text-sub-text px-4 py-2.5">{fmtDate(e.event_date)}</td>
-                      <td className="text-[11px] text-foreground px-4 py-2.5 font-medium truncate max-w-[220px]">{val(e.event_name)}</td>
-                      <td className="px-4 py-2.5"><span className="text-[10px] font-bold text-foreground bg-secondary px-1.5 py-0.5 rounded">{val(e.event_currency)}</span></td>
-                      <td className="text-[11px] text-sub-text px-4 py-2.5">{val(e.expected_value)}</td>
-                      <td className="text-[11px] text-foreground font-bold px-4 py-2.5">{val(e.actual_value)}</td>
-                      <td className="px-4 py-2.5"><SurpriseBadge direction={e.surprise_direction} score={e.surprise_score} /></td>
-                      <td className="px-4 py-2.5"><div className="flex items-center gap-1.5">{impactIcon(e.event_impact)}<ImpactChip impact={e.event_impact} /></div></td>
-                    </tr>
-                    {isExp && (
-                      <tr key={`exp-${e.id}`}>
-                        <td colSpan={7} className="bg-secondary/60 px-6 py-4 border-b border-card-border animate-fade-in">
-                          <div className="flex gap-6 mb-3">
-                            {[["Yields", e.yields_reaction],["DXY", e.dxy_reaction],["Aandelen", e.equity_reaction],["Goud", e.gold_reaction]].map(([l,v]) => (
-                              <div key={l as string}>
-                                <div className="text-[9px] text-label uppercase">{l}</div>
-                                <div className="text-[11px] text-sub-text">{val(v)}</div>
-                              </div>
-                            ))}
-                          </div>
-                          {e.interpretation && <MarkdownBlock content={e.interpretation} />}
-                          {e.market_impact_narrative && <div className="mt-2"><MarkdownBlock content={e.market_impact_narrative} /></div>}
-                          {!e.interpretation && !e.market_impact_narrative && <span className="text-[11px] text-label italic">Geen details beschikbaar</span>}
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
-        </DataCard>
-      )}
+          {filtered.map((e, idx) => {
+            const isExpanded = expandedId === e.id;
+            const dir = surpriseDir(e.surprise_direction);
+            const badgeColor = dir === "beat" ? "bg-bullish-text" : dir === "miss" ? "bg-bearish-text" : "bg-neutral-text";
 
-      {/* PER CURRENCY SUMMARY */}
-      {perCurrency.length > 0 && (
-        <>
-          <SectionLabel>BEAT / MISS PER VALUTA</SectionLabel>
-          <div className="grid grid-cols-5 gap-4">
-            {perCurrency.map(([cur, counts]) => {
-              const total = counts.beat + counts.miss + counts.inline;
-              const dominant = counts.beat >= counts.miss && counts.beat >= counts.inline ? "text-bullish-text"
-                : counts.miss >= counts.beat && counts.miss >= counts.inline ? "text-bearish-text"
-                : "text-neutral-text";
-              return (
-                <DataCard key={cur} className="p-4">
-                  <div className={`text-[14px] font-bold mb-2 ${dominant}`}>{cur}</div>
-                  <div className="flex gap-2 text-[10px] flex-wrap">
-                    <span className="text-bullish-text font-semibold">{counts.beat} beat</span>
-                    <span className="text-bearish-text font-semibold">{counts.miss} miss</span>
-                    <span className="text-neutral-text">{counts.inline} inline</span>
+            return (
+              <div key={e.id} className="relative mb-5">
+                {/* timeline dot */}
+                <div className={`absolute -left-4 md:-left-6 top-4 w-3 h-3 rounded-full border-2 border-background ${badgeColor}`} />
+
+                {/* date column */}
+                <div className="mb-1">
+                  <span className="text-[11px] text-label font-medium">{fmtDate(e.event_date)}</span>
+                  <SurprisePill direction={dir} />
+                </div>
+
+                {/* event card */}
+                <DataCard className="p-4 ml-0 md:ml-2" onClick={() => setExpandedId(isExpanded ? null : e.id)}>
+                  {/* header */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[16px]">{FLAG[e.event_country] || "🌍"}</span>
+                      <span className="text-[15px] font-bold text-foreground truncate">{e.event_name || "—"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <CatPill category={e.event_category} />
+                      {isExpanded ? <ChevronUp size={14} className="text-label" /> : <ChevronDown size={14} className="text-label" />}
+                    </div>
                   </div>
-                  {total > 0 && (
-                    <div className="flex h-1.5 rounded-full overflow-hidden bg-neutral-bg mt-2">
-                      {counts.beat > 0 && <div className="bg-bullish-text" style={{ width: `${(counts.beat / total) * 100}%` }} />}
-                      {counts.inline > 0 && <div className="bg-neutral-text/30" style={{ width: `${(counts.inline / total) * 100}%` }} />}
-                      {counts.miss > 0 && <div className="bg-bearish-text" style={{ width: `${(counts.miss / total) * 100}%` }} />}
+
+                  {/* actual vs expected */}
+                  <div className="flex flex-wrap gap-4 text-[12px] mb-3">
+                    <div>
+                      <span className="text-label mr-1">Actual:</span>
+                      <span className={`font-bold font-mono ${dir === "beat" ? "text-bullish-text" : dir === "miss" ? "text-bearish-text" : "text-foreground"}`}>
+                        {val(e.actual_value)}
+                      </span>
+                    </div>
+                    <div><span className="text-label mr-1">Verwacht:</span><span className="text-sub-text">{val(e.expected_value)}</span></div>
+                    <div><span className="text-label mr-1">Vorig:</span><span className="text-sub-text">{val(e.previous_value)}</span></div>
+                  </div>
+
+                  {/* macro regime tag */}
+                  {e.macro_regime && (
+                    <span className="inline-block bg-secondary text-label text-[9px] font-semibold uppercase px-2 py-0.5 rounded mb-3">
+                      {e.macro_regime}
+                    </span>
+                  )}
+
+                  {/* reaction table */}
+                  <ReactionTable event={e} />
+
+                  {/* dominant reaction */}
+                  {e.dominant_reaction && !isExpanded && (
+                    <p className="text-[12px] text-sub-text italic mt-3 line-clamp-2">{e.dominant_reaction}</p>
+                  )}
+
+                  {/* priced in badge */}
+                  <div className="flex items-center gap-2 mt-3">
+                    {e.was_priced_in === true && (
+                      <span className="inline-flex items-center gap-1 bg-secondary text-label text-[9px] font-semibold px-2 py-0.5 rounded">
+                        <Check size={10} /> Ingeprijsd
+                      </span>
+                    )}
+                    {e.was_priced_in === false && (
+                      <span className="inline-flex items-center gap-1 bg-mixed-bg text-mixed-text text-[9px] font-semibold px-2 py-0.5 rounded">
+                        <Zap size={10} /> Verrassing
+                      </span>
+                    )}
+                  </div>
+
+                  {/* analyst note (always visible if present) */}
+                  {e.analyst_note && (
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded p-3 mt-3">
+                      <p className="text-[12px] text-blue-800 dark:text-blue-300">{e.analyst_note}</p>
+                    </div>
+                  )}
+
+                  {/* expanded section */}
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-card-border space-y-3 animate-fade-in">
+                      {e.dominant_reaction && (
+                        <ExpandField label="Dominant Reaction" value={e.dominant_reaction} />
+                      )}
+                      {e.fx_reaction_summary && (
+                        <ExpandField label="FX Reactie" value={e.fx_reaction_summary} />
+                      )}
+                      {e.rates_reaction_summary && (
+                        <ExpandField label="Rates Reactie" value={e.rates_reaction_summary} />
+                      )}
+                      {e.equity_reaction_summary && (
+                        <ExpandField label="Equity Reactie" value={e.equity_reaction_summary} />
+                      )}
+                      {e.market_surprise && (
+                        <ExpandField label="Market Surprise" value={e.market_surprise} />
+                      )}
+                      {/* D+21 row */}
+                      {(n(e.dxy_d21_chg) != null || n(e.spx_d21_chg) != null || n(e.gold_d21_chg) != null) && (
+                        <div>
+                          <p className="text-[9px] text-label uppercase font-semibold mb-1">D+21 Reactie</p>
+                          <div className="grid grid-cols-4 gap-2 text-[11px] font-mono">
+                            <MiniStat label="DXY" val={fmtPct(e.dxy_d21_chg)} raw={e.dxy_d21_chg} />
+                            <MiniStat label="SPX" val={fmtPct(e.spx_d21_chg)} raw={e.spx_d21_chg} />
+                            <MiniStat label="Gold" val={fmtPct(e.gold_d21_chg)} raw={e.gold_d21_chg} />
+                            <MiniStat label="Oil" val={fmtPct(e.oil_d21_chg)} raw={e.oil_d21_chg} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </DataCard>
-              );
-            })}
-          </div>
-        </>
+              </div>
+            );
+          })}
+        </div>
       )}
     </DashboardLayout>
+  );
+}
+
+/* ── sub-components ────────────────────────────────────── */
+
+function FilterSelect({ label, value, options, onChange, disabled }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void; disabled?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-[9px] text-label uppercase tracking-wide mb-1 font-medium">{label}</div>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        className="w-full bg-secondary border border-card-border rounded px-2 py-1.5 text-[11px] text-foreground disabled:opacity-40"
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <DataCard className="p-3">
+      <div className="text-[9px] text-label uppercase font-medium mb-1">{label}</div>
+      <div className={`text-[14px] font-bold truncate ${color || "text-foreground"}`} style={{ fontFamily: "DM Mono, monospace" }}>
+        {value}
+      </div>
+      {sub && <div className="text-[10px] text-sub-text font-mono mt-0.5">{sub}</div>}
+    </DataCard>
+  );
+}
+
+function SurprisePill({ direction }: { direction: string }) {
+  const cls = direction === "beat"
+    ? "bg-bullish-bg text-bullish-text"
+    : direction === "miss"
+    ? "bg-bearish-bg text-bearish-text"
+    : "bg-neutral-bg text-neutral-text";
+  return (
+    <span className={`ml-2 px-2 py-[1px] text-[9px] font-semibold uppercase rounded ${cls}`}>
+      {direction === "beat" ? "BEAT" : direction === "miss" ? "MISS" : "INLINE"}
+    </span>
+  );
+}
+
+function CatPill({ category }: { category: string | null }) {
+  const c = (category || "").toLowerCase();
+  const color = CAT_COLORS[c] || "#6B7280";
+  return (
+    <span
+      className="px-2 py-[2px] text-[9px] font-semibold uppercase rounded text-white"
+      style={{ backgroundColor: color }}
+    >
+      {category || "—"}
+    </span>
+  );
+}
+
+function ReactionTable({ event: e }: { event: any }) {
+  const rows = [
+    { label: "DXY", d1: fmtPct(e.dxy_d1_chg), d3: fmtPct(e.dxy_d3_chg), d5: fmtPct(e.dxy_d5_chg), r1: e.dxy_d1_chg, r3: e.dxy_d3_chg, r5: e.dxy_d5_chg },
+    { label: "EUR/USD", d1: fmtPct(e.usdeur_d1_chg), d3: fmtPct(e.usdeur_d3_chg), d5: fmtPct(e.usdeur_d5_chg), r1: e.usdeur_d1_chg, r3: e.usdeur_d3_chg, r5: e.usdeur_d5_chg },
+    { label: "USD/JPY", d1: fmtPct(e.usdjpy_d1_chg), d3: fmtPct(e.usdjpy_d3_chg), d5: fmtPct(e.usdjpy_d5_chg), r1: e.usdjpy_d1_chg, r3: e.usdjpy_d3_chg, r5: e.usdjpy_d5_chg },
+    { label: "US 10Y", d1: fmtBp(e.us10y_d1_chg), d3: fmtBp(e.us10y_d3_chg), d5: fmtBp(e.us10y_d5_chg), r1: e.us10y_d1_chg, r3: e.us10y_d3_chg, r5: e.us10y_d5_chg },
+    { label: "S&P 500", d1: fmtPct(e.spx_d1_chg), d3: fmtPct(e.spx_d3_chg), d5: fmtPct(e.spx_d5_chg), r1: e.spx_d1_chg, r3: e.spx_d3_chg, r5: e.spx_d5_chg },
+    { label: "GOLD", d1: fmtPct(e.gold_d1_chg), d3: fmtPct(e.gold_d3_chg), d5: fmtPct(e.gold_d5_chg), r1: e.gold_d1_chg, r3: e.gold_d3_chg, r5: e.gold_d5_chg },
+    { label: "OIL", d1: fmtPct(e.oil_d1_chg), d3: fmtPct(e.oil_d3_chg), d5: fmtPct(e.oil_d5_chg), r1: e.oil_d1_chg, r3: e.oil_d3_chg, r5: e.oil_d5_chg },
+  ];
+
+  return (
+    <div className="overflow-x-auto -mx-1">
+      <table className="w-full text-[10px] min-w-[320px]">
+        <thead>
+          <tr className="text-label uppercase">
+            <th className="text-left py-1 px-1 font-medium">Asset</th>
+            <th className="text-right py-1 px-1 font-medium">D+1</th>
+            <th className="text-right py-1 px-1 font-medium">D+3</th>
+            <th className="text-right py-1 px-1 font-medium">D+5</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.label} className="border-t border-card-border/50">
+              <td className="py-1 px-1 font-semibold text-foreground">{r.label}</td>
+              <td className={`py-1 px-1 text-right font-mono ${chgColor(r.r1)}`}>{r.d1 || "—"}</td>
+              <td className={`py-1 px-1 text-right font-mono ${chgColor(r.r3)}`}>{r.d3 || "—"}</td>
+              <td className={`py-1 px-1 text-right font-mono ${chgColor(r.r5)}`}>{r.d5 || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ExpandField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[9px] text-label uppercase font-semibold mb-0.5">{label}</p>
+      <p className="text-[12px] text-sub-text leading-relaxed">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, val: v, raw }: { label: string; val: string | null; raw: any }) {
+  return (
+    <div>
+      <span className="text-[9px] text-label">{label}</span>
+      <div className={`text-[11px] font-mono ${chgColor(raw)}`}>{v || "—"}</div>
+    </div>
   );
 }
