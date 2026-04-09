@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, ImpactChip, MarkdownBlock, fmtDate, fmtDateTime, queryWithRetry, getBiasColor, getBiasBackground } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, ImpactChip, fmtDate, fmtDateTime, queryWithRetry } from "@/components/ui-helpers";
 import {
   Zap, TrendingUp, TrendingDown, Sun, RefreshCw, GitMerge, HelpCircle,
   Shield, AlertTriangle, AlertOctagon, ShieldAlert, ShieldCheck,
@@ -24,10 +24,45 @@ const RISK_COLORS: Record<string, string> = {
 
 const ALIGNMENT_COLORS: Record<string, string> = {
   aligned: "bg-bullish-bg text-bullish-text",
-  mixed: "bg-mixed-bg text-mixed-text",
+  mixed: "bg-amber-100 text-amber-700",
   conflicted: "bg-bearish-bg text-bearish-text",
   transitioning: "bg-mixed-bg text-mixed-text",
 };
+
+function parseCurrencyRanking(raw: string | null): { rank: number; code: string; bias: string; conviction: string }[] {
+  if (!raw) return [];
+  return raw.split("|").map(part => {
+    const m = part.trim().match(/^(\d+)\.\s*(\w+)\s*\((\w+),\s*(\w+)\)$/);
+    if (!m) return null;
+    return { rank: Number(m[1]), code: m[2], bias: m[3].toLowerCase(), conviction: m[4].toLowerCase() };
+  }).filter(Boolean) as any[];
+}
+
+function parseHighConviction(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw.split("|").map(s => s.trim()).filter(s => s.length > 0);
+}
+
+function parseSummaryDashboard(raw: string | null): { header: string; body: string }[] {
+  if (!raw) return [];
+  const sections: { header: string; body: string }[] = [];
+  const lines = raw.split("\n");
+  let current: { header: string; body: string } | null = null;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed === trimmed.toUpperCase() && trimmed.length > 2 && !trimmed.includes(".")) {
+      if (current) sections.push(current);
+      current = { header: trimmed, body: "" };
+    } else if (current) {
+      current.body += (current.body ? "\n" : "") + trimmed;
+    } else {
+      current = { header: "", body: trimmed };
+    }
+  }
+  if (current) sections.push(current);
+  return sections;
+}
 
 function getStepColor(value: string | null): string {
   const v = (value || "").toLowerCase();
@@ -78,22 +113,20 @@ export default function Overview() {
   const navigate = useNavigate();
   const [cockpit, setCockpit] = useState<any>(null);
   const [market, setMarket] = useState<any>(null);
-  const [fxRanking, setFxRanking] = useState<any[]>([]);
+  
   const [events, setEvents] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const [ck, md, fx, e, r] = await Promise.all([
+    const [ck, md, e, r] = await Promise.all([
       queryWithRetry(() => supabase.from("v_overview_cockpit").select("*").limit(1), "Overview/cockpit"),
       queryWithRetry(() => supabase.from("v_market_delta").select("*").limit(1), "Overview/market_delta"),
-      queryWithRetry(() => supabase.from("v_fx_currency_ranking").select("*").order("rank_position", { ascending: true }).limit(8), "Overview/fx_ranking"),
       queryWithRetry(() => supabase.from("macro_events_calendar").select("*").gte("event_date", new Date().toISOString().split("T")[0]).in("event_impact", ["high", "medium"]).order("event_datetime", { ascending: true }).limit(6), "Overview/events"),
       queryWithRetry(() => supabase.from("report_analysis").select("id,analysis_date,title,macro_regime,confidence_score").order("analysis_date", { ascending: false }).limit(5), "Overview/reports"),
     ]);
     setCockpit((ck as any[])?.[0] || null);
     setMarket((md as any[])?.[0] || null);
-    setFxRanking((fx as any[]) || []);
     setEvents((e as any[]) || []);
     setReports((r as any[]) || []);
     setLoaded(true);
@@ -265,24 +298,75 @@ export default function Overview() {
         </>
       )}
 
-      {/* 5. FX RANKING */}
-      <SectionLabel>FX RANKING</SectionLabel>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {fxRanking.map((fx) => {
-          const biasColor = getBiasColor(fx.bias);
-          const biasBg = getBiasBackground(fx.bias);
-          return (
-            <div key={fx.currency_code} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-card-border" style={{ backgroundColor: biasBg }}>
-              <span className="text-[10px] font-mono text-label font-bold">{fx.rank_position}</span>
-              <span className="text-[11px] font-bold" style={{ color: biasColor }}>{fx.currency_code}</span>
-              <span className="text-[9px] uppercase font-semibold" style={{ color: biasColor }}>{(fx.bias || "neutral").toLowerCase()}</span>
-              {fx.confidence && (
-                <span className="text-[7px] text-label uppercase bg-secondary px-1 py-[0px] rounded">{fx.confidence}</span>
-              )}
+      {/* 5. CURRENCY RANKING (parsed from cockpit) */}
+      <SectionLabel>CURRENCY RANKING</SectionLabel>
+      <DataCard className="overflow-hidden mb-3">
+        <table className="w-full">
+          <thead className="bg-secondary">
+            <tr>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
+              const biasColor = fx.bias === "bullish" ? "bg-bullish-bg text-bullish-text" : fx.bias === "bearish" ? "bg-bearish-bg text-bearish-text" : "bg-neutral-bg text-neutral-text";
+              return (
+                <tr key={fx.rank} className="border-b border-card-border last:border-0">
+                  <td className="text-[11px] font-mono font-bold text-label px-4 py-2">{fx.rank}</td>
+                  <td className="text-[12px] font-bold text-foreground px-4 py-2">{fx.code}</td>
+                  <td className="px-4 py-2"><span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasColor}`}>{fx.bias}</span></td>
+                  <td className="text-[10px] text-sub-text px-4 py-2 uppercase">{fx.conviction}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </DataCard>
+
+      {/* HIGH CONVICTION TRADES */}
+      {parseHighConviction(a?.high_conviction_assets).length > 0 && (
+        <>
+          <SectionLabel>HIGH CONVICTION TRADES</SectionLabel>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {parseHighConviction(a?.high_conviction_assets).map((idea, i) => {
+              const isLong = idea.toLowerCase().startsWith("long");
+              const isShort = idea.toLowerCase().startsWith("short");
+              const borderColor = isLong ? "border-l-bullish-text" : isShort ? "border-l-bearish-text" : "border-l-label";
+              const icon = isLong ? <TrendingUp size={13} className="text-bullish-text" /> : isShort ? <TrendingDown size={13} className="text-bearish-text" /> : <Minus size={13} className="text-label" />;
+              const parts = idea.split("—").map(s => s.trim());
+              return (
+                <DataCard key={i} className={`px-4 py-3 border-l-[3px] ${borderColor}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {icon}
+                    <span className="text-[12px] font-bold text-foreground">{parts[0]}</span>
+                  </div>
+                  {parts[1] && <div className="text-[10px] text-sub-text leading-relaxed">{parts[1]}</div>}
+                </DataCard>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* SUMMARY DASHBOARD */}
+      {parseSummaryDashboard(a?.summary_dashboard).length > 0 && (
+        <>
+          <SectionLabel>DAILY SUMMARY</SectionLabel>
+          <DataCard className="px-4 py-3 mb-3">
+            <div className="space-y-3">
+              {parseSummaryDashboard(a?.summary_dashboard).map((section, i) => (
+                <div key={i}>
+                  {section.header && <div className="text-[9px] text-label uppercase tracking-wider font-bold mb-0.5">{section.header}</div>}
+                  <div className="text-[11px] text-sub-text leading-relaxed">{section.body}</div>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          </DataCard>
+        </>
+      )}
 
       {/* TABLES */}
       <div className="grid grid-cols-2 gap-3">
