@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, DollarSign, Layers, GitMerge, FileText,
   BookOpen, TrendingUp, BarChart2, Activity, CalendarDays, History,
-  Lightbulb, Grid3X3,
+  Lightbulb, Grid3X3, Clock,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useSidebar } from "./DashboardLayout";

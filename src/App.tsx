@@ -15,7 +15,7 @@ import Market from "./pages/Market";
 import Calendar from "./pages/Calendar";
 import EventHistory from "./pages/EventHistory";
 import TradeIdeas from "./pages/TradeIdeas";
-
+import RegimeTimeline from "./pages/RegimeTimeline";
 import Correlations from "./pages/Correlations";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +42,7 @@ const App = () => (
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/event-history" element={<EventHistory />} />
           <Route path="/trade-ideas" element={<TradeIdeas />} />
+          <Route path="/regime-timeline" element={<RegimeTimeline />} />
           
           <Route path="/correlations" element={<Correlations />} />
           <Route path="*" element={<NotFound />} />
