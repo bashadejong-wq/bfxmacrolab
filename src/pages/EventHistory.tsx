@@ -184,7 +184,7 @@ export default function EventHistory() {
                 return (
                   <>
                     <tr key={e.id}
-                      className={`border-b border-card-border cursor-pointer transition-colors hover:bg-[#F7F7F8] ${idx % 2 === 1 ? "bg-[#FAFAFA]" : ""}`}
+                      className={`border-b border-card-border cursor-pointer transition-colors hover:bg-secondary/50 ${idx % 2 === 1 ? "bg-secondary/30" : ""}`}
                       onClick={() => setExpandedId(isExp ? null : e.id)}>
                       <td className="text-[11px] text-sub-text px-4 py-2.5">{fmtDate(e.event_date)}</td>
                       <td className="text-[11px] text-foreground px-4 py-2.5 font-medium truncate max-w-[220px]">{val(e.event_name)}</td>
