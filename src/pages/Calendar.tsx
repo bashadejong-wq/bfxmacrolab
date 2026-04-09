@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, val, ImpactChip, MarkdownBlock, fmtDate, fmtDateTime, queryWithRetry } from "@/components/ui-helpers";
+import { CalendarDays, Zap, Activity, Minus, TrendingUp, TrendingDown } from "lucide-react";
+
+const impactIcon = (impact: string | null) => {
+  const i = (impact || "").toLowerCase();
+  if (i === "high") return <Zap size={12} className="text-bearish-text" />;
+  if (i === "medium") return <Activity size={12} className="text-mixed-text" />;
+  return <Minus size={12} className="text-neutral-text" />;
+};
 
 export default function Calendar() {
   const [activeTab, setActiveTab] = useState("upcoming");
@@ -27,9 +35,12 @@ export default function Calendar() {
       <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-7">
         {[["Upcoming","upcoming"],["Recent","recent"]].map(([label, key]) => (
           <button key={key} onClick={() => setActiveTab(key)}
-            className={`px-5 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-5 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
               key === activeTab ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
-            }`}>{label}</button>
+            }`}>
+            <CalendarDays size={14} />
+            {label}
+          </button>
         ))}
       </div>
 
@@ -42,14 +53,14 @@ export default function Calendar() {
           <table className="w-full">
             <thead className="bg-secondary">
               <tr>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">{activeTab === "upcoming" ? "Datum/Tijd" : "Datum"}</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Event</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Valuta</th>
-                {activeTab === "recent" && <th className="text-[9px] text-label uppercase text-left px-4 py-2">Actueel</th>}
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Verwacht</th>
-                {activeTab === "upcoming" && <th className="text-[9px] text-label uppercase text-left px-4 py-2">Vorig</th>}
-                {activeTab === "recent" && <th className="text-[9px] text-label uppercase text-left px-4 py-2">Verrassing</th>}
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Impact</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2">{activeTab === "upcoming" ? "Datum/Tijd" : "Datum"}</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Event</th>
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Valuta</th>
+                {activeTab === "recent" && <th className="text-[9px] text-label uppercase text-left px-5 py-2">Actueel</th>}
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Verwacht</th>
+                {activeTab === "upcoming" && <th className="text-[9px] text-label uppercase text-left px-5 py-2">Vorig</th>}
+                {activeTab === "recent" && <th className="text-[9px] text-label uppercase text-left px-5 py-2">Verrassing</th>}
+                <th className="text-[9px] text-label uppercase text-left px-5 py-2">Impact</th>
               </tr>
             </thead>
             <tbody>
@@ -58,31 +69,34 @@ export default function Calendar() {
                 return (
                   <tbody key={e.id}>
                     <tr className="border-b border-card-border hover:bg-secondary cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : e.id)}>
-                      <td className="text-[11px] text-sub-text px-4 py-2">{activeTab === "upcoming" ? fmtDateTime(e.event_datetime) : fmtDate(e.event_date)}</td>
-                      <td className="text-[11px] text-sub-text px-4 py-2">{val(e.event_name)}</td>
-                      <td className="text-[11px] text-sub-text px-4 py-2">{val(e.event_currency)}</td>
-                      {activeTab === "recent" && <td className="text-[11px] text-sub-text px-4 py-2">{val(e.actual_value)}</td>}
-                      <td className="text-[11px] text-sub-text px-4 py-2">{val(e.expected_value)}</td>
-                      {activeTab === "upcoming" && <td className="text-[11px] text-sub-text px-4 py-2">{val(e.previous_value)}</td>}
+                      <td className="text-[11px] text-sub-text px-5 py-2.5">{activeTab === "upcoming" ? fmtDateTime(e.event_datetime) : fmtDate(e.event_date)}</td>
+                      <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.event_name)}</td>
+                      <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.event_currency)}</td>
+                      {activeTab === "recent" && <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.actual_value)}</td>}
+                      <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.expected_value)}</td>
+                      {activeTab === "upcoming" && <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.previous_value)}</td>}
                       {activeTab === "recent" && (
-                        <td className="text-[11px] px-4 py-2">
+                        <td className="text-[11px] px-5 py-2.5">
                           {e.surprise_direction ? (
-                            <span className={e.surprise_direction === "positive" ? "text-bullish-text" : "text-bearish-text"}>
-                              {e.surprise_direction === "positive" ? "↑" : "↓"} {val(e.surprise_score)}
+                            <span className={`flex items-center gap-1 ${e.surprise_direction === "positive" ? "text-bullish-text" : "text-bearish-text"}`}>
+                              {e.surprise_direction === "positive" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                              {val(e.surprise_score)}
                             </span>
                           ) : "—"}
                         </td>
                       )}
-                      <td className="px-4 py-2"><ImpactChip impact={e.event_impact} /></td>
+                      <td className="px-5 py-2.5">
+                        <div className="flex items-center gap-1">{impactIcon(e.event_impact)}<ImpactChip impact={e.event_impact} /></div>
+                      </td>
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={activeTab === "upcoming" ? 7 : 8} className="bg-secondary px-[18px] py-[14px]">
+                        <td colSpan={activeTab === "upcoming" ? 6 : 7} className="bg-secondary px-5 py-4">
                           {activeTab === "recent" && (
                             <div className="flex gap-6 mb-3">
                               {[["Yields", e.yields_reaction],["DXY", e.dxy_reaction],["Aandelen", e.equity_reaction],["Goud", e.gold_reaction]].map(([l,v]) => (
                                 <div key={l as string}>
-                                  <div className="text-[9px] text-label uppercase">{l}</div>
+                                  <div className="text-[0.65rem] text-label uppercase">{l}</div>
                                   <div className="text-[11px] text-sub-text">{val(v)}</div>
                                 </div>
                               ))}

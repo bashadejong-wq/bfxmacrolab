@@ -4,6 +4,35 @@ import ReactMarkdown from "react-markdown";
 const MONTHS_NL = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 const DAYS_NL = ["Zo","Ma","Di","Wo","Do","Vr","Za"];
 
+/** Shared bias color utility */
+export function getBiasColor(bias: string | null): string {
+  const b = (bias || "").toLowerCase();
+  if (b === "bullish") return "#16A34A";
+  if (b === "bearish") return "#DC2626";
+  if (b === "mixed") return "#D97706";
+  return "#6B7280";
+}
+
+/** Shared bias background utility */
+export function getBiasBackground(bias: string | null): string {
+  const b = (bias || "").toLowerCase();
+  if (b === "bullish") return "#F0FDF4";
+  if (b === "bearish") return "#FEF2F2";
+  if (b === "mixed") return "#FFFBEB";
+  return "#F9FAFB";
+}
+
+/** Bias tailwind class utility */
+export function getBiasClasses(bias: string | null): string {
+  const b = (bias || "").toLowerCase();
+  if (b === "bullish") return "bg-bullish-bg text-bullish-text";
+  if (b === "bearish") return "bg-bearish-bg text-bearish-text";
+  if (b === "mixed") return "bg-mixed-bg text-mixed-text";
+  return "bg-neutral-bg text-neutral-text";
+}
+
+const FALLBACK_TEXT = "Nog geen analyse beschikbaar";
+
 /** Format date string to Dutch readable format */
 export const fmtDate = (v: any): string => {
   if (!v || v === "null") return "—";
@@ -27,11 +56,17 @@ export const fmtDateTime = (v: any): string => {
   } catch { return String(v); }
 };
 
-/** Null-safe value display — treats 0 as valid for numeric display */
+/** Null-safe value display — for numeric/data fields returns "—" */
 export const val = (v: any, suffix = "") => {
-  if (v === null || v === undefined || v === "" || v === "null" || (typeof v === "string" && v.trim() === "")) return "—";
+  if (v === null || v === undefined || v === "" || v === "null" || v === "undefined" || (typeof v === "string" && v.trim() === "")) return "—";
   if (v === 0 && suffix === "") return "—";
   return `${v}${suffix}`;
+};
+
+/** Null-safe text display — for narrative/text fields returns fallback */
+export const textVal = (v: any, fallback = FALLBACK_TEXT) => {
+  if (v === null || v === undefined || v === "" || v === "null" || v === "undefined" || (typeof v === "string" && v.trim() === "")) return fallback;
+  return String(v);
 };
 
 /** Null-safe numeric value — treats 0 as "—" */
@@ -65,11 +100,7 @@ export async function queryWithRetry<T>(
 
 /** Bias chip */
 export function BiasChip({ bias, size = "sm" }: { bias: string | null; size?: "sm" | "lg" }) {
-  const b = (bias || "").toLowerCase();
-  const styles =
-    b === "bullish" ? "bg-bullish-bg text-bullish-text" :
-    b === "bearish" ? "bg-bearish-bg text-bearish-text" :
-    "bg-neutral-bg text-neutral-text";
+  const styles = getBiasClasses(bias);
   const padding = size === "lg" ? "px-5 py-3 text-[14px]" : "px-2 py-[2px] text-[9px]";
   return (
     <span className={`${styles} ${padding} rounded uppercase font-semibold inline-block`}>
@@ -82,8 +113,9 @@ export function BiasChip({ bias, size = "sm" }: { bias: string | null; size?: "s
 export function RiskChip({ regime }: { regime: string | null }) {
   const r = (regime || "").toLowerCase();
   const styles =
-    r === "risk-off" ? "bg-bearish-bg text-bearish-text" :
-    r === "risk-on" ? "bg-bullish-bg text-bullish-text" :
+    r === "risk-off" || r === "stress" || r === "crisis" ? "bg-bearish-bg text-bearish-text" :
+    r === "risk-on" || r === "low" ? "bg-bullish-bg text-bullish-text" :
+    r === "elevated" ? "bg-mixed-bg text-mixed-text" :
     "bg-neutral-bg text-neutral-text";
   return (
     <span className={`${styles} px-2 py-[2px] text-[9px] rounded uppercase font-semibold inline-block`}>
@@ -97,7 +129,7 @@ export function ImpactChip({ impact }: { impact: string | null }) {
   const i = (impact || "").toLowerCase();
   const styles =
     i === "high" ? "bg-bearish-bg text-bearish-text" :
-    i === "medium" ? "bg-warning-bg text-warning-text" :
+    i === "medium" ? "bg-mixed-bg text-mixed-text" :
     "bg-neutral-bg text-neutral-text";
   return (
     <span className={`${styles} px-2 py-[2px] text-[9px] rounded uppercase font-semibold inline-block`}>
@@ -111,7 +143,7 @@ export function ConfidenceChip({ confidence }: { confidence: string | null }) {
   const c = (confidence || "").toLowerCase();
   const styles =
     c === "high" ? "bg-bullish-bg text-bullish-text" :
-    c === "medium" ? "bg-warning-bg text-warning-text" :
+    c === "medium" ? "bg-mixed-bg text-mixed-text" :
     c === "low" ? "bg-bearish-bg text-bearish-text" :
     "bg-neutral-bg text-neutral-text";
   return (
@@ -133,7 +165,7 @@ export function SurpriseChip({ direction, score }: { direction: string | null; s
 export function DataCard({ children, className = "", onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return (
     <div
-      className={`bg-card border border-card-border rounded-lg ${onClick ? "cursor-pointer hover:border-purple-accent/30 hover:bg-[#F5F0FF] transition-colors" : ""} ${className}`}
+      className={`bg-card border border-card-border rounded-lg ${onClick ? "cursor-pointer hover:border-purple-accent/30 transition-colors" : ""} ${className}`}
       onClick={onClick}
     >
       {children}
@@ -145,15 +177,17 @@ export function DataCard({ children, className = "", onClick }: { children: Reac
 export function SectionLabel({ children, subtitle }: { children: ReactNode; subtitle?: string }) {
   return (
     <div className="mb-3">
-      <span className="text-[9px] text-label uppercase tracking-[0.08em] font-medium">{children}</span>
-      {subtitle && <span className="text-[9px] text-neutral-text ml-2">{subtitle}</span>}
+      <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">{children}</span>
+      {subtitle && <span className="text-[0.65rem] text-neutral-text ml-2">{subtitle}</span>}
     </div>
   );
 }
 
 /** Markdown block */
 export function MarkdownBlock({ content, fallback }: { content: string | null; fallback?: string }) {
-  if (!content || content.trim() === "" || content === "null") return <span className="text-[11px] text-label italic">{fallback || "—"}</span>;
+  if (!content || content.trim() === "" || content === "null" || content === "undefined") {
+    return <span className="text-[11px] text-label italic">{fallback || FALLBACK_TEXT}</span>;
+  }
   return (
     <div className="markdown-content">
       <ReactMarkdown>{content}</ReactMarkdown>
@@ -167,7 +201,7 @@ export function LabelValue({ label, value, suffix, mono, large, className = "" }
 }) {
   return (
     <div className={className}>
-      <div className="text-[9px] text-label uppercase tracking-[0.08em]">{label}</div>
+      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em]">{label}</div>
       <div className={`${large ? "text-[22px]" : "text-[12px]"} text-foreground font-semibold ${mono ? "font-mono" : ""} mt-1`}>
         {val(value, suffix)}
       </div>
