@@ -45,17 +45,6 @@ function SensitivityPill({ type, value }: { type: string; value: string | null }
   );
 }
 
-function ConvictionBar({ pct }: { pct: number | null }) {
-  const p = pct ?? 0;
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-[60px] h-[3px] rounded-full bg-[#E5E7EB] overflow-hidden">
-        <div className="h-full rounded-full bg-purple-accent transition-all" style={{ width: `${Math.min(p, 100)}%` }} />
-      </div>
-      <span className="text-[9px] font-mono text-label">{p > 0 ? `${p}%` : "—"}</span>
-    </div>
-  );
-}
 
 export default function Currencies() {
   const { code } = useParams();
@@ -65,7 +54,7 @@ export default function Currencies() {
   const [snap, setSnap] = useState<any>(null);
   const [ranking, setRanking] = useState<any>(null);
   const [biasHistory, setBiasHistory] = useState<any[]>([]);
-  const [g8Consensus, setG8Consensus] = useState<any[]>([]);
+  const [fxRanking, setFxRanking] = useState<any[]>([]);
   const [yieldData, setYieldData] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -85,8 +74,8 @@ export default function Currencies() {
         `Currencies/entity_bias/${activeCurrency}`
       ),
       queryWithRetry(
-        () => supabase.from("v_g8_consensus").select("*").order("rank_position", { ascending: true }),
-        "Currencies/g8_consensus"
+        () => supabase.from("v_fx_currency_ranking").select("*").order("rank_position", { ascending: true }).limit(8),
+        "Currencies/fx_ranking"
       ),
       queryWithRetry(
         () => supabase.from("v_yield_pattern_intelligence").select("*").limit(1),
@@ -96,7 +85,7 @@ export default function Currencies() {
       setSnap((s as any[])?.[0] || null);
       setRanking((r as any[])?.[0] || null);
       setBiasHistory((b as any[]) || []);
-      setG8Consensus((g as any[]) || []);
+      setFxRanking((g as any[]) || []);
       setYieldData((y as any[])?.[0] || null);
       setLoaded(true);
     });
@@ -395,24 +384,26 @@ export default function Currencies() {
                 </div>
               )}
 
-              {/* 7. G8 CONSENSUS */}
-              <SectionLabel>G8 CONSENSUS</SectionLabel>
+              {/* FX CURRENCY RANKING */}
+              <SectionLabel>FX CURRENCY RANKING</SectionLabel>
               <DataCard className="overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-secondary">
                     <tr>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Code</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bullish</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bearish</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Totaal</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Confidence</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bull / Bear</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Main Driver</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {g8Consensus.map((c, i) => {
+                    {fxRanking.map((c, i) => {
                       const isActive = c.currency_code === activeCurrency;
+                      const biasClass = c.bias === "bullish" ? "bg-bullish-bg text-bullish-text" : c.bias === "bearish" ? "bg-bearish-bg text-bearish-text" : "bg-neutral-bg text-neutral-text";
+                      const confClass = c.confidence === "high" ? "text-bullish-text" : c.confidence === "low" ? "text-bearish-text" : "text-mixed-text";
+                      const FLAG: Record<string, string> = { USD: "🇺🇸", EUR: "🇪🇺", JPY: "🇯🇵", GBP: "🇬🇧", AUD: "🇦🇺", NZD: "🇳🇿", CAD: "🇨🇦", CHF: "🇨🇭" };
                       return (
                         <tr key={c.currency_code || i}
                           className={`border-b border-card-border cursor-pointer hover:bg-secondary transition-colors ${
@@ -420,15 +411,27 @@ export default function Currencies() {
                           }`}
                           onClick={() => navigate(`/currencies/${c.currency_code}`)}
                         >
-                          <td className="text-[10px] font-mono text-label px-4 py-2">{c.rank_position || i + 1}</td>
-                          <td className="text-[10px] font-bold px-4 py-2">
-                            <span className="text-purple-accent">{c.currency_code}</span>
+                          <td className="text-[11px] font-mono font-bold text-label px-4 py-2.5">{c.rank_position || i + 1}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[14px]">{FLAG[c.currency_code] || ""}</span>
+                              <span className="text-[12px] font-bold text-foreground">{c.currency_code}</span>
+                            </div>
                           </td>
-                          <td className="px-4 py-2"><BiasChip bias={c.consensus_bias} /></td>
-                          <td className="px-4 py-2"><ConvictionBar pct={c.conviction_pct} /></td>
-                          <td className="text-[10px] text-bullish-text font-mono px-4 py-2">{c.bullish_count ?? 0}</td>
-                          <td className="text-[10px] text-bearish-text font-mono px-4 py-2">{c.bearish_count ?? 0}</td>
-                          <td className="text-[10px] text-sub-text font-mono px-4 py-2">{c.total_reports ?? 0}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{c.bias || "neutral"}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`text-[10px] font-semibold uppercase ${confClass}`}>{c.confidence || "—"}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-mono text-bullish-text font-semibold">{c.bullish_count ?? 0}</span>
+                              <span className="text-[8px] text-label">/</span>
+                              <span className="text-[10px] font-mono text-bearish-text font-semibold">{c.bearish_count ?? 0}</span>
+                            </div>
+                          </td>
+                          <td className="text-[10px] text-sub-text px-4 py-2.5 max-w-[220px] truncate">{c.main_driver || "—"}</td>
                         </tr>
                       );
                     })}
