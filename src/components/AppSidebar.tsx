@@ -20,7 +20,7 @@ const navItems = [
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
   { label: "Event History", path: "/event-history", icon: History },
   { label: "Trade Ideas", path: "/trade-ideas", icon: Lightbulb },
-  { label: "Weekly Digest", path: "/weekly-digest", icon: Newspaper },
+  
   { label: "Correlations", path: "/correlations", icon: Grid3X3 },
 ];
 
