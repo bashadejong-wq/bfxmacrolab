@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, BiasChip, RiskChip, ImpactChip, MarkdownBlock, fmtDate, fmtDateTime, queryWithRetry } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, ImpactChip, MarkdownBlock, fmtDate, fmtDateTime, queryWithRetry, getBiasColor, getBiasBackground } from "@/components/ui-helpers";
 import {
   Zap, TrendingUp, TrendingDown, Sun, RefreshCw, GitMerge, HelpCircle,
   Shield, AlertTriangle, AlertOctagon, ShieldAlert, ShieldCheck,
@@ -10,46 +10,16 @@ import {
 } from "lucide-react";
 
 const REGIME_ICONS: Record<string, React.ElementType> = {
-  energy_shock: Zap,
-  stagflation: TrendingUp,
-  goldilocks: Sun,
-  reflation: RefreshCw,
-  deflation: TrendingDown,
-  mixed: GitMerge,
-  transitional: GitMerge,
+  energy_shock: Zap, stagflation: TrendingUp, goldilocks: Sun, reflation: RefreshCw,
+  deflation: TrendingDown, mixed: GitMerge, transitional: GitMerge,
 };
-
 const RISK_ICONS: Record<string, React.ElementType> = {
-  low: ShieldCheck,
-  normal: Shield,
-  elevated: ShieldAlert,
-  stress: AlertTriangle,
-  crisis: AlertOctagon,
+  low: ShieldCheck, normal: Shield, elevated: ShieldAlert, stress: AlertTriangle, crisis: AlertOctagon,
 };
-
 const RISK_COLORS: Record<string, string> = {
-  low: "text-bullish-text bg-bullish-bg",
-  normal: "text-neutral-text bg-neutral-bg",
-  elevated: "text-warning-text bg-warning-bg",
-  stress: "text-bearish-text bg-bearish-bg",
-  crisis: "text-bearish-text bg-bearish-bg",
+  low: "text-bullish-text bg-bullish-bg", normal: "text-neutral-text bg-neutral-bg",
+  elevated: "text-mixed-text bg-mixed-bg", stress: "text-bearish-text bg-bearish-bg", crisis: "text-bearish-text bg-bearish-bg",
 };
-
-function getBiasColor(bias: string | null): string {
-  const b = (bias || "").toLowerCase();
-  if (b === "bullish") return "#16A34A";
-  if (b === "bearish") return "#DC2626";
-  if (b === "mixed") return "#D97706";
-  return "#6B7280";
-}
-
-function getBiasBackground(bias: string | null): string {
-  const b = (bias || "").toLowerCase();
-  if (b === "bullish") return "#F0FDF4";
-  if (b === "bearish") return "#FEF2F2";
-  if (b === "mixed") return "#FFFBEB";
-  return "#F9FAFB";
-}
 
 function ConvictionBar({ score }: { score: number | null }) {
   const s = score ?? 0;
@@ -72,7 +42,7 @@ function BiasPill({ code, bias, isTop3 }: { code: string; bias: string | null; i
   const bg = getBiasBackground(bias);
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md" style={{ backgroundColor: bg }}>
-      {isTop3 && <Star size={12} className="text-warning-text fill-warning-text" />}
+      {isTop3 && <Star size={12} className="text-mixed-text fill-mixed-text" />}
       <span className="text-[11px] font-bold" style={{ color }}>{code}</span>
       <span className="text-[9px] uppercase font-semibold" style={{ color }}>{(bias || "neutral").toLowerCase()}</span>
     </div>
@@ -106,11 +76,7 @@ export default function Overview() {
     setLoaded(true);
   }, []);
 
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
-  }, [load]);
+  useEffect(() => { load(); const interval = setInterval(load, 60000); return () => clearInterval(interval); }, [load]);
 
   const regimeKey = (alignment?.macro_regime || "").toLowerCase().replace(/[\s-]/g, "_");
   const RegimeIcon = REGIME_ICONS[regimeKey] || HelpCircle;
@@ -120,7 +86,7 @@ export default function Overview() {
 
   const vixColor = (regime: string | null) => {
     const r = (regime || "").toLowerCase();
-    return r === "elevated" ? "text-warning-text" : r === "extreme" ? "text-bearish-text" : r === "low" ? "text-bullish-text" : "text-label";
+    return r === "elevated" ? "text-mixed-text" : r === "extreme" ? "text-bearish-text" : r === "low" ? "text-bullish-text" : "text-label";
   };
 
   const top3Codes = consensus.slice(0, 3).map(c => c.entity_code);
@@ -130,63 +96,55 @@ export default function Overview() {
   const impactIcon = (impact: string | null) => {
     const i = (impact || "").toLowerCase();
     if (i === "high") return <Zap size={12} className="text-bearish-text" />;
-    if (i === "medium") return <Activity size={12} className="text-warning-text" />;
+    if (i === "medium") return <Activity size={12} className="text-mixed-text" />;
     return <Minus size={12} className="text-neutral-text" />;
   };
 
   return (
     <DashboardLayout>
-      {/* === REGIME HERO === */}
+      {/* REGIME HERO */}
       <DataCard className="p-5 mb-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="text-[10px] text-label uppercase tracking-[0.08em] mb-2">MACRO REGIME</div>
+            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2">MACRO REGIME</div>
             <div className="flex items-center gap-3 mb-3">
               <div className="flex items-center gap-2 bg-secondary px-4 py-2 rounded-md">
                 <RegimeIcon size={18} className="text-purple-accent" />
-                <span className="text-[20px] font-black text-foreground uppercase tracking-tight">
-                  {alignment?.macro_regime || FALLBACK}
-                </span>
+                <span className="text-[20px] font-black text-foreground uppercase tracking-tight">{alignment?.macro_regime || FALLBACK}</span>
               </div>
               <div className={`flex items-center gap-1.5 px-3 py-2 rounded-md ${riskColor}`}>
                 <RiskIcon size={14} />
                 <span className="text-[11px] font-semibold uppercase">{alignment?.risk_regime || "—"}</span>
               </div>
             </div>
-            <div className="text-[11px] text-sub-text leading-relaxed max-w-[520px] line-clamp-2">
-              {alignment?.core_driver || FALLBACK}
-            </div>
+            <div className="text-[11px] text-sub-text leading-relaxed max-w-[520px] line-clamp-2">{textVal(alignment?.core_driver)}</div>
           </div>
           <div className="flex flex-col items-end">
-            <div className="text-[10px] text-label uppercase tracking-[0.08em] mb-2">CONVICTION</div>
+            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2">CONVICTION</div>
             <ConvictionBar score={alignment?.conviction_score} />
           </div>
         </div>
       </DataCard>
 
-      {/* === WHAT TO DO / AVOID === */}
+      {/* WHAT TO DO / AVOID */}
       <div className="grid grid-cols-2 gap-4 mb-8">
-        <DataCard className="p-5 border-l-[3px] border-l-[#16A34A]">
+        <DataCard className="p-5 border-l-[3px] border-l-bullish-text">
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle size={14} className="text-bullish-text" />
-            <span className="text-[10px] text-label uppercase tracking-[0.08em] font-medium">WAT TE DOEN</span>
+            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">WAT TE DOEN</span>
           </div>
-          <div className="text-[11px] text-sub-text leading-relaxed">
-            {alignment?.what_to_do || FALLBACK}
-          </div>
+          <div className="text-[11px] text-sub-text leading-relaxed">{textVal(alignment?.what_to_do)}</div>
         </DataCard>
-        <DataCard className="p-5 border-l-[3px] border-l-[#DC2626]">
+        <DataCard className="p-5 border-l-[3px] border-l-bearish-text">
           <div className="flex items-center gap-2 mb-3">
             <XCircle size={14} className="text-bearish-text" />
-            <span className="text-[10px] text-label uppercase tracking-[0.08em] font-medium">VERMIJD</span>
+            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">VERMIJD</span>
           </div>
-          <div className="text-[11px] text-sub-text leading-relaxed">
-            {alignment?.what_to_avoid || FALLBACK}
-          </div>
+          <div className="text-[11px] text-sub-text leading-relaxed">{textVal(alignment?.what_to_avoid)}</div>
         </DataCard>
       </div>
 
-      {/* === MARKET CARDS === */}
+      {/* MARKET CARDS */}
       <SectionLabel>MARKET SNAPSHOT</SectionLabel>
       <div className="grid grid-cols-5 gap-4 mb-8">
         {[
@@ -198,41 +156,35 @@ export default function Overview() {
         ].map((item) => (
           <DataCard key={item.label} className="p-5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-label uppercase font-medium">{item.label}</span>
+              <span className="text-[0.65rem] text-label uppercase font-medium">{item.label}</span>
               {item.label === "VIX" && (
                 item.sub?.toLowerCase() === "elevated" || item.sub?.toLowerCase() === "extreme"
                   ? <TrendingUp size={14} className="text-bearish-text" />
                   : <TrendingDown size={14} className="text-bullish-text" />
               )}
             </div>
-            <div className="text-[20px] font-bold text-foreground font-mono mt-1">
-              {item.value != null ? item.value : "—"}
-            </div>
-            {item.sub && (
-              <div className={`text-[9px] mt-1 font-semibold uppercase ${vixColor(item.sub)}`}>{item.sub}</div>
-            )}
+            <div className="text-[20px] font-bold text-foreground font-mono mt-1">{item.value != null ? item.value : "—"}</div>
+            {item.sub && <div className={`text-[9px] mt-1 font-semibold uppercase ${vixColor(item.sub)}`}>{item.sub}</div>}
           </DataCard>
         ))}
       </div>
 
-      {/* === FX CONSENSUS === */}
-      <SectionLabel subtitle="★ = Top 3 conviction">FX CONSENSUS</SectionLabel>
+      {/* FX CONSENSUS */}
+      <SectionLabel subtitle="Top 3 conviction">FX CONSENSUS</SectionLabel>
       <div className="flex flex-wrap gap-2 mb-8">
         {allCurrencies.map((code) => {
           const c = consensusMap[code];
-          const bias = c?.consensus_bias || null;
-          const isTop3 = top3Codes.includes(code);
-          return <BiasPill key={code} code={code} bias={bias} isTop3={isTop3} />;
+          return <BiasPill key={code} code={code} bias={c?.consensus_bias || null} isTop3={top3Codes.includes(code)} />;
         })}
       </div>
 
-      {/* === TABLES === */}
+      {/* TABLES */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Upcoming Events */}
+        {/* Events */}
         <DataCard className="overflow-hidden">
           <div className="px-5 py-3 border-b border-card-border flex items-center gap-2">
             <CalendarDays size={14} className="text-label" />
-            <span className="text-[10px] text-label uppercase tracking-[0.08em] font-medium">AANKOMENDE EVENTS</span>
+            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">AANKOMENDE EVENTS</span>
           </div>
           {events.length === 0 && loaded ? (
             <div className="p-5 text-center text-[11px] text-label">{FALLBACK}</div>
@@ -252,27 +204,22 @@ export default function Overview() {
                     <td className="text-[11px] text-sub-text px-5 py-2.5">{fmtDateTime(e.event_datetime)}</td>
                     <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.event_name)}</td>
                     <td className="text-[11px] text-sub-text px-5 py-2.5">{val(e.event_currency)}</td>
-                    <td className="px-5 py-2.5">
-                      <div className="flex items-center gap-1">
-                        {impactIcon(e.event_impact)}
-                        <ImpactChip impact={e.event_impact} />
-                      </div>
-                    </td>
+                    <td className="px-5 py-2.5"><div className="flex items-center gap-1">{impactIcon(e.event_impact)}<ImpactChip impact={e.event_impact} /></div></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
           <div className="px-5 py-2.5 border-t border-card-border">
-            <span className="text-[10px] text-purple-accent cursor-pointer hover:underline font-medium" onClick={() => navigate("/calendar")}>→ Alle events</span>
+            <span className="text-[10px] text-purple-accent cursor-pointer hover:underline font-medium" onClick={() => navigate("/calendar")}>Alle events</span>
           </div>
         </DataCard>
 
-        {/* Recent Reports */}
+        {/* Reports */}
         <DataCard className="overflow-hidden">
           <div className="px-5 py-3 border-b border-card-border flex items-center gap-2">
             <FileText size={14} className="text-label" />
-            <span className="text-[10px] text-label uppercase tracking-[0.08em] font-medium">RECENTE RAPPORTEN</span>
+            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">RECENTE RAPPORTEN</span>
           </div>
           {reports.length === 0 && loaded ? (
             <div className="p-5 text-center text-[11px] text-label">{FALLBACK}</div>
@@ -291,14 +238,9 @@ export default function Overview() {
                   <tr key={r.id} className="hover:bg-secondary cursor-pointer border-b border-card-border last:border-0" onClick={() => navigate(`/reports?id=${r.id}`)}>
                     <td className="text-[11px] text-sub-text px-5 py-2.5">{fmtDate(r.analysis_date)}</td>
                     <td className="text-[11px] text-sub-text px-5 py-2.5 max-w-[200px] truncate">
-                      <div className="flex items-center gap-1.5">
-                        <FileText size={12} className="text-label shrink-0" />
-                        {val(r.title)}
-                      </div>
+                      <div className="flex items-center gap-1.5"><FileText size={12} className="text-label shrink-0" />{val(r.title)}</div>
                     </td>
-                    <td className="px-5 py-2.5">
-                      <span className="bg-secondary text-purple-accent px-2 py-[2px] text-[9px] rounded uppercase font-semibold">{val(r.macro_regime)}</span>
-                    </td>
+                    <td className="px-5 py-2.5"><span className="bg-secondary text-purple-accent px-2 py-[2px] text-[9px] rounded uppercase font-semibold">{val(r.macro_regime)}</span></td>
                     <td className="text-[11px] text-foreground font-mono font-semibold px-5 py-2.5">{r.confidence_score != null ? `${r.confidence_score}/10` : "—"}</td>
                   </tr>
                 ))}
@@ -306,7 +248,7 @@ export default function Overview() {
             </table>
           )}
           <div className="px-5 py-2.5 border-t border-card-border">
-            <span className="text-[10px] text-purple-accent cursor-pointer hover:underline font-medium" onClick={() => navigate("/reports")}>→ Alle rapporten</span>
+            <span className="text-[10px] text-purple-accent cursor-pointer hover:underline font-medium" onClick={() => navigate("/reports")}>Alle rapporten</span>
           </div>
         </DataCard>
       </div>
