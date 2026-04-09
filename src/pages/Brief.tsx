@@ -4,8 +4,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, val, textVal, MarkdownBlock, RiskChip, queryWithRetry, getBiasColor } from "@/components/ui-helpers";
 import {
   BookOpen, GitMerge, CheckCircle, XCircle, AlertTriangle,
-  Eye, Target, Star,
-  Zap, Sun, TrendingUp, TrendingDown, RefreshCw
+  Eye, Target, Star, Building2,
+  Zap, Sun, TrendingUp, TrendingDown, RefreshCw, Crosshair, BarChart3
 } from "lucide-react";
 
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
@@ -23,6 +23,21 @@ function regimeIcon(r: string | null) {
   const k = (r || "").toLowerCase().replace(/[\s-]/g, "_");
   for (const [key, I] of Object.entries(REGIME_MAP)) { if (k.includes(key)) return I; }
   return GitMerge;
+}
+
+/* ---- Shared section header ---- */
+function SectionHead({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <Icon size={16} className="text-label" />
+      <span className="text-[0.7rem] text-label uppercase tracking-[0.08em] font-semibold">{label}</span>
+    </div>
+  );
+}
+
+/* ---- Spacer between sections ---- */
+function Divider() {
+  return <hr className="border-card-border my-8" />;
 }
 
 export default function Brief() {
@@ -53,7 +68,6 @@ export default function Brief() {
 
   return (
     <DashboardLayout>
-      {/* Tab bar */}
       <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-8">
         {tabs.map((t) => {
           const Icon = t.icon;
@@ -69,8 +83,7 @@ export default function Brief() {
         })}
       </div>
 
-      {/* Content area — reading-optimized max-width */}
-      <div className="max-w-[780px] mx-auto">
+      <div className="max-w-[760px] mx-auto pb-16">
         {!loaded ? (
           <div className="text-center text-label text-[14px] mt-16">Laden...</div>
         ) : tab === "alignment" ? (
@@ -92,14 +105,26 @@ function Empty({ label }: { label: string }) {
   );
 }
 
-/* ===================== PERIOD BRIEF (Daily / Weekly / Monthly) ===================== */
+/* ---- Prose wrapper for reading sections ---- */
+function Prose({ children }: { children: React.ReactNode }) {
+  return <div className="text-[15px] text-sub-text leading-[1.75]">{children}</div>;
+}
+
+/* ===================== PERIOD BRIEF ===================== */
 function PeriodBrief({ snap, period }: { snap: any; period: string }) {
   const RegimeIcon = regimeIcon(snap.macro_regime);
   const convictionPct = snap.conviction_score ? Math.min(Math.max((snap.conviction_score / 10) * 100, 0), 100) : 0;
 
+  // Combine macro summaries
+  const macroStory = [snap.summary_micro, snap.summary_dashboard, snap.summary]
+    .filter(Boolean)
+    .join("\n\n---\n\n");
+
+  const watchpoints = snap.what_to_watch || snap.what_to_watch_next || snap.next_watchpoints;
+
   return (
     <>
-      {/* Date + regime line */}
+      {/* ── Meta line ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <span className="text-[12px] text-label">{fmtDate(snap.period_start)}</span>
         <span className="flex items-center gap-1 bg-neutral-bg text-neutral-text px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
@@ -115,40 +140,68 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
         </div>
       </div>
 
-      {/* Headline */}
-      <div className="flex items-start gap-2.5 mb-6">
-        <BookOpen size={22} className="text-label mt-[2px] shrink-0" />
-        <h1 className="text-[22px] font-bold text-foreground leading-snug">{textVal(snap.headline, "Nog geen headline beschikbaar")}</h1>
-      </div>
+      {/* ── 1. HEADLINE ── */}
+      <h2 className="text-[24px] font-bold text-foreground leading-snug mb-2">
+        {textVal(snap.headline, "Nog geen headline beschikbaar")}
+      </h2>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* Macro story */}
-      <div className="text-[14px] text-sub-text leading-[1.75] mb-8">
-        <MarkdownBlock content={snap.summary_micro || snap.summary_dashboard || snap.summary} fallback="Nog geen macro samenvatting beschikbaar" />
-      </div>
+      {/* ── 2. MACRO STORY ── */}
+      <SectionHead icon={BookOpen} label="Macro Story" />
+      <Prose>
+        <MarkdownBlock content={macroStory} fallback="Nog geen macro samenvatting beschikbaar" />
+      </Prose>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* Scenarios — compact row */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      {/* ── 3. CORE DRIVER + FLOW CHAIN ── */}
+      <SectionHead icon={Crosshair} label="Core Driver" />
+      <DataCard className="p-5 mb-4">
+        <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">CORE DRIVER</div>
+        <Prose><MarkdownBlock content={snap.core_driver} /></Prose>
+      </DataCard>
+      {snap.flow_chain && (
+        <DataCard className="p-5">
+          <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">FLOW CHAIN</div>
+          <Prose><MarkdownBlock content={snap.flow_chain} /></Prose>
+        </DataCard>
+      )}
+
+      <Divider />
+
+      {/* ── 4. CENTRAL BANK ── */}
+      <SectionHead icon={Building2} label="Central Bank Narrative" />
+      <Prose><MarkdownBlock content={snap.cb_narrative} /></Prose>
+
+      <Divider />
+
+      {/* ── 5. WHAT CHANGED ── */}
+      <SectionHead icon={RefreshCw} label="What Changed" />
+      <Prose><MarkdownBlock content={snap.what_changed} /></Prose>
+
+      <Divider />
+
+      {/* ── 6. SCENARIOS ── */}
+      <SectionHead icon={GitMerge} label="Scenarios" />
+      <div className="grid grid-cols-3 gap-4 mb-2">
         {[
           { label: "BASIS", value: snap.scenario_base, borderColor: "#6B7280" },
           { label: "OPWAARTS", value: snap.scenario_upside, borderColor: "#16A34A" },
           { label: "NEERWAARTS", value: snap.scenario_downside, borderColor: "#DC2626" },
         ].map(s => (
           <DataCard key={s.label} className="p-4" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-1.5">{s.label}</div>
-            <div className="text-[12px] text-sub-text leading-relaxed">{textVal(s.value)}</div>
+            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{s.label}</div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={s.value} /></div>
           </DataCard>
         ))}
       </div>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* FX Bias pills */}
-      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">FX BIAS</div>
-      <div className="flex flex-wrap gap-2 mb-8">
+      {/* ── 7. FX BIAS ── */}
+      <SectionHead icon={BarChart3} label="FX Bias" />
+      <div className="flex flex-wrap gap-2 mb-2">
         {FX.map(code => {
           const bias = snap[`${code.toLowerCase()}_bias`];
           const color = getBiasColor(bias);
@@ -161,29 +214,46 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
         })}
       </div>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* Watchpoints + Trading */}
-      <div className="grid grid-cols-2 gap-5">
-        <div>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Eye size={15} className="text-label" />
-            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">KEY WATCHPOINTS</span>
-          </div>
-          <div className="text-[13px] text-sub-text leading-[1.7]">
-            <MarkdownBlock content={snap.what_to_watch || snap.what_to_watch_next || snap.next_watchpoints} />
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Target size={15} className="text-label" />
-            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">TRADING IMPLICATIES</span>
-          </div>
-          <div className="text-[13px] text-sub-text leading-[1.7]">
-            <MarkdownBlock content={snap.trading_implications} />
-          </div>
-        </div>
+      {/* ── 8. ASSET VIEWS ── */}
+      <SectionHead icon={TrendingUp} label="Asset Views" />
+      <div className="grid grid-cols-2 gap-4 mb-2">
+        {[
+          { label: "GOLD", value: snap.gold_view },
+          { label: "OIL", value: snap.oil_view },
+          { label: "S&P 500", value: snap.spx_view },
+          { label: "NASDAQ", value: snap.nasdaq_view },
+        ].map(a => (
+          <DataCard key={a.label} className="p-4">
+            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{a.label}</div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={a.value} /></div>
+          </DataCard>
+        ))}
       </div>
+
+      <Divider />
+
+      {/* ── 9. TRADING IMPLICATIONS ── */}
+      <SectionHead icon={Target} label="Trading Implicaties" />
+      <Prose><MarkdownBlock content={snap.trading_implications} /></Prose>
+
+      <Divider />
+
+      {/* ── 10. KEY WATCHPOINTS ── */}
+      <SectionHead icon={Eye} label="Key Watchpoints" />
+      <Prose><MarkdownBlock content={watchpoints} /></Prose>
+
+      {/* ── 11. FORWARD IMPLICATIONS (if present) ── */}
+      {(snap.next_week_focus || snap.high_conviction_next_month || snap.key_developments) && (
+        <>
+          <Divider />
+          <SectionHead icon={TrendingUp} label="Forward Implications" />
+          <Prose>
+            <MarkdownBlock content={snap.next_week_focus || snap.high_conviction_next_month || snap.key_developments} />
+          </Prose>
+        </>
+      )}
     </>
   );
 }
@@ -198,10 +268,14 @@ function AlignmentBrief({ al }: { al: any }) {
   const StateIcon = isAligned ? CheckCircle : isConflict ? AlertTriangle : GitMerge;
   const convictionPct = al.conviction_score ? Math.min(Math.max((al.conviction_score / 10) * 100, 0), 100) : 0;
 
+  const macroStory = [al.macro_story, al.summary_dashboard, al.summary]
+    .filter(Boolean)
+    .join("\n\n---\n\n");
+
   return (
     <>
-      {/* State hero */}
-      <div className="flex items-center gap-4 mb-6">
+      {/* ── State hero ── */}
+      <div className="flex items-center gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-2.5 px-5 py-3 rounded-lg border" style={{ background: stateBg, borderColor: stateColor }}>
           <StateIcon size={24} style={{ color: stateColor }} />
           <span className="text-[24px] font-black uppercase tracking-wide" style={{ color: stateColor }}>{val(al.alignment_state)}</span>
@@ -216,71 +290,130 @@ function AlignmentBrief({ al }: { al: any }) {
         <span className="text-[12px] text-label ml-auto">{fmtDate(al.alignment_date)}</span>
       </div>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* Macro story */}
-      <div className="text-[14px] text-sub-text leading-[1.75] mb-8">
-        <MarkdownBlock content={al.macro_story || al.summary_dashboard || al.summary} fallback="Nog geen macro verhaal beschikbaar" />
+      {/* ── 1. MACRO STORY ── */}
+      <SectionHead icon={BookOpen} label="Macro Story" />
+      <Prose>
+        <MarkdownBlock content={macroStory} fallback="Nog geen macro verhaal beschikbaar" />
+      </Prose>
+
+      <Divider />
+
+      {/* ── 2. CORE DRIVER + FLOW CHAIN ── */}
+      <SectionHead icon={Crosshair} label="Core Driver" />
+      <DataCard className="p-5 mb-4">
+        <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">CORE DRIVER</div>
+        <Prose><MarkdownBlock content={al.core_driver} /></Prose>
+      </DataCard>
+      {al.flow_chain && (
+        <DataCard className="p-5">
+          <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">FLOW CHAIN</div>
+          <Prose><MarkdownBlock content={al.flow_chain} /></Prose>
+        </DataCard>
+      )}
+
+      <Divider />
+
+      {/* ── 3. CENTRAL BANK ── */}
+      <SectionHead icon={Building2} label="Central Bank Narrative" />
+      <Prose><MarkdownBlock content={al.cb_alignment_narrative || al.cb_view} /></Prose>
+
+      <Divider />
+
+      {/* ── 4. SCENARIOS ── */}
+      <SectionHead icon={GitMerge} label="Scenarios" />
+      <div className="grid grid-cols-3 gap-4 mb-2">
+        {[
+          { label: "BASIS", value: al.scenario_base, borderColor: "#6B7280" },
+          { label: "OPWAARTS", value: al.scenario_upside, borderColor: "#16A34A" },
+          { label: "NEERWAARTS", value: al.scenario_downside, borderColor: "#DC2626" },
+        ].map(s => (
+          <DataCard key={s.label} className="p-4" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
+            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{s.label}</div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={s.value} /></div>
+          </DataCard>
+        ))}
       </div>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* Do / Avoid */}
-      <div className="grid grid-cols-2 gap-5 mb-8">
+      {/* ── 5. DO / AVOID ── */}
+      <div className="grid grid-cols-2 gap-5 mb-2">
         <DataCard className="p-5" style={{ borderLeft: "3px solid #16A34A" }}>
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle size={15} className="text-bullish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">WAT TE DOEN</span>
           </div>
-          <div className="text-[13px] text-sub-text leading-[1.7]">
-            <MarkdownBlock content={al.what_to_do} />
-          </div>
+          <Prose><MarkdownBlock content={al.what_to_do} /></Prose>
         </DataCard>
         <DataCard className="p-5" style={{ borderLeft: "3px solid #DC2626" }}>
           <div className="flex items-center gap-2 mb-3">
             <XCircle size={15} className="text-bearish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">VERMIJD</span>
           </div>
-          <div className="text-[13px] text-sub-text leading-[1.7]">
-            <MarkdownBlock content={al.what_to_avoid} />
-          </div>
+          <Prose><MarkdownBlock content={al.what_to_avoid} /></Prose>
         </DataCard>
       </div>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* High conviction / Avoid assets */}
-      <div className="grid grid-cols-2 gap-5 mb-8">
+      {/* ── 6. HIGH / LOW CONVICTION ASSETS ── */}
+      <div className="grid grid-cols-2 gap-5 mb-2">
         <div>
           <div className="flex items-center gap-1.5 mb-3">
             <Star size={15} className="text-bullish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">HOOG CONVICTION ASSETS</span>
           </div>
-          <div className="text-[13px] text-sub-text leading-[1.7]">
-            <MarkdownBlock content={al.high_conviction_assets} />
-          </div>
+          <Prose><MarkdownBlock content={al.high_conviction_assets} /></Prose>
         </div>
         <div>
           <div className="flex items-center gap-1.5 mb-3">
             <XCircle size={15} className="text-bearish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">VERMIJD ASSETS</span>
           </div>
-          <div className="text-[13px] text-sub-text leading-[1.7]">
-            <MarkdownBlock content={al.low_conviction_assets} />
-          </div>
+          <Prose><MarkdownBlock content={al.low_conviction_assets} /></Prose>
         </div>
       </div>
 
-      <hr className="border-card-border mb-6" />
+      <Divider />
 
-      {/* Watchpoints */}
-      <div className="flex items-center gap-1.5 mb-3">
-        <Eye size={15} className="text-label" />
-        <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">KEY WATCHPOINTS</span>
+      {/* ── 7. ASSET VIEWS ── */}
+      <SectionHead icon={TrendingUp} label="Asset Views" />
+      <div className="grid grid-cols-2 gap-4 mb-2">
+        {[
+          { label: "GOLD", value: al.gold_view },
+          { label: "OIL", value: al.oil_view },
+          { label: "S&P 500", value: al.spx_view },
+          { label: "VIX", value: al.vix_view },
+        ].map(a => (
+          <DataCard key={a.label} className="p-4">
+            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{a.label}</div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={a.value} /></div>
+          </DataCard>
+        ))}
       </div>
-      <div className="text-[13px] text-sub-text leading-[1.7]">
-        <MarkdownBlock content={al.key_watchpoints} />
-      </div>
+
+      <Divider />
+
+      {/* ── 8. TRADING IMPLICATIONS ── */}
+      <SectionHead icon={Target} label="Trading Implicaties" />
+      <Prose><MarkdownBlock content={al.trading_implications} /></Prose>
+
+      <Divider />
+
+      {/* ── 9. KEY WATCHPOINTS ── */}
+      <SectionHead icon={Eye} label="Key Watchpoints" />
+      <Prose><MarkdownBlock content={al.key_watchpoints} /></Prose>
+
+      {/* ── 10. CONFLICTS (if present) ── */}
+      {al.conflicts && (
+        <>
+          <Divider />
+          <SectionHead icon={AlertTriangle} label="Conflicts" />
+          <Prose><MarkdownBlock content={al.conflicts} /></Prose>
+        </>
+      )}
     </>
   );
 }
