@@ -11,10 +11,13 @@ import {
   Layers, ArrowRight, ChevronRight
 } from "lucide-react";
 
+import { BriefContent as BriefInline } from "./Brief";
+
 const PERIODS = [
   { label: "Daily", value: "daily", icon: CalendarDays },
   { label: "Weekly", value: "weekly", icon: CalendarRange },
   { label: "Monthly", value: "monthly", icon: CalIcon },
+  { label: "Brief", value: "brief", icon: BookOpen },
 ];
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
 
@@ -155,7 +158,9 @@ export default function DWM() {
         })}
       </div>
 
-      {loaded && !snap ? (
+      {activePeriod === "brief" ? (
+        <BriefInline />
+      ) : loaded && !snap ? (
         <div className="text-center text-label text-[13px] mt-10">Nog geen snapshot beschikbaar voor {activePeriod}</div>
       ) : !loaded ? (
         <div className="text-center text-label text-[13px] mt-10">Laden...</div>

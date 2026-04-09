@@ -40,7 +40,8 @@ function Divider() {
   return <hr className="border-card-border my-8" />;
 }
 
-export default function Brief() {
+/** Brief content without DashboardLayout — used inline in DWM */
+export function BriefContent() {
   const [tab, setTab] = useState<"daily"|"weekly"|"monthly"|"alignment">("daily");
   const [snap, setSnap] = useState<any>(null);
   const [al, setAl] = useState<any>(null);
@@ -67,20 +68,16 @@ export default function Brief() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-8">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 px-5 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
-                t.key === tab ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
-              }`}>
-              <Icon size={14} />
-              {t.label}
-            </button>
-          );
-        })}
+    <>
+      <div className="flex gap-2 mb-6">
+        {tabs.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-3 py-1.5 text-[11px] font-semibold rounded transition-colors ${
+              t.key === tab ? "bg-purple-accent text-white" : "bg-secondary text-label hover:text-foreground"
+            }`}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <div className="max-w-[760px] mx-auto pb-16">
@@ -92,6 +89,14 @@ export default function Brief() {
           snap ? <PeriodBrief snap={snap} period={tab} /> : <Empty label={tab} />
         )}
       </div>
+    </>
+  );
+}
+
+export default function Brief() {
+  return (
+    <DashboardLayout>
+      <BriefContent />
     </DashboardLayout>
   );
 }

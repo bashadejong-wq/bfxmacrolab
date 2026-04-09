@@ -8,15 +8,12 @@ import Currencies from "./pages/Currencies";
 import DWM from "./pages/DWM";
 import Alignment from "./pages/Alignment";
 import Reports from "./pages/Reports";
-import Brief from "./pages/Brief";
 import Yields from "./pages/Yields";
 import MacroData from "./pages/MacroData";
 import Market from "./pages/Market";
 import Calendar from "./pages/Calendar";
 import EventHistory from "./pages/EventHistory";
 import TradeIdeas from "./pages/TradeIdeas";
-import RegimeTimeline from "./pages/RegimeTimeline";
-import Correlations from "./pages/Correlations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,18 +30,17 @@ const App = () => (
           <Route path="/currencies/:code" element={<Currencies />} />
           <Route path="/currencies" element={<Navigate to="/currencies/USD" replace />} />
           <Route path="/dwm" element={<DWM />} />
+          <Route path="/brief" element={<Navigate to="/dwm" replace />} />
           <Route path="/alignment" element={<Alignment />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/brief" element={<Brief />} />
           <Route path="/yields" element={<Yields />} />
           <Route path="/macro-data" element={<MacroData />} />
           <Route path="/market" element={<Market />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/event-history" element={<EventHistory />} />
           <Route path="/trade-ideas" element={<TradeIdeas />} />
-          <Route path="/regime-timeline" element={<RegimeTimeline />} />
-          
-          <Route path="/correlations" element={<Correlations />} />
+          <Route path="/regime-timeline" element={<Navigate to="/alignment" replace />} />
+          <Route path="/correlations" element={<Navigate to="/currencies/USD" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
