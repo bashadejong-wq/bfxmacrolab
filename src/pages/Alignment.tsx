@@ -151,7 +151,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
   const avoidChips = parseChips(al.low_conviction_assets || al.what_to_avoid);
 
   return (
-    <DashboardLayout>
+    <>
       {/* 1. ALIGNMENT STATE HEADER */}
       <DataCard className="px-4 py-3 mb-3" style={{ borderLeft: `4px solid ${stateColor}` }}>
         <div className="flex items-center gap-3 flex-wrap">
@@ -404,6 +404,6 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
           </div>
         </DataCard>
       </div>
-    </DashboardLayout>
+    </>
   );
 }
