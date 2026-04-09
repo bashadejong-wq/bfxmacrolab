@@ -65,7 +65,7 @@ export default function Currencies() {
   const [snap, setSnap] = useState<any>(null);
   const [ranking, setRanking] = useState<any>(null);
   const [biasHistory, setBiasHistory] = useState<any[]>([]);
-  const [g8Consensus, setG8Consensus] = useState<any[]>([]);
+  const [fxRanking, setFxRanking] = useState<any[]>([]);
   const [yieldData, setYieldData] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -85,8 +85,8 @@ export default function Currencies() {
         `Currencies/entity_bias/${activeCurrency}`
       ),
       queryWithRetry(
-        () => supabase.from("v_g8_consensus").select("*").order("rank_position", { ascending: true }),
-        "Currencies/g8_consensus"
+        () => supabase.from("v_fx_currency_ranking").select("*").order("rank_position", { ascending: true }).limit(8),
+        "Currencies/fx_ranking"
       ),
       queryWithRetry(
         () => supabase.from("v_yield_pattern_intelligence").select("*").limit(1),
@@ -96,7 +96,7 @@ export default function Currencies() {
       setSnap((s as any[])?.[0] || null);
       setRanking((r as any[])?.[0] || null);
       setBiasHistory((b as any[]) || []);
-      setG8Consensus((g as any[]) || []);
+      setFxRanking((g as any[]) || []);
       setYieldData((y as any[])?.[0] || null);
       setLoaded(true);
     });
