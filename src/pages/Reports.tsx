@@ -411,7 +411,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
       {biasData.length === 0 ? (
         <div className="text-[11px] text-label italic">Nog geen entity bias data voor dit rapport</div>
       ) : (
-        <div className="border border-card-border rounded-lg overflow-hidden">
+        <div className="border border-card-border rounded-lg overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead className="bg-secondary">
               <tr>
