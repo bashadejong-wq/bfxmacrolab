@@ -166,6 +166,13 @@ export default function Reports() {
             <div className="flex items-center justify-center h-full text-[13px] text-label">Laden...</div>
           ) : (
             <>
+              {/* Mobile back button */}
+              <button
+                className="md:hidden flex items-center gap-1 text-[11px] text-purple-accent font-semibold mb-3"
+                onClick={() => { setActiveReportId(null); setSearchParams({}); }}
+              >
+                ← Terug naar lijst
+              </button>
               {/* HEADER */}
               <div className="mb-2">
                 <div className="text-[18px] font-bold text-foreground leading-snug">{val(detail.title)}</div>
@@ -280,7 +287,7 @@ function CompactTab({ detail }: { detail: any }) {
       <Spacer />
 
       <SHead icon={GitMerge} label="Scenario's" />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: "BASIS", value: detail.scenario_base, borderColor: "#6B7280" },
           { label: "OPWAARTS", value: detail.scenario_upside, borderColor: "#16A34A" },
@@ -336,7 +343,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       {/* FX BIAS with cleaned reasons */}
       <SHead icon={DollarSign} label="FX Bias" />
-      <div className="grid grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
         {FX_CODES.map(code => {
           const bias = detail[`${code.toLowerCase()}_bias`];
           const reason = detail[`${code.toLowerCase()}_reason`];
@@ -359,7 +366,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       {/* ASSET BIAS with cleaned reasons */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ASSET BIAS</div>
-      <div className="grid grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
         {ASSETS.map(({ label, bias, reason, icon: Icon }) => {
           const color = getBiasColor(bias);
           const displayReason = cleanAssetReason(label, bias, reason);
@@ -380,7 +387,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       {/* RATES */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">RENTES</div>
-      <div className="grid grid-cols-2 gap-3 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
         {RATES.map(({ label, bias, reason }) => {
           const color = getBiasColor(bias);
           const displayReason = cleanAssetReason(label, bias, reason);
