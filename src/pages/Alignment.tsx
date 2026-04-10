@@ -103,7 +103,7 @@ export default function Alignment() {
   return (
     <DashboardLayout>
       {/* Tab bar */}
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-5">
+      <div className="bg-card border-b border-card-border px-4 md:px-7 flex overflow-x-auto -mx-4 md:-mx-7 -mt-4 md:-mt-7 mb-5">
         {[
           { key: "alignment" as const, label: "Alignment", icon: GitMerge },
           { key: "timeline" as const, label: "Regime Timeline", icon: Clock },
@@ -228,7 +228,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
 
       {/* 3. TIMEFRAME VERGELIJKING */}
       <SectionLabel>TIMEFRAME VERGELIJKING</SectionLabel>
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         {[
           { label: "DAILY VS WEEKLY", value: al.daily_vs_weekly },
           { label: "WEEKLY VS MONTHLY", value: al.weekly_vs_monthly },
@@ -250,7 +250,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
 
       {/* 4. MACRO PILAREN */}
       <SectionLabel>MACRO PILAREN</SectionLabel>
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
           { label: "GROEI", alignment: al.growth_alignment, view: al.growth_view, icon: TrendingUp },
           { label: "INFLATIE", alignment: al.inflation_alignment, view: al.inflation_view, icon: Flame },
@@ -275,7 +275,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
       <hr className="border-card-border mb-4" />
 
       {/* 5 & 6. HIGH CONVICTION / VERMIJD — chip-based */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         <DataCard className="px-4 py-3" style={{ borderLeft: "3px solid #16A34A" }}>
           <div className="flex items-center gap-2 mb-2">
             <Star size={13} className="text-bullish-text" />
@@ -310,7 +310,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
 
       {/* WAT TE DOEN / VERMIJD narratief */}
       {(al.what_to_do || al.what_to_avoid) && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           <DataCard className="px-4 py-3" style={{ borderLeft: "3px solid #16A34A" }}>
             <div className="flex items-center gap-2 mb-1.5">
               <CheckCircle size={13} className="text-bullish-text" />
@@ -332,7 +332,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
 
       {/* 7. CURRENCY VIEWS — 2x4 grid ranked */}
       <SectionLabel>CURRENCY VIEWS</SectionLabel>
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {orderedFx.map((c, idx) => {
           const view = al?.[`${c.toLowerCase()}_view`];
           const bias = getViewBias(view);
@@ -353,7 +353,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
 
       {/* 8. SCENARIOS */}
       <SectionLabel>SCENARIO'S</SectionLabel>
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         {[
           { label: "BASIS", value: al.scenario_base, borderColor: "#6B7280" },
           { label: "OPWAARTS", value: al.scenario_upside, borderColor: "#16A34A" },
@@ -372,7 +372,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
 
       {/* 9. MONITORING & ACTIE */}
       <SectionLabel>MONITORING & ACTIE</SectionLabel>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <DataCard className="px-4 py-3">
           <div className="flex items-center gap-1.5 mb-2">
             <Eye size={13} className="text-label" />

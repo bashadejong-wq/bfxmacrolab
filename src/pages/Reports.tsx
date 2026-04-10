@@ -116,9 +116,9 @@ export default function Reports() {
 
   return (
     <DashboardLayout>
-      <div className="flex -mx-7 -mt-7 min-h-screen">
+      <div className="flex flex-col md:flex-row -mx-4 md:-mx-7 -mt-4 md:-mt-7 min-h-screen">
         {/* LEFT PANEL — Report List */}
-        <div className="w-[300px] min-w-[300px] bg-card border-r border-card-border h-screen overflow-y-auto sticky top-0">
+        <div className={`w-full md:w-[300px] md:min-w-[300px] bg-card border-b md:border-b-0 md:border-r border-card-border md:h-screen overflow-y-auto md:sticky md:top-0 ${activeReportId ? "hidden md:block" : ""}`}>
           <div className="px-5 py-3 border-b border-card-border flex items-center gap-2">
             <FileText size={14} className="text-label" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">RAPPORTEN</span>
@@ -156,9 +156,9 @@ export default function Reports() {
         </div>
 
         {/* RIGHT PANEL — Report Detail */}
-        <div className="flex-1 p-7 overflow-y-auto">
+        <div className="flex-1 p-4 md:p-7 overflow-y-auto">
           {!activeReportId ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-10 md:py-0">
               <FileText size={32} className="text-label" />
               <span className="text-[13px] text-label">Selecteer een rapport uit de lijst</span>
             </div>
@@ -166,6 +166,13 @@ export default function Reports() {
             <div className="flex items-center justify-center h-full text-[13px] text-label">Laden...</div>
           ) : (
             <>
+              {/* Mobile back button */}
+              <button
+                className="md:hidden flex items-center gap-1 text-[11px] text-purple-accent font-semibold mb-3"
+                onClick={() => { setActiveReportId(null); setSearchParams({}); }}
+              >
+                ← Terug naar lijst
+              </button>
               {/* HEADER */}
               <div className="mb-2">
                 <div className="text-[18px] font-bold text-foreground leading-snug">{val(detail.title)}</div>
@@ -280,7 +287,7 @@ function CompactTab({ detail }: { detail: any }) {
       <Spacer />
 
       <SHead icon={GitMerge} label="Scenario's" />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: "BASIS", value: detail.scenario_base, borderColor: "#6B7280" },
           { label: "OPWAARTS", value: detail.scenario_upside, borderColor: "#16A34A" },
@@ -336,7 +343,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       {/* FX BIAS with cleaned reasons */}
       <SHead icon={DollarSign} label="FX Bias" />
-      <div className="grid grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
         {FX_CODES.map(code => {
           const bias = detail[`${code.toLowerCase()}_bias`];
           const reason = detail[`${code.toLowerCase()}_reason`];
@@ -359,7 +366,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       {/* ASSET BIAS with cleaned reasons */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ASSET BIAS</div>
-      <div className="grid grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
         {ASSETS.map(({ label, bias, reason, icon: Icon }) => {
           const color = getBiasColor(bias);
           const displayReason = cleanAssetReason(label, bias, reason);
@@ -380,7 +387,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       {/* RATES */}
       <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">RENTES</div>
-      <div className="grid grid-cols-2 gap-3 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
         {RATES.map(({ label, bias, reason }) => {
           const color = getBiasColor(bias);
           const displayReason = cleanAssetReason(label, bias, reason);
@@ -404,7 +411,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
       {biasData.length === 0 ? (
         <div className="text-[11px] text-label italic">Nog geen entity bias data voor dit rapport</div>
       ) : (
-        <div className="border border-card-border rounded-lg overflow-hidden">
+        <div className="border border-card-border rounded-lg overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead className="bg-secondary">
               <tr>

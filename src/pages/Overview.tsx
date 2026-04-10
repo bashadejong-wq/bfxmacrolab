@@ -175,7 +175,7 @@ export default function Overview() {
   return (
     <DashboardLayout>
       {/* 1. TRANSMISSION CHAIN STRIP */}
-      <div className="flex items-stretch gap-0 mb-3 bg-card border border-card-border rounded-lg overflow-hidden">
+      <div className="flex items-stretch gap-0 mb-3 bg-card border border-card-border rounded-lg overflow-x-auto">
         {chainSteps.map((step, i) => {
           const color = getStepColor(step.value);
           const bg = getStepBg(step.value);
@@ -195,11 +195,11 @@ export default function Overview() {
 
       {/* REGIME HERO — compact */}
       <DataCard className="px-4 py-3 mb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-secondary px-3 py-1.5 rounded-md">
               <RegimeIcon size={16} className="text-purple-accent" />
-              <span className="text-[16px] font-black text-foreground uppercase tracking-tight">{a?.macro_regime || FALLBACK}</span>
+              <span className="text-[14px] md:text-[16px] font-black text-foreground uppercase tracking-tight">{a?.macro_regime || FALLBACK}</span>
             </div>
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${riskColor}`}>
               <RiskIcon size={13} />
@@ -232,7 +232,7 @@ export default function Overview() {
       </DataCard>
 
       {/* WHAT TO DO / AVOID — compact */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         <DataCard className="px-4 py-3 border-l-[3px] border-l-bullish-text">
           <div className="flex items-center gap-1.5 mb-1.5">
             <CheckCircle size={12} className="text-bullish-text" />
@@ -251,7 +251,7 @@ export default function Overview() {
 
       {/* MARKET SNAPSHOT */}
       <SectionLabel>MARKET SNAPSHOT</SectionLabel>
-      <div className="grid grid-cols-5 gap-3 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
         {marketItems.map((item) => (
           <DataCard key={item.label} className="px-4 py-3">
             <div className="flex items-center justify-between mb-0.5">
@@ -300,7 +300,7 @@ export default function Overview() {
 
       {/* 5. CURRENCY RANKING (parsed from cockpit) */}
       <SectionLabel>CURRENCY RANKING</SectionLabel>
-      <DataCard className="overflow-hidden mb-3">
+      <DataCard className="overflow-hidden mb-3 overflow-x-auto">
         <table className="w-full">
           <thead className="bg-secondary">
             <tr>
@@ -330,7 +330,7 @@ export default function Overview() {
       {parseHighConviction(a?.high_conviction_assets).length > 0 && (
         <>
           <SectionLabel>HIGH CONVICTION TRADES</SectionLabel>
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             {parseHighConviction(a?.high_conviction_assets).map((idea, i) => {
               const isLong = idea.toLowerCase().startsWith("long");
               const isShort = idea.toLowerCase().startsWith("short");
@@ -369,9 +369,9 @@ export default function Overview() {
       )}
 
       {/* TABLES */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Events */}
-        <DataCard className="overflow-hidden">
+        <DataCard className="overflow-hidden overflow-x-auto">
           <div className="px-4 py-2.5 border-b border-card-border flex items-center gap-2">
             <CalendarDays size={13} className="text-label" />
             <span className="text-[8px] text-label uppercase tracking-wider font-medium">AANKOMENDE EVENTS</span>
@@ -406,7 +406,7 @@ export default function Overview() {
         </DataCard>
 
         {/* Reports */}
-        <DataCard className="overflow-hidden">
+        <DataCard className="overflow-hidden overflow-x-auto">
           <div className="px-4 py-2.5 border-b border-card-border flex items-center gap-2">
             <FileText size={13} className="text-label" />
             <span className="text-[8px] text-label uppercase tracking-wider font-medium">RECENTE RAPPORTEN</span>
