@@ -127,10 +127,10 @@ export default function Currencies() {
   return (
     <DashboardLayout>
       {/* Currency tabs */}
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-5">
+      <div className="bg-card border-b border-card-border px-4 md:px-7 flex overflow-x-auto -mx-4 md:-mx-7 -mt-4 md:-mt-7 mb-5">
         {CURRENCIES.map((c) => (
           <button key={c} onClick={() => navigate(`/currencies/${c}`)}
-            className={`px-4 py-2.5 text-[11px] font-semibold border-b-2 transition-colors ${
+            className={`px-3 md:px-4 py-2.5 text-[11px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
               c === activeCurrency ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
             }`}>{c}</button>
         ))}
@@ -151,7 +151,7 @@ export default function Currencies() {
             <>
               {/* 1. CURRENCY HEADER */}
               <DataCard className="px-4 py-3 mb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <DollarSign size={18} className="text-purple-accent" />
@@ -184,7 +184,7 @@ export default function Currencies() {
 
               {/* 2. MACRO PILLARS */}
               <SectionLabel>MACRO PILLARS</SectionLabel>
-              <div className="grid grid-cols-4 gap-3 mb-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 {[
                   { label: "GROEI", score: r?.score_growth, direction: snap?.growth_now || snap?.growth_expectation, narrative: snap?.growth_now ? `Nu: ${snap.growth_now}` : null },
                   { label: "INFLATIE", score: r?.score_inflation, direction: snap?.inflation_now || snap?.inflation_expectation, narrative: snap?.inflation_now ? `Nu: ${snap.inflation_now}` : null },
@@ -200,7 +200,7 @@ export default function Currencies() {
               </div>
 
               {/* Macro fundamentals text */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <DataCard className="px-3 py-3">
                   <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">GROEI</div>
                   <div className="grid grid-cols-2 gap-3">
@@ -220,7 +220,7 @@ export default function Currencies() {
               {/* 3. CENTRALE BANK */}
               <DataCard className="px-3 py-3 mb-3">
                 <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">CENTRALE BANK</div>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div>
                     <div className="text-[8px] text-label uppercase">STANCE</div>
                     <div className="text-[12px] font-bold text-foreground mt-0.5">{val(r?.cb_stance || snap?.cb_stance)}</div>
@@ -256,7 +256,7 @@ export default function Currencies() {
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <div className="text-[8px] text-label uppercase">2J RENTE</div>
                     <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(y2, "%")}</div>
@@ -285,7 +285,7 @@ export default function Currencies() {
 
               {/* 5. TIMEFRAME BIAS */}
               <SectionLabel>TIMEFRAME BIAS</SectionLabel>
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 {[
                   { label: "KORTE TERMIJN", value: r?.short_term_bias || snap?.short_term_bias },
                   { label: "MIDDELLANG", value: r?.medium_term_bias || snap?.medium_term_bias },
@@ -313,7 +313,7 @@ export default function Currencies() {
               </div>
 
               {/* 8. MONITORING CARDS */}
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 <DataCard className="px-3 py-3 border-l-[3px] border-l-purple-accent">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <Eye size={11} className="text-purple-accent" />
@@ -347,7 +347,7 @@ export default function Currencies() {
               {biasHistory.length > 0 && (
                 <>
                   <SectionLabel>RECENTE BIAS SIGNALEN</SectionLabel>
-                  <DataCard className="overflow-hidden mb-3">
+                  <DataCard className="overflow-hidden mb-3 overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-secondary">
                         <tr>
@@ -386,7 +386,7 @@ export default function Currencies() {
 
               {/* FX CURRENCY RANKING */}
               <SectionLabel>FX CURRENCY RANKING</SectionLabel>
-              <DataCard className="overflow-hidden">
+              <DataCard className="overflow-hidden overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-secondary">
                     <tr>
