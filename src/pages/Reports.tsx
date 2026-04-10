@@ -156,9 +156,9 @@ export default function Reports() {
         </div>
 
         {/* RIGHT PANEL — Report Detail */}
-        <div className="flex-1 p-7 overflow-y-auto">
+        <div className="flex-1 p-4 md:p-7 overflow-y-auto">
           {!activeReportId ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-10 md:py-0">
               <FileText size={32} className="text-label" />
               <span className="text-[13px] text-label">Selecteer een rapport uit de lijst</span>
             </div>
