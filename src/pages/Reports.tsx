@@ -116,9 +116,9 @@ export default function Reports() {
 
   return (
     <DashboardLayout>
-      <div className="flex -mx-7 -mt-7 min-h-screen">
+      <div className="flex flex-col md:flex-row -mx-4 md:-mx-7 -mt-4 md:-mt-7 min-h-screen">
         {/* LEFT PANEL — Report List */}
-        <div className="w-[300px] min-w-[300px] bg-card border-r border-card-border h-screen overflow-y-auto sticky top-0">
+        <div className={`w-full md:w-[300px] md:min-w-[300px] bg-card border-b md:border-b-0 md:border-r border-card-border md:h-screen overflow-y-auto md:sticky md:top-0 ${activeReportId ? "hidden md:block" : ""}`}>
           <div className="px-5 py-3 border-b border-card-border flex items-center gap-2">
             <FileText size={14} className="text-label" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">RAPPORTEN</span>
