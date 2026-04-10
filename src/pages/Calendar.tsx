@@ -118,7 +118,7 @@ export default function Calendar() {
   return (
     <DashboardLayout>
       {/* Tabs */}
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-5">
+      <div className="bg-card border-b border-card-border px-4 md:px-7 flex overflow-x-auto -mx-4 md:-mx-7 -mt-4 md:-mt-7 mb-5">
         {[["Upcoming","upcoming"],["Recent","recent"]].map(([label, key]) => (
           <button key={key} onClick={() => { setActiveTab(key); setImpactFilter("all"); }}
             className={`flex items-center gap-1.5 px-5 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
@@ -159,7 +159,7 @@ export default function Calendar() {
       </div>
 
       {/* Main content: table + side panel */}
-      <div className="flex gap-4">
+      <div className="flex flex-col md:flex-row gap-4">
         {/* TABLE */}
         <div className={`${selectedEvent ? "flex-1 min-w-0" : "w-full"} transition-all`}>
           {loaded && filtered.length === 0 ? (
@@ -174,7 +174,7 @@ export default function Calendar() {
               )}
             </div>
           ) : filtered.length > 0 && (
-            <DataCard className="overflow-hidden">
+            <DataCard className="overflow-hidden overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-secondary">
                   <tr>
@@ -245,7 +245,7 @@ export default function Calendar() {
 
         {/* 2. SIDE PANEL — Event Detail */}
         {selectedEvent && (
-          <div className="w-[340px] min-w-[340px] sticky top-0 self-start">
+          <div className="w-full md:w-[340px] md:min-w-[340px] md:sticky md:top-0 md:self-start">
             <DataCard className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <div>
