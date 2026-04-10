@@ -143,7 +143,7 @@ export default function DWM() {
   return (
     <DashboardLayout>
       {/* Tab bar */}
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-5">
+      <div className="bg-card border-b border-card-border px-4 md:px-7 flex overflow-x-auto -mx-4 md:-mx-7 -mt-4 md:-mt-7 mb-5">
         {PERIODS.map((p) => {
           const Icon = p.icon;
           return (
@@ -249,7 +249,7 @@ export default function DWM() {
 
           {/* WEEKLY: strongest/weakest theme */}
           {isWeekly && (snap.strongest_theme || snap.weakest_theme) && (
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <DataCard className="px-4 py-3 border-l-[3px] border-l-bullish-text">
                 <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">STERKSTE THEMA</div>
                 <div className="text-[12px] text-foreground font-semibold">{textVal(snap.strongest_theme, "Geen dominant thema geïdentificeerd")}</div>
@@ -326,7 +326,7 @@ export default function DWM() {
 
           {/* SCENARIOS */}
           <SectionLabel>SCENARIO'S</SectionLabel>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             {[
               { label: "BASIS", value: snap.scenario_base, borderColor: "#6B7280" },
               { label: "OPWAARTS", value: snap.scenario_upside, borderColor: "#16A34A" },
@@ -364,7 +364,7 @@ export default function DWM() {
 
           {/* ASSET VIEWS */}
           <SectionLabel>ASSET VIEWS</SectionLabel>
-          <div className="grid grid-cols-5 gap-3 mb-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
             {[
               { l: "GOLD", v: snap.gold_view, icon: Package },
               { l: "OIL", v: snap.oil_view, icon: Package },
@@ -386,7 +386,7 @@ export default function DWM() {
 
           {/* RATES */}
           <SectionLabel>RENTES & CURVE</SectionLabel>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             {[
               { l: "US 2Y", v: snap.us_2y_view, icon: Percent, curve: false },
               { l: "US 10Y", v: snap.us_10y_view, icon: Percent, curve: false },
@@ -410,7 +410,7 @@ export default function DWM() {
 
           {/* ACTIE & MONITORING */}
           <SectionLabel>ACTIE & MONITORING</SectionLabel>
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
             {[
               { l: "WAT VERANDERDE", v: snap.what_changed, icon: RefreshCw, fallback: "Geen veranderingen geregistreerd — markt in continuïteit" },
               { l: "TE MONITOREN", v: snap.what_to_watch || snap.what_to_watch_next || snap.next_watchpoints, icon: Eye, fallback: "Volg regime-indicatoren en CB communicatie" },
