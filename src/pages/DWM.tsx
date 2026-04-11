@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, queryWithRetry, getBiasColor } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel } from "@/components/ui-helpers";
 import {
   CalendarDays, CalendarRange, Calendar as CalIcon,
   BookOpen, Package, BarChart2, Activity, Percent,
@@ -169,11 +169,11 @@ export default function DWM() {
           {/* 1. HEADER — improved */}
           <DataCard className="px-4 py-3 mb-3">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="text-[16px] font-bold text-foreground">{val(snap.period_label)}</span>
+              <span className="text-[16px] font-bold text-foreground">{safeText(val(snap.period_label))}</span>
               <span className="text-[11px] text-label">{fmtShortDate(snap.period_start)}</span>
               <span className="flex items-center gap-1 bg-neutral-bg text-neutral-text px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
                 <RegimeIcon size={11} />
-                {val(snap.macro_regime)}
+                {formatLabel(snap.macro_regime) || "—"}
               </span>
               <RiskChip regime={snap.risk_regime} />
               <span className="px-2 py-[2px] text-[9px] rounded uppercase font-bold" style={{ backgroundColor: roBadge.bg, color: roBadge.color }}>
@@ -243,7 +243,7 @@ export default function DWM() {
           <SectionLabel>MACRO SAMENVATTING</SectionLabel>
           <div className="bg-secondary border border-card-border rounded-lg p-4 mb-4">
             <div className="max-w-[720px] text-[13px] text-sub-text leading-[1.7]">
-              <MarkdownBlock content={snap.summary_micro || snap.summary_dashboard || snap.summary} />
+              <MarkdownBlock content={renderDashboardText(snap.summary_micro || snap.summary_dashboard || snap.summary)} />
             </div>
           </div>
 

@@ -4,12 +4,58 @@ import ReactMarkdown from "react-markdown";
 const MONTHS_NL = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 const DAYS_NL = ["Zo","Ma","Di","Wo","Do","Vr","Za"];
 
+/** FIX 6 — Global text sanitizer: strips CJK characters, objects, double spaces */
+export function safeText(value: any): string {
+  if (!value) return "";
+  if (typeof value === "object") return "";
+  return String(value)
+    .replace(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** FIX 1 — Render summary_dashboard: handles objects, strips raw section labels */
+export function renderDashboardText(value: any): string {
+  if (!value) return "";
+  if (typeof value === "object") {
+    return value.text || value.summary || value.content || JSON.stringify(value);
+  }
+  let text = String(value);
+  text = text.replace(/^MACRO STORY\n?/i, "");
+  text = text.replace(/\nCORE DRIVER\n[\s\S]*/i, "");
+  text = text.replace(/\nKAPITAALSTROMEN\n[\s\S]*/i, "");
+  text = text.replace(/\nMARKTIMPACT\n[\s\S]*/i, "");
+  text = text.replace(/\nTRADING IMPLICATIE[\s\S]*/i, "");
+  text = text.replace(/[\u4E00-\u9FFF\u3040-\u30FF]/g, "");
+  return text.trim();
+}
+
+/** FIX 2 — Format regime/driver labels: underscores → spaces, title case */
+export function formatLabel(value: any): string {
+  if (!value) return "";
+  return String(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** FIX 4 — Parse watchpoints into bullet list items */
+export function parseWatchpoints(text: string | null): string[] {
+  if (!text) return [];
+  return text
+    .split(/\d+\.\s+|;\s*|,\s+(?=[A-Z])/)
+    .map(s => s.replace(/^\d+\.\s*/, "").trim())
+    .filter(s => s.length > 5);
+}
+
 /** Shared bias color utility */
 export function getBiasColor(bias: string | null): string {
   const b = (bias || "").toLowerCase();
   if (b === "bullish") return "#16A34A";
+  if (b === "licht bullish") return "#4ADE80";
   if (b === "bearish") return "#DC2626";
+  if (b === "licht bearish") return "#F97316";
   if (b === "mixed") return "#D97706";
+  if (b === "niet relevant") return "#D1D5DB";
   return "#6B7280";
 }
 
@@ -17,8 +63,11 @@ export function getBiasColor(bias: string | null): string {
 export function getBiasBackground(bias: string | null): string {
   const b = (bias || "").toLowerCase();
   if (b === "bullish") return "#F0FDF4";
+  if (b === "licht bullish") return "#F0FDF4";
   if (b === "bearish") return "#FEF2F2";
+  if (b === "licht bearish") return "#FFF7ED";
   if (b === "mixed") return "#FFFBEB";
+  if (b === "niet relevant") return "#F9FAFB";
   return "#F9FAFB";
 }
 
@@ -26,8 +75,12 @@ export function getBiasBackground(bias: string | null): string {
 export function getBiasClasses(bias: string | null): string {
   const b = (bias || "").toLowerCase();
   if (b === "bullish") return "bg-bullish-bg text-bullish-text";
+  if (b === "licht bullish") return "bg-bullish-bg text-[#4ADE80]";
   if (b === "bearish") return "bg-bearish-bg text-bearish-text";
+  if (b === "licht bearish") return "bg-[#FFF7ED] text-[#F97316]";
   if (b === "mixed") return "bg-mixed-bg text-mixed-text";
+  if (b === "niet relevant") return "bg-neutral-bg text-[#D1D5DB] italic";
+  if (b === "neutraal") return "bg-neutral-bg text-neutral-text";
   return "bg-neutral-bg text-neutral-text";
 }
 
@@ -100,8 +153,10 @@ export async function queryWithRetry<T>(
 
 /** Bias chip */
 export function BiasChip({ bias, size = "sm" }: { bias: string | null; size?: "sm" | "lg" }) {
+  const b = (bias || "").toLowerCase();
+  const isNietRelevant = b === "niet relevant";
   const styles = getBiasClasses(bias);
-  const padding = size === "lg" ? "px-5 py-3 text-[14px]" : "px-2 py-[2px] text-[9px]";
+  const padding = size === "lg" ? "px-5 py-3 text-[14px]" : isNietRelevant ? "px-2 py-[2px] text-[8px]" : "px-2 py-[2px] text-[9px]";
   return (
     <span className={`${styles} ${padding} rounded uppercase font-semibold inline-block`}>
       {bias || "NEUTRAL"}

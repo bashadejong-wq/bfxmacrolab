@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, val, textVal, MarkdownBlock, RiskChip, queryWithRetry, getBiasColor } from "@/components/ui-helpers";
+import { DataCard, val, textVal, MarkdownBlock, RiskChip, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
 import {
   BookOpen, GitMerge, CheckCircle, XCircle, AlertTriangle,
   Eye, Target, Star, Building2,
@@ -120,10 +120,11 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
   const RegimeIcon = regimeIcon(snap.macro_regime);
   const convictionPct = snap.conviction_score ? Math.min(Math.max((snap.conviction_score / 10) * 100, 0), 100) : 0;
 
-  // Combine macro summaries
-  const macroStory = [snap.summary_micro, snap.summary_dashboard, snap.summary]
-    .filter(Boolean)
-    .join("\n\n---\n\n");
+  // FIX 1 + 8: Combine macro summaries with renderDashboardText, fallback chain
+  const rawStory = snap.summary_micro || snap.summary_dashboard || snap.summary;
+  const macroStory = renderDashboardText(rawStory) || 
+    renderDashboardText(snap.summary) || 
+    renderDashboardText(snap.summary_micro) || "";
 
   const watchpoints = snap.what_to_watch || snap.what_to_watch_next || snap.next_watchpoints;
 
@@ -133,7 +134,7 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <span className="text-[12px] text-label">{fmtDate(snap.period_start)}</span>
         <span className="flex items-center gap-1 bg-neutral-bg text-neutral-text px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
-          <RegimeIcon size={11} /> {val(snap.macro_regime)}
+          <RegimeIcon size={11} /> {formatLabel(snap.macro_regime) || "—"}
         </span>
         <RiskChip regime={snap.risk_regime} />
         <div className="flex items-center gap-1.5">
@@ -147,7 +148,7 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
 
       {/* ── 1. HEADLINE ── */}
       <h2 className="text-[24px] font-bold text-foreground leading-snug mb-2">
-        {textVal(snap.headline, "Nog geen headline beschikbaar")}
+        {safeText(textVal(snap.headline, "Nog geen headline beschikbaar"))}
       </h2>
 
       <Divider />
@@ -164,12 +165,12 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
       <SectionHead icon={Crosshair} label="Core Driver" />
       <DataCard className="p-5 mb-4">
         <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">CORE DRIVER</div>
-        <Prose><MarkdownBlock content={snap.core_driver} /></Prose>
+        <Prose><MarkdownBlock content={safeText(snap.core_driver)} /></Prose>
       </DataCard>
       {snap.flow_chain && (
         <DataCard className="p-5">
           <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">FLOW CHAIN</div>
-          <Prose><MarkdownBlock content={snap.flow_chain} /></Prose>
+          <Prose><MarkdownBlock content={safeText(snap.flow_chain)} /></Prose>
         </DataCard>
       )}
 
@@ -177,19 +178,19 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
 
       {/* ── 4. CENTRAL BANK ── */}
       <SectionHead icon={Building2} label="Central Bank Narrative" />
-      <Prose><MarkdownBlock content={snap.cb_narrative} /></Prose>
+      <Prose><MarkdownBlock content={safeText(snap.cb_narrative)} /></Prose>
 
       <Divider />
 
       {/* ── 5. WHAT CHANGED ── */}
       <SectionHead icon={RefreshCw} label="What Changed" />
-      <Prose><MarkdownBlock content={snap.what_changed} /></Prose>
+      <Prose><MarkdownBlock content={safeText(snap.what_changed)} /></Prose>
 
       <Divider />
 
       {/* ── 6. SCENARIOS ── */}
       <SectionHead icon={GitMerge} label="Scenarios" />
-      <div className="grid grid-cols-3 gap-4 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
         {[
           { label: "BASIS", value: snap.scenario_base, borderColor: "#6B7280" },
           { label: "OPWAARTS", value: snap.scenario_upside, borderColor: "#16A34A" },
@@ -197,7 +198,7 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
         ].map(s => (
           <DataCard key={s.label} className="p-4" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
             <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{s.label}</div>
-            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={s.value} /></div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={safeText(s.value)} /></div>
           </DataCard>
         ))}
       </div>
@@ -232,7 +233,7 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
         ].map(a => (
           <DataCard key={a.label} className="p-4">
             <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{a.label}</div>
-            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={a.value} /></div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={safeText(a.value)} /></div>
           </DataCard>
         ))}
       </div>
@@ -241,13 +242,28 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
 
       {/* ── 9. TRADING IMPLICATIONS ── */}
       <SectionHead icon={Target} label="Trading Implicaties" />
-      <Prose><MarkdownBlock content={snap.trading_implications} /></Prose>
+      <Prose><MarkdownBlock content={safeText(snap.trading_implications)} /></Prose>
 
       <Divider />
 
-      {/* ── 10. KEY WATCHPOINTS ── */}
+      {/* ── 10. KEY WATCHPOINTS — FIX 4: bullet list ── */}
       <SectionHead icon={Eye} label="Key Watchpoints" />
-      <Prose><MarkdownBlock content={watchpoints} /></Prose>
+      {(() => {
+        const items = parseWatchpoints(watchpoints);
+        if (items.length > 0) {
+          return (
+            <ul className="space-y-1.5">
+              {items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-purple-accent mt-[5px] shrink-0">•</span>
+                  <span className="text-[15px] text-sub-text leading-[1.75]">{safeText(item)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return <Prose><MarkdownBlock content={safeText(watchpoints)} /></Prose>;
+      })()}
 
       {/* ── 11. FORWARD IMPLICATIONS (if present) ── */}
       {(snap.next_week_focus || snap.high_conviction_next_month || snap.key_developments) && (
@@ -255,7 +271,7 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
           <Divider />
           <SectionHead icon={TrendingUp} label="Forward Implications" />
           <Prose>
-            <MarkdownBlock content={snap.next_week_focus || snap.high_conviction_next_month || snap.key_developments} />
+            <MarkdownBlock content={safeText(snap.next_week_focus || snap.high_conviction_next_month || snap.key_developments)} />
           </Prose>
         </>
       )}
@@ -273,9 +289,9 @@ function AlignmentBrief({ al }: { al: any }) {
   const StateIcon = isAligned ? CheckCircle : isConflict ? AlertTriangle : GitMerge;
   const convictionPct = al.conviction_score ? Math.min(Math.max((al.conviction_score / 10) * 100, 0), 100) : 0;
 
-  const macroStory = [al.macro_story, al.summary_dashboard, al.summary]
-    .filter(Boolean)
-    .join("\n\n---\n\n");
+  // FIX 1 + 8: use renderDashboardText with fallback
+  const rawStory = al.macro_story || al.summary_dashboard || al.summary;
+  const macroStory = renderDashboardText(rawStory) || "";
 
   return (
     <>
@@ -283,7 +299,7 @@ function AlignmentBrief({ al }: { al: any }) {
       <div className="flex items-center gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-2.5 px-5 py-3 rounded-lg border" style={{ background: stateBg, borderColor: stateColor }}>
           <StateIcon size={24} style={{ color: stateColor }} />
-          <span className="text-[24px] font-black uppercase tracking-wide" style={{ color: stateColor }}>{val(al.alignment_state)}</span>
+          <span className="text-[24px] font-black uppercase tracking-wide" style={{ color: stateColor }}>{formatLabel(al.alignment_state) || "—"}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[18px] font-extrabold text-purple-accent font-mono">{val(al.conviction_score)}</span>
@@ -309,12 +325,12 @@ function AlignmentBrief({ al }: { al: any }) {
       <SectionHead icon={Crosshair} label="Core Driver" />
       <DataCard className="p-5 mb-4">
         <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">CORE DRIVER</div>
-        <Prose><MarkdownBlock content={al.core_driver} /></Prose>
+        <Prose><MarkdownBlock content={safeText(al.core_driver)} /></Prose>
       </DataCard>
       {al.flow_chain && (
         <DataCard className="p-5">
           <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">FLOW CHAIN</div>
-          <Prose><MarkdownBlock content={al.flow_chain} /></Prose>
+          <Prose><MarkdownBlock content={safeText(al.flow_chain)} /></Prose>
         </DataCard>
       )}
 
@@ -322,13 +338,13 @@ function AlignmentBrief({ al }: { al: any }) {
 
       {/* ── 3. CENTRAL BANK ── */}
       <SectionHead icon={Building2} label="Central Bank Narrative" />
-      <Prose><MarkdownBlock content={al.cb_alignment_narrative || al.cb_view} /></Prose>
+      <Prose><MarkdownBlock content={safeText(al.cb_alignment_narrative || al.cb_view)} /></Prose>
 
       <Divider />
 
       {/* ── 4. SCENARIOS ── */}
       <SectionHead icon={GitMerge} label="Scenarios" />
-      <div className="grid grid-cols-3 gap-4 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
         {[
           { label: "BASIS", value: al.scenario_base, borderColor: "#6B7280" },
           { label: "OPWAARTS", value: al.scenario_upside, borderColor: "#16A34A" },
@@ -336,7 +352,7 @@ function AlignmentBrief({ al }: { al: any }) {
         ].map(s => (
           <DataCard key={s.label} className="p-4" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
             <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{s.label}</div>
-            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={s.value} /></div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={safeText(s.value)} /></div>
           </DataCard>
         ))}
       </div>
@@ -344,40 +360,40 @@ function AlignmentBrief({ al }: { al: any }) {
       <Divider />
 
       {/* ── 5. DO / AVOID ── */}
-      <div className="grid grid-cols-2 gap-5 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-2">
         <DataCard className="p-5" style={{ borderLeft: "3px solid #16A34A" }}>
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle size={15} className="text-bullish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">WAT TE DOEN</span>
           </div>
-          <Prose><MarkdownBlock content={al.what_to_do} /></Prose>
+          <Prose><MarkdownBlock content={safeText(al.what_to_do)} /></Prose>
         </DataCard>
         <DataCard className="p-5" style={{ borderLeft: "3px solid #DC2626" }}>
           <div className="flex items-center gap-2 mb-3">
             <XCircle size={15} className="text-bearish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">VERMIJD</span>
           </div>
-          <Prose><MarkdownBlock content={al.what_to_avoid} /></Prose>
+          <Prose><MarkdownBlock content={safeText(al.what_to_avoid)} /></Prose>
         </DataCard>
       </div>
 
       <Divider />
 
       {/* ── 6. HIGH / LOW CONVICTION ASSETS ── */}
-      <div className="grid grid-cols-2 gap-5 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-2">
         <div>
           <div className="flex items-center gap-1.5 mb-3">
             <Star size={15} className="text-bullish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">HOOG CONVICTION ASSETS</span>
           </div>
-          <Prose><MarkdownBlock content={al.high_conviction_assets} /></Prose>
+          <Prose><MarkdownBlock content={safeText(al.high_conviction_assets)} /></Prose>
         </div>
         <div>
           <div className="flex items-center gap-1.5 mb-3">
             <XCircle size={15} className="text-bearish-text" />
             <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">VERMIJD ASSETS</span>
           </div>
-          <Prose><MarkdownBlock content={al.low_conviction_assets} /></Prose>
+          <Prose><MarkdownBlock content={safeText(al.low_conviction_assets)} /></Prose>
         </div>
       </div>
 
@@ -394,7 +410,7 @@ function AlignmentBrief({ al }: { al: any }) {
         ].map(a => (
           <DataCard key={a.label} className="p-4">
             <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-2">{a.label}</div>
-            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={a.value} /></div>
+            <div className="text-[13px] text-sub-text leading-[1.75]"><MarkdownBlock content={safeText(a.value)} /></div>
           </DataCard>
         ))}
       </div>
@@ -403,20 +419,35 @@ function AlignmentBrief({ al }: { al: any }) {
 
       {/* ── 8. TRADING IMPLICATIONS ── */}
       <SectionHead icon={Target} label="Trading Implicaties" />
-      <Prose><MarkdownBlock content={al.trading_implications} /></Prose>
+      <Prose><MarkdownBlock content={safeText(al.trading_implications)} /></Prose>
 
       <Divider />
 
-      {/* ── 9. KEY WATCHPOINTS ── */}
+      {/* ── 9. KEY WATCHPOINTS — FIX 4: bullet list ── */}
       <SectionHead icon={Eye} label="Key Watchpoints" />
-      <Prose><MarkdownBlock content={al.key_watchpoints} /></Prose>
+      {(() => {
+        const items = parseWatchpoints(al.key_watchpoints);
+        if (items.length > 0) {
+          return (
+            <ul className="space-y-1.5">
+              {items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-purple-accent mt-[5px] shrink-0">•</span>
+                  <span className="text-[15px] text-sub-text leading-[1.75]">{safeText(item)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return <Prose><MarkdownBlock content={safeText(al.key_watchpoints)} /></Prose>;
+      })()}
 
       {/* ── 10. CONFLICTS (if present) ── */}
       {al.conflicts && (
         <>
           <Divider />
           <SectionHead icon={AlertTriangle} label="Conflicts" />
-          <Prose><MarkdownBlock content={al.conflicts} /></Prose>
+          <Prose><MarkdownBlock content={safeText(al.conflicts)} /></Prose>
         </>
       )}
     </>
