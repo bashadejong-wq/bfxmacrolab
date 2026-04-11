@@ -178,6 +178,55 @@ export function RiskChip({ regime }: { regime: string | null }) {
   );
 }
 
+/** Regime badge with glow effect */
+const REGIME_BADGE_MAP: Record<string, { color: string; glow: string }> = {
+  energy_shock: { color: "#F97316", glow: "rgba(249,115,22,0.3)" },
+  mixed: { color: "#7C3AED", glow: "rgba(124,58,237,0.3)" },
+  goldilocks: { color: "#16A34A", glow: "rgba(22,163,74,0.3)" },
+  stagflation: { color: "#DC2626", glow: "rgba(220,38,38,0.3)" },
+  stress: { color: "#DC2626", glow: "rgba(220,38,38,0.3)" },
+  crisis: { color: "#DC2626", glow: "rgba(220,38,38,0.3)" },
+  transitional: { color: "#6B7280", glow: "rgba(107,114,128,0.3)" },
+  deflation: { color: "#3B82F6", glow: "rgba(59,130,246,0.3)" },
+  reflation: { color: "#F59E0B", glow: "rgba(245,158,11,0.3)" },
+};
+
+export function RegimeBadge({ regime }: { regime: string | null }) {
+  const key = (regime || "").toLowerCase().replace(/[\s-]/g, "_");
+  const match = Object.entries(REGIME_BADGE_MAP).find(([k]) => key.includes(k));
+  const { color, glow } = match?.[1] || { color: "#6B7280", glow: "rgba(107,114,128,0.3)" };
+  return (
+    <span
+      className="inline-block px-3 py-1 rounded uppercase tracking-[0.1em] font-extrabold"
+      style={{ fontSize: 13, color, boxShadow: `0 0 12px ${glow}`, border: `1px solid ${color}33` }}
+    >
+      {formatLabel(regime) || "—"}
+    </span>
+  );
+}
+
+/** Macro pillar card with bias-colored left border */
+export function PillarCard({ label, bias, children, className = "" }: { label: string; bias?: string | null; children: ReactNode; className?: string }) {
+  const b = (bias || "").toLowerCase();
+  const borderColor = b.includes("bullish") ? "#16A34A" : b.includes("bearish") ? "#DC2626" : "#374151";
+  const bgTint = b.includes("bullish") ? "rgba(22,163,74,0.06)" : b.includes("bearish") ? "rgba(220,38,38,0.06)" : "transparent";
+  const arrow = b.includes("bullish") ? "↑" : b.includes("bearish") ? "↓" : "→";
+  return (
+    <div
+      className={`bg-card border border-card-border rounded-lg px-3 py-3 ${className}`}
+      style={{ borderLeftWidth: 3, borderLeftColor: borderColor, backgroundColor: bgTint }}
+    >
+      <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mb-1.5 border-b border-card-border pb-1">{label}</div>
+      {bias && (
+        <div className="text-[15px] font-semibold text-foreground mb-1">
+          {arrow} {bias}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 /** Impact chip */
 export function ImpactChip({ impact }: { impact: string | null }) {
   const i = (impact || "").toLowerCase();
