@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/components/ui-helpers";
-import { ChevronDown, ChevronUp, Zap, Check, MailX } from "lucide-react";
+import { DataCard, SectionLabel, val, fmtDate, MarkdownBlock, ImpactChip, SurpriseChip, queryWithRetry } from "@/components/ui-helpers";
+import { ChevronDown, ChevronUp, Zap, Check, MailX, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /* ── constants ─────────────────────────────────────────── */
@@ -55,6 +55,7 @@ export default function EventHistory() {
   const [releases, setReleases] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedRelease, setSelectedRelease] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"reactions" | "releases">("reactions");
 
   // filters
