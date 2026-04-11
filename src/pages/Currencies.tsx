@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, ConfidenceChip, MarkdownBlock, LabelValue, fmtDate, queryWithRetry, getBiasColor, getBiasBackground } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, ConfidenceChip, MarkdownBlock, LabelValue, fmtDate, queryWithRetry, getBiasColor, getBiasBackground, PillarCard } from "@/components/ui-helpers";
 import { DollarSign, Star, TrendingUp, TrendingDown, Minus, Shield, AlertTriangle, Eye, Zap, Activity } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CorrelationsContent from "@/components/content/CorrelationsContent";
@@ -119,6 +119,22 @@ export default function Currencies() {
     return n > 0 ? "#16A34A" : n < 0 ? "#DC2626" : "#6B7280";
   };
 
+  /** Parse "bias | conviction | driver" format */
+  const parsePillarText = (text: any): { bias: string | null; conviction: string | null; driver: string | null } => {
+    if (!text || typeof text !== "string") return { bias: null, conviction: null, driver: null };
+    const parts = text.split(" | ").map((s: string) => s.trim());
+    if (parts.length >= 3) return { bias: parts[0], conviction: parts[1], driver: parts[2] };
+    if (parts.length === 2) return { bias: parts[0], conviction: parts[1], driver: null };
+    return { bias: null, conviction: null, driver: text };
+  };
+
+  /** "Geen data" fallback for missing CB/Yield fields */
+  const geenData = (v: any) => {
+    if (!v || v === "" || v === "null" || v === "undefined" || v === "—" || (typeof v === "string" && v.trim() === ""))
+      return <span className="text-[11px] italic" style={{ color: "#4B5563" }}>Geen data</span>;
+    return val(v);
+  };
+
   const fallbackEmpty = (v: any, fallback: string) => {
     if (!v || v === "" || v === "null" || v === "undefined" || (typeof v === "string" && v.trim() === "")) return fallback;
     return v;
@@ -186,17 +202,21 @@ export default function Currencies() {
               <SectionLabel>MACRO PILLARS</SectionLabel>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 {[
-                  { label: "GROEI", score: r?.score_growth, direction: snap?.growth_now || snap?.growth_expectation, narrative: snap?.growth_now ? `Nu: ${snap.growth_now}` : null },
-                  { label: "INFLATIE", score: r?.score_inflation, direction: snap?.inflation_now || snap?.inflation_expectation, narrative: snap?.inflation_now ? `Nu: ${snap.inflation_now}` : null },
-                  { label: "CENTRALE BANK", score: r?.score_cb, direction: r?.cb_stance || snap?.cb_stance, narrative: r?.cb_direction || snap?.cb_direction ? `Richting: ${r?.cb_direction || snap?.cb_direction}` : null },
-                  { label: "LIQUIDITEIT", score: r?.score_liquidity, direction: snap?.liquidity_conditions || snap?.liquidity_impact, narrative: null },
-                ].map(({ label, score, direction, narrative }) => (
-                  <DataCard key={label} className="px-3 py-3">
-                    <ScoreBar score={score} label={label} />
-                    {direction && <div className="text-[10px] text-sub-text mt-1.5 truncate">{val(direction)}</div>}
-                    {narrative && <div className="text-[9px] text-label mt-0.5">{narrative}</div>}
-                  </DataCard>
-                ))}
+                  { label: "GROEI", score: r?.score_growth, raw: snap?.growth_now || snap?.growth_expectation },
+                  { label: "INFLATIE", score: r?.score_inflation, raw: snap?.inflation_now || snap?.inflation_expectation },
+                  { label: "CENTRALE BANK", score: r?.score_cb, raw: r?.cb_stance || snap?.cb_stance },
+                  { label: "LIQUIDITEIT", score: r?.score_liquidity, raw: snap?.liquidity_conditions || snap?.liquidity_impact },
+                ].map(({ label, score, raw }) => {
+                  const parsed = parsePillarText(raw);
+                  const biasVal = parsed.bias || (typeof raw === "string" && !raw.includes(" | ") ? raw : null);
+                  return (
+                    <PillarCard key={label} label={label} bias={biasVal}>
+                      <ScoreBar score={score} label="" />
+                      {parsed.conviction && <div className="text-[11px] mt-1" style={{ color: "#9CA3AF" }}>{parsed.conviction}</div>}
+                      {parsed.driver && <div className="text-[11px] italic mt-0.5" style={{ color: "#6B7280" }}>{parsed.driver}</div>}
+                    </PillarCard>
+                  );
+                })}
               </div>
 
               {/* Macro fundamentals text */}
@@ -223,20 +243,20 @@ export default function Currencies() {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div>
                     <div className="text-[8px] text-label uppercase">STANCE</div>
-                    <div className="text-[12px] font-bold text-foreground mt-0.5">{val(r?.cb_stance || snap?.cb_stance)}</div>
+                    <div className="text-[12px] font-bold text-foreground mt-0.5">{geenData(r?.cb_stance || snap?.cb_stance)}</div>
                   </div>
                   <div>
                     <div className="text-[8px] text-label uppercase">RICHTING</div>
-                    <div className="text-[12px] font-bold text-foreground mt-0.5">{val(r?.cb_direction || snap?.cb_direction)}</div>
+                    <div className="text-[12px] font-bold text-foreground mt-0.5">{geenData(r?.cb_direction || snap?.cb_direction)}</div>
                   </div>
                   <div>
                     <div className="text-[8px] text-label uppercase">QE/QT</div>
-                    <div className="text-[12px] font-bold text-foreground mt-0.5">{val(snap?.cb_qe_qt)}</div>
+                    <div className="text-[12px] font-bold text-foreground mt-0.5">{geenData(snap?.cb_qe_qt)}</div>
                   </div>
                   <div>
                     <div className="text-[8px] text-label uppercase">SPREAD VS USD</div>
                     <div className="text-[12px] font-bold font-mono mt-0.5" style={{ color: spreadColor(r?.rate_diff_vs_usd ?? snap?.rate_diff_vs_usd) }}>
-                      {activeCurrency === "USD" ? "—" : val(r?.rate_diff_vs_usd ?? snap?.rate_diff_vs_usd, "%")}
+                      {activeCurrency === "USD" ? "—" : geenData(r?.rate_diff_vs_usd ?? snap?.rate_diff_vs_usd)}
                     </div>
                   </div>
                   <div>
@@ -259,21 +279,21 @@ export default function Currencies() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <div className="text-[8px] text-label uppercase">2J RENTE</div>
-                    <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(y2, "%")}</div>
+                    <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{geenData(y2)}</div>
                   </div>
                   <div>
                     <div className="text-[8px] text-label uppercase">10J RENTE</div>
-                    <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(y10, "%")}</div>
+                    <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{geenData(y10)}</div>
                   </div>
                   <div>
                     <div className="text-[8px] text-label uppercase">SPREAD VS USD</div>
                     <div className="text-[16px] font-bold font-mono mt-0.5" style={{ color: spreadColor(spreadVsUsd) }}>
-                      {activeCurrency === "USD" ? "—" : spreadVsUsd != null ? `${Number(spreadVsUsd) > 0 ? "+" : ""}${spreadVsUsd}%` : "—"}
+                      {activeCurrency === "USD" ? "—" : spreadVsUsd != null ? `${Number(spreadVsUsd) > 0 ? "+" : ""}${spreadVsUsd}%` : <span className="text-[11px] italic" style={{ color: "#4B5563" }}>Geen data</span>}
                     </div>
                   </div>
                   <div>
                     <div className="text-[8px] text-label uppercase">2S10S</div>
-                    <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(yieldInfo.s2s10s)}</div>
+                    <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{geenData(yieldInfo.s2s10s)}</div>
                   </div>
                 </div>
                 {fxImplication && (
@@ -296,7 +316,7 @@ export default function Currencies() {
                     <DataCard key={label} className="px-3 py-3 text-center min-h-[80px]">
                       <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">{label}</div>
                       <BiasChip bias={value as string} />
-                      {driver && <div className="text-[9px] text-label mt-1.5">— {driver}</div>}
+                      {driver && <div className="text-[9px] text-label mt-1.5 break-words whitespace-normal">— {driver}</div>}
                     </DataCard>
                   );
                 })}

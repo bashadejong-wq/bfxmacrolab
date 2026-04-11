@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, fmtDate, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, fmtDate, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints, RegimeBadge } from "@/components/ui-helpers";
 import {
   FileText, DollarSign, Package, BarChart2, Percent,
   Building2, Target, Eye, RefreshCw, ArrowRightLeft, ArrowRight,
@@ -142,9 +142,7 @@ export default function Reports() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5">
-                  <span className="px-1.5 py-[1px] text-[8px] rounded uppercase font-semibold" style={{ backgroundColor: regimeStyle.bg, color: regimeStyle.text }}>
-                    {val(r.macro_regime)}
-                  </span>
+                  <RegimeBadge regime={r.macro_regime} />
                   {r.confidence_score != null && (
                     <span className="bg-purple-accent/10 text-purple-accent px-1.5 py-[1px] text-[8px] rounded font-mono font-bold">{r.confidence_score}/10</span>
                   )}
@@ -178,14 +176,7 @@ export default function Reports() {
                 <div className="text-[18px] font-bold text-foreground leading-snug">{val(detail.title)}</div>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-[11px] text-label">{fmtDate(detail.analysis_date)}</span>
-                  {(() => {
-                    const rs = getRegimeStyle(detail.macro_regime);
-                    return (
-                      <span className="flex items-center gap-1 px-2 py-[2px] text-[9px] rounded uppercase font-semibold" style={{ backgroundColor: rs.bg, color: rs.text }}>
-                        <RegimeIcon size={11} /> {formatLabel(detail.macro_regime) || "—"}
-                      </span>
-                    );
-                  })()}
+                  <RegimeBadge regime={detail.macro_regime} />
                   <RiskChip regime={detail.risk_regime} />
                   <div className="flex items-center gap-1.5 ml-2">
                     <span className="text-[18px] font-extrabold text-purple-accent font-mono">{val(detail.confidence_score)}</span>
