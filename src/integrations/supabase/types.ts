@@ -616,7 +616,7 @@ export type Database = {
           bias_strength: string | null
           carry_bias: string | null
           confidence: number | null
-          context_id: number
+          context_id: string | null
           context_type: string
           created_at: string | null
           entity_class: string
@@ -638,7 +638,7 @@ export type Database = {
           bias_strength?: string | null
           carry_bias?: string | null
           confidence?: number | null
-          context_id: number
+          context_id?: string | null
           context_type: string
           created_at?: string | null
           entity_class: string
@@ -660,7 +660,7 @@ export type Database = {
           bias_strength?: string | null
           carry_bias?: string | null
           confidence?: number | null
-          context_id?: number
+          context_id?: string | null
           context_type?: string
           created_at?: string | null
           entity_class?: string
@@ -3207,23 +3207,17 @@ export type Database = {
       }
       v_fx_currency_ranking: {
         Row: {
-          bearish_count: number | null
-          bias: string | null
-          bullish_count: number | null
-          carry_bias: string | null
-          confidence: string | null
-          currency_code: string | null
-          currency_yield_regime: string | null
-          entity_label: string | null
-          main_driver: string | null
-          medium_term_bias: string | null
+          bear_count: number | null
+          bias_label: string | null
+          bull_count: number | null
+          conviction: number | null
+          directional_count: number | null
+          entity_code: string | null
+          mentioned_count: number | null
           neutral_count: number | null
-          overall_score: number | null
-          rank_position: number | null
-          rate_diff_vs_usd: number | null
+          normalized_score: number | null
+          rank: number | null
           raw_score: number | null
-          short_term_bias: string | null
-          total_reports: number | null
         }
         Relationships: []
       }
@@ -4090,8 +4084,86 @@ export type Database = {
     Functions: {
       get_complete_schema: { Args: never; Returns: Json }
       save_period_snapshot: { Args: { payload: Json }; Returns: Json }
+      trigger_market_data_fetch: { Args: never; Returns: undefined }
       update_market_dxy_dji: {
         Args: { p_dji: number; p_dxy: number }
+        Returns: undefined
+      }
+      upsert_market_data:
+        | {
+            Args: {
+              p_audusd?: number
+              p_bbb_spread?: number
+              p_btcusd?: number
+              p_copper?: number
+              p_credit_regime?: string
+              p_dji?: number
+              p_dxy?: number
+              p_dxy_trade_weighted?: number
+              p_eurusd?: number
+              p_fetch_date: string
+              p_gbpusd?: number
+              p_gold?: number
+              p_gold_real_yield_note?: string
+              p_hy_spread?: number
+              p_natgas?: number
+              p_ndx?: number
+              p_nzdusd?: number
+              p_oil_brent?: number
+              p_oil_wti?: number
+              p_silver?: number
+              p_source?: string
+              p_spx?: number
+              p_usdcad?: number
+              p_usdchf?: number
+              p_usdjpy?: number
+              p_vix?: number
+              p_vix_regime?: string
+              p_vix_term_structure?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_btcusd?: number
+              p_copper?: number
+              p_fetch_date: string
+              p_gold?: number
+              p_natgas?: number
+              p_ndx?: number
+              p_oil_brent?: number
+              p_oil_wti?: number
+              p_silver?: number
+              p_spx?: number
+            }
+            Returns: undefined
+          }
+      upsert_market_data_live: {
+        Args: {
+          p_audusd: number
+          p_btcusd: number
+          p_copper: number
+          p_dji: number
+          p_dxy: number
+          p_eurusd: number
+          p_fetch_date: string
+          p_gbpusd: number
+          p_gold: number
+          p_gold_real_yield_note: string
+          p_natgas: number
+          p_ndx: number
+          p_nzdusd: number
+          p_oil_brent: number
+          p_oil_wti: number
+          p_silver: number
+          p_source: string
+          p_spx: number
+          p_usdcad: number
+          p_usdchf: number
+          p_usdjpy: number
+          p_vix: number
+          p_vix_regime: string
+        }
         Returns: undefined
       }
       upsert_period_snapshot: {
@@ -4101,6 +4173,40 @@ export type Database = {
           p_period_label: string
           p_period_start: string
           p_period_type: string
+        }
+        Returns: undefined
+      }
+      upsert_yields: {
+        Args: {
+          p_aud_10y?: number
+          p_aud_2s10s?: number
+          p_aud_2y?: number
+          p_cad_10y?: number
+          p_cad_2s10s?: number
+          p_cad_2y?: number
+          p_chf_10y?: number
+          p_chf_2s10s?: number
+          p_chf_2y?: number
+          p_diff_aud_10y?: number
+          p_diff_cad_10y?: number
+          p_diff_chf_10y?: number
+          p_diff_eur_10y?: number
+          p_diff_gbp_10y?: number
+          p_diff_jpy_10y?: number
+          p_diff_nzd_10y?: number
+          p_eur_10y?: number
+          p_eur_2s10s?: number
+          p_eur_2y?: number
+          p_fetch_date: string
+          p_gbp_10y?: number
+          p_gbp_2s10s?: number
+          p_gbp_2y?: number
+          p_jpy_10y?: number
+          p_jpy_2s10s?: number
+          p_jpy_2y?: number
+          p_nzd_10y?: number
+          p_nzd_2s10s?: number
+          p_nzd_2y?: number
         }
         Returns: undefined
       }
