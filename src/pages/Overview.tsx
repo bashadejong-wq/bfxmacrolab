@@ -399,6 +399,24 @@ export default function Overview() {
         </>
       )}
 
+      {/* NEXT WEEK FOCUS / WHAT TO WATCH */}
+      {(a?.next_week_focus || a?.daily_what_to_watch) && (
+        <DataCard className="px-4 py-3 mb-3 border-l-[3px] border-l-purple-accent">
+          {a?.daily_what_to_watch && (
+            <div className="mb-2">
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-0.5">TE MONITOREN VANDAAG</div>
+              <div className="text-[11px] text-sub-text leading-relaxed">{safeText(a.daily_what_to_watch)}</div>
+            </div>
+          )}
+          {a?.next_week_focus && (
+            <div>
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-0.5">FOCUS VOLGENDE WEEK</div>
+              <div className="text-[11px] text-foreground font-semibold leading-relaxed">{safeText(a.next_week_focus)}</div>
+            </div>
+          )}
+        </DataCard>
+      )}
+
       {/* TABLES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Events */}
