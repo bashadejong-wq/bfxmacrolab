@@ -60,11 +60,11 @@ function cleanAssetReason(asset: string, bias: string | null, reason: string | n
 function StatusTag({ label, status }: { label: string; status: string | null }) {
   const s = (status || "").toLowerCase();
   const isProcessing = s === "processing";
-  const color = s === "complete" || s === "processed" ? "text-bullish-text bg-bullish-bg" :
-    isProcessing ? "text-mixed-text bg-mixed-bg" :
-    s === "pending" ? "text-neutral-text bg-neutral-bg" : "text-neutral-text bg-neutral-bg";
+  const color = s === "complete" || s === "processed" ? "bg-[#14532D] text-[#4ADE80]" :
+    isProcessing ? "bg-mixed-bg text-mixed-text" :
+    s === "pending" || s === "pass1_complete" ? "bg-[#7F1D1D] text-[#F87171]" : "bg-[#1F2937] text-[#9CA3AF]";
   return (
-    <span className={`${color} px-1.5 py-[1px] text-[8px] rounded font-semibold uppercase inline-flex items-center gap-1`}>
+    <span className={`${color} px-1.5 py-[1px] text-[10px] rounded font-bold uppercase inline-flex items-center gap-1`}>
       {isProcessing && <span className="w-[5px] h-[5px] rounded-full bg-mixed-text animate-pulse" />}
       {label}: {val(status)}
     </span>
@@ -207,17 +207,17 @@ export default function Reports() {
               </div>
 
               {/* TABS */}
-              <div className="bg-card border-b border-card-border flex mb-0 rounded-t-lg">
+              <div className="flex gap-2 mb-4">
                 {([["Compact","compact"],["Dashboard","dashboard"],["Volledig","volledig"]] as const).map(([label, key]) => (
                   <button key={key} onClick={() => setTab(key as any)}
-                    className={`px-5 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
-                      key === tab ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
+                    className={`px-[14px] py-1 text-[12px] font-semibold rounded-md transition-colors ${
+                      key === tab ? "bg-purple-accent text-white" : "bg-transparent text-label hover:text-foreground"
                     }`}>{label}</button>
                 ))}
               </div>
 
               {/* TAB CONTENT */}
-              <DataCard className="p-5 rounded-t-none mb-6">
+              <DataCard className="p-5 mb-6">
                 {tab === "compact" && <CompactTab detail={detail} />}
                 {tab === "dashboard" && <DashboardTab detail={detail} biasData={biasData} />}
                 {tab === "volledig" && <VolledigTab detail={detail} />}
