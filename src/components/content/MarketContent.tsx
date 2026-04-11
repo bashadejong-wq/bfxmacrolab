@@ -5,11 +5,11 @@ import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/componen
 import { BarChart2, DollarSign, Package, Activity, AlertTriangle, Clock, Shield } from "lucide-react";
 
 function DeltaLabel({ value, inverted = false }: { value: number | null | undefined; inverted?: boolean }) {
-  if (value === null || value === undefined) return <span className="text-[10px] font-mono text-[#6B7280]">0.00%</span>;
+  if (value === null || value === undefined) return <span className="text-[11px] font-mono text-label">0.00%</span>;
   const positive = value > 0;
   const color = inverted ? (positive ? "#F87171" : "#4ADE80") : (positive ? "#4ADE80" : "#F87171");
   const prefix = positive ? "▲ " : value < 0 ? "▼ " : "";
-  return <span className="text-[10px] font-mono font-bold" style={{ color }}>{prefix}{Math.abs(value).toFixed(2)}%</span>;
+  return <span className="text-[11px] font-mono font-bold" style={{ color }}>{prefix}{Math.abs(value).toFixed(2)}%</span>;
 }
 
 function DeltaPts({ value, inverted = false }: { value: number | null | undefined; inverted?: boolean }) {
@@ -17,7 +17,7 @@ function DeltaPts({ value, inverted = false }: { value: number | null | undefine
   const positive = value > 0;
   const color = inverted ? (positive ? "#F87171" : "#4ADE80") : (positive ? "#4ADE80" : "#F87171");
   const prefix = positive ? "▲ " : value < 0 ? "▼ " : "";
-  return <span className="text-[10px] font-mono font-bold" style={{ color }}>{prefix}{Math.abs(Number(value)).toFixed(2)}</span>;
+  return <span className="text-[11px] font-mono font-bold" style={{ color }}>{prefix}{Math.abs(Number(value)).toFixed(2)}</span>;
 }
 
 function daysSince(dateStr: string | null): number {
@@ -81,155 +81,144 @@ export default function MarketContent() {
   return (
     <>
       {staleAge > 1 && (
-        <div className="flex items-center gap-2 bg-mixed-bg text-mixed-text px-4 py-2 rounded-lg mb-4 text-[11px] font-medium">
+        <div className="flex items-center gap-2 bg-mixed-bg text-mixed-text px-4 py-2 rounded-lg mb-6 text-[11px] font-medium">
           <AlertTriangle size={14} />
           Marktdata bijgewerkt op {fmtDate(m.today_date)} — mogelijk verouderd
         </div>
       )}
 
-      <div className="rounded-lg px-5 py-4 mb-6 border" style={{ backgroundColor: risk.bg, borderColor: risk.color + "33" }}>
-        <div className="flex items-center gap-3">
-          <Shield size={20} style={{ color: risk.color }} />
+      {/* RISK TONE HERO */}
+      <div className="inst-card section-gap" style={{ borderLeft: `4px solid ${risk.color}`, backgroundColor: risk.bg, borderRadius: 12 }}>
+        <div className="flex items-center gap-4">
+          <Shield size={24} style={{ color: risk.color }} />
           <div>
-            <div className="text-[10px] text-label uppercase tracking-wider font-medium">RISK TOON</div>
-            <div className="text-[22px] font-extrabold uppercase" style={{ color: risk.color }}>{risk.label}</div>
+            <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold">RISK TOON</div>
+            <div className="text-[28px] font-extrabold uppercase" style={{ color: risk.color }}>{risk.label}</div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className={`${vixBadgeColor} px-2 py-[2px] text-[8px] rounded uppercase font-semibold`}>VIX {val(m.vix_regime)}</span>
-            <span className={`${creditColor(m.credit_regime)} px-2 py-[2px] text-[8px] rounded uppercase font-semibold`}>CREDIT {val(m.credit_regime)}</span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className={`${vixBadgeColor} px-2 py-1 text-[9px] rounded uppercase font-semibold`}>VIX {val(m.vix_regime)}</span>
+            <span className={`${creditColor(m.credit_regime)} px-2 py-1 text-[9px] rounded uppercase font-semibold`}>CREDIT {val(m.credit_regime)}</span>
           </div>
         </div>
       </div>
 
-      <SectionLabel>VOLATILITEIT & DOLLAR</SectionLabel>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <DataCard className="p-5">
-          <div className="flex items-center gap-1.5 mb-1">
+      {/* VOLATILITEIT & DOLLAR */}
+      <div className="inst-section-label">VOLATILITEIT & DOLLAR</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 section-gap">
+        <DataCard className="p-6">
+          <div className="flex items-center gap-2 mb-2">
             <Activity size={14} className="text-label" />
-            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">VIX</span>
+            <span className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold">VIX</span>
           </div>
-          <div className="text-[36px] font-extrabold text-foreground font-mono mt-1">{val(m.vix)}</div>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="inst-metric mt-1">{val(m.vix)}</div>
+          <div className="flex items-center gap-3 mt-3">
             <DeltaPts value={m.vix_delta} inverted />
-            {vixElevated && <AlertTriangle size={13} className="text-bearish-text" />}
+            {vixElevated && <AlertTriangle size={14} className="text-bearish-text" />}
             <span className={`${vixBadgeColor} px-2 py-[2px] text-[9px] rounded uppercase font-semibold`}>{val(m.vix_regime)}</span>
           </div>
         </DataCard>
-        <DataCard className="p-5">
-          <div className="flex items-center gap-1.5 mb-1">
+        <DataCard className="p-6">
+          <div className="flex items-center gap-2 mb-2">
             <DollarSign size={14} className="text-label" />
-            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">DXY</span>
+            <span className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold">DXY</span>
           </div>
-          <div className="text-[36px] font-extrabold text-foreground font-mono mt-1">{val(m.dxy)}</div>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="inst-metric mt-1">{val(m.dxy)}</div>
+          <div className="flex items-center gap-3 mt-3">
             <DeltaLabel value={m.dxy_pct} />
             {m.dxy_delta != null && <DeltaPts value={m.dxy_delta} />}
           </div>
         </DataCard>
       </div>
 
-      <hr className="border-card-border mb-6" />
-
-      <SectionLabel><span className="inline-flex items-center gap-1.5"><BarChart2 size={13} className="text-label" /> AANDELEN</span></SectionLabel>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      {/* AANDELEN */}
+      <div className="inst-section-label"><span className="inline-flex items-center gap-2"><BarChart2 size={13} className="text-label" /> AANDELEN</span></div>
+      <div className="grid grid-cols-3 gap-6 section-gap">
         {[
-          { l: "SPX", v: m.spx, pct: m.spx_pct, delta: m.spx_delta },
-          { l: "NDX", v: m.ndx, pct: m.ndx_pct, delta: m.ndx_delta },
-          { l: "DJI", v: m.dji, pct: null, delta: null },
+          { l: "SPX", v: m.spx, pct: m.spx_pct },
+          { l: "NDX", v: m.ndx, pct: m.ndx_pct },
+          { l: "DJI", v: m.dji, pct: null },
         ].map(({ l, v, pct }) => (
-          <DataCard key={l} className="p-5">
-            <div className="text-[24px] font-bold text-foreground font-mono">{val(v)}</div>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mt-1">{l}</div>
-            <div className="flex items-center gap-2 mt-1.5">
+          <DataCard key={l} className="p-6">
+            <div className="inst-metric-sm">{val(v)}</div>
+            <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mt-2">{l}</div>
+            <div className="flex items-center gap-2 mt-2">
               <DeltaLabel value={pct} />
-              {v == null && l === "DJI" && <span className="text-[10px] text-[#4B5563] italic">niet beschikbaar</span>}
+              {v == null && l === "DJI" && <span className="text-[10px] text-label italic">niet beschikbaar</span>}
             </div>
           </DataCard>
         ))}
       </div>
 
-      <hr className="border-card-border mb-6" />
-
-      <SectionLabel><span className="inline-flex items-center gap-1.5"><DollarSign size={13} className="text-label" /> FX</span></SectionLabel>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      {/* FX */}
+      <div className="inst-section-label"><span className="inline-flex items-center gap-2"><DollarSign size={13} className="text-label" /> FX</span></div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 section-gap-sm">
         {[
           { label: "EURUSD", value: m.eurusd, pct: m.eurusd_pct, nav: "/currencies/EUR" },
           { label: "USDJPY", value: m.usdjpy, pct: m.usdjpy_pct, nav: "/currencies/JPY" },
           { label: "GBPUSD", value: m.gbpusd, pct: m.gbpusd_pct, nav: "/currencies/GBP" },
           { label: "AUDUSD", value: m.audusd, pct: m.audusd_delta, nav: "/currencies/AUD" },
         ].map(p => (
-          <DataCard key={p.label} className="p-5" onClick={() => navigate(p.nav)}>
-            <div className="text-[16px] font-bold text-foreground font-mono">{val(p.value)}</div>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mt-1">{p.label}</div>
-            <div className="mt-1"><DeltaLabel value={p.pct} /></div>
+          <DataCard key={p.label} className="p-6" onClick={() => navigate(p.nav)}>
+            <div className="text-[18px] font-bold text-foreground font-mono">{val(p.value)}</div>
+            <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mt-2">{p.label}</div>
+            <div className="mt-2"><DeltaLabel value={p.pct} /></div>
           </DataCard>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 section-gap">
         {[
           { label: "NZDUSD", value: m.nzdusd, pct: m.nzdusd_delta, nav: "/currencies/NZD" },
           { label: "USDCAD", value: m.usdcad, pct: m.usdcad_delta, nav: "/currencies/CAD", inverted: true },
           { label: "USDCHF", value: m.usdchf, pct: m.usdchf_delta, nav: "/currencies/CHF", inverted: true },
         ].map(p => (
-          <DataCard key={p.label} className="p-5" onClick={() => navigate(p.nav)}>
-            <div className="text-[16px] font-bold text-foreground font-mono">{val(p.value)}</div>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mt-1">{p.label}</div>
-            <div className="mt-1"><DeltaPts value={p.pct} inverted={(p as any).inverted} /></div>
+          <DataCard key={p.label} className="p-6" onClick={() => navigate(p.nav)}>
+            <div className="text-[18px] font-bold text-foreground font-mono">{val(p.value)}</div>
+            <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mt-2">{p.label}</div>
+            <div className="mt-2"><DeltaPts value={p.pct} inverted={(p as any).inverted} /></div>
           </DataCard>
         ))}
       </div>
 
-      <hr className="border-card-border mb-6" />
-
-      <SectionLabel><span className="inline-flex items-center gap-1.5"><Package size={13} className="text-label" /> GRONDSTOFFEN</span></SectionLabel>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+      {/* COMMODITIES */}
+      <div className="inst-section-label"><span className="inline-flex items-center gap-2"><Package size={13} className="text-label" /> GRONDSTOFFEN</span></div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 section-gap">
         {[
-          { l: "GOLD", v: m.gold, pct: m.gold_pct },
-          { l: "SILVER", v: m.silver, pct: m.silver_delta },
-          { l: "OIL WTI", v: m.oil_wti || m.oil_brent, pct: m.oil_pct },
-        ].map(({ l, v, pct }) => (
-          <DataCard key={l} className="p-5">
-            <div className="text-[16px] font-bold text-foreground font-mono">{val(v)}</div>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mt-1">{l}</div>
-            <div className="mt-1"><DeltaLabel value={pct} /></div>
-          </DataCard>
-        ))}
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        {[
-          { l: "OIL BRENT", v: m.oil_brent, pct: null },
-          { l: "COPPER", v: m.copper, pct: m.copper_delta },
-          { l: "NATGAS", v: m.natgas, pct: m.natgas_delta },
-        ].map(({ l, v, pct }) => (
-          <DataCard key={l} className="p-5">
-            <div className="text-[16px] font-bold text-foreground font-mono">{val(v)}</div>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mt-1">{l}</div>
-            <div className="mt-1"><DeltaPts value={pct} /></div>
+          { l: "GOLD", v: m.gold, pct: m.gold_pct, pts: null },
+          { l: "OIL BRENT", v: m.oil_brent, pct: m.oil_pct, pts: null },
+          { l: "SILVER", v: m.silver, pct: null, pts: m.silver_delta },
+          { l: "COPPER", v: m.copper, pct: null, pts: m.copper_delta },
+          { l: "NATGAS", v: m.natgas, pct: null, pts: m.natgas_delta },
+        ].map(({ l, v, pct, pts }) => (
+          <DataCard key={l} className="p-6">
+            <div className="text-[18px] font-bold text-foreground font-mono">{val(v)}</div>
+            <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mt-2">{l}</div>
+            <div className="mt-2">
+              {pct != null ? <DeltaLabel value={pct} /> : <DeltaPts value={pts} />}
+            </div>
           </DataCard>
         ))}
       </div>
 
-      <hr className="border-card-border mb-6" />
-
-      <SectionLabel><span className="inline-flex items-center gap-1.5"><Activity size={13} className="text-label" /> CREDIT</span></SectionLabel>
-      <div className="flex items-center gap-2 mb-3">
+      {/* CREDIT */}
+      <div className="inst-section-label"><span className="inline-flex items-center gap-2"><Activity size={13} className="text-label" /> CREDIT</span></div>
+      <div className="flex items-center gap-2 mb-4">
         <span className={`${creditColor(m.credit_regime)} px-3 py-1 text-[11px] rounded uppercase font-bold`}>{val(m.credit_regime)}</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-        <DataCard className="p-5">
-          <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-1">HY SPREAD</div>
-          <div className="text-[20px] font-bold text-foreground font-mono">{val(m.hy_spread)}</div>
-          <div className="mt-1"><DeltaPts value={m.hy_delta} inverted /></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 section-gap-sm">
+        <DataCard className="p-6">
+          <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mb-2">HY SPREAD</div>
+          <div className="inst-metric-sm">{val(m.hy_spread)}</div>
+          <div className="mt-2"><DeltaPts value={m.hy_delta} inverted /></div>
         </DataCard>
-        <DataCard className="p-5">
-          <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-1">BBB SPREAD</div>
-          <div className="text-[20px] font-bold text-foreground font-mono">{val(m.bbb_spread)}</div>
+        <DataCard className="p-6">
+          <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mb-2">BBB SPREAD</div>
+          <div className="inst-metric-sm">{val(m.bbb_spread)}</div>
         </DataCard>
       </div>
-      <div className="text-[10px] text-sub-text italic mb-8">{creditImplication(m.credit_regime)}</div>
+      <div className="text-[11px] text-sub-text italic mb-8">{creditImplication(m.credit_regime)}</div>
 
-      <div className="flex items-center gap-1.5 text-[9px] text-label">
-        <Clock size={10} />
+      <div className="flex items-center gap-2 text-[10px] text-label">
+        <Clock size={11} />
         Bijgewerkt {fmtDate(m.today_date)}
       </div>
     </>

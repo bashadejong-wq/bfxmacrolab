@@ -39,7 +39,6 @@ function getRegimeStyle(regime: string | null) {
   return { bg: "#F5F5F5", text: "#6B7280" };
 }
 
-/** Replace "no specific information" reasons with a proper fallback */
 function cleanReason(code: string, bias: string | null, reason: string | null): string {
   const r = (reason || "").toLowerCase();
   if (!reason || reason.trim() === "" || reason === "null" || r.includes("no specific information") || r.includes("no information")) {
@@ -99,7 +98,6 @@ export default function Reports() {
 
   useEffect(() => {
     if (!activeReportId) { setDetail(null); setBiasData([]); return; }
-    // Find analysis_id from reports list
     const report = reports.find(r => r.id === activeReportId || r.analysis_id === activeReportId);
     const analysisId = report?.analysis_id || activeReportId;
     Promise.all([
@@ -111,27 +109,25 @@ export default function Reports() {
     });
   }, [activeReportId, reports]);
 
-  const RegimeIcon = detail ? getRegimeIcon(detail.macro_regime) : GitMerge;
   const convictionPct = detail?.confidence_score ? Math.min(Math.max((detail.confidence_score / 10) * 100, 0), 100) : 0;
 
   return (
     <DashboardLayout>
       <div className="flex flex-col md:flex-row -mx-4 md:-mx-7 -mt-4 md:-mt-7 min-h-screen">
-        {/* LEFT PANEL — Report List */}
-        <div className={`w-full md:w-[300px] md:min-w-[300px] bg-card border-b md:border-b-0 md:border-r border-card-border md:h-screen overflow-y-auto md:sticky md:top-0 ${activeReportId ? "hidden md:block" : ""}`}>
-          <div className="px-5 py-3 border-b border-card-border flex items-center gap-2">
+        {/* LEFT PANEL */}
+        <div className={`w-full md:w-[280px] md:min-w-[280px] bg-card border-b md:border-b-0 md:border-r border-card-border md:h-screen overflow-y-auto md:sticky md:top-0 ${activeReportId ? "hidden md:block" : ""}`}>
+          <div className="px-6 py-4 border-b border-card-border flex items-center gap-2">
             <FileText size={14} className="text-label" />
-            <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">RAPPORTEN</span>
+            <span className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold">RAPPORTEN</span>
             <span className="ml-auto text-[9px] text-label font-mono">{reports.length}</span>
           </div>
-          {reports.length === 0 && <div className="p-5 text-center text-[11px] text-label">Nog geen rapporten gevonden</div>}
+          {reports.length === 0 && <div className="p-6 text-center text-[12px] text-label">Nog geen rapporten gevonden</div>}
           {reports.map((r) => {
             const rId = r.analysis_id || r.id;
-            const regimeStyle = getRegimeStyle(r.macro_regime);
             return (
               <div key={rId}
-                className={`px-5 py-3 border-b border-card-border cursor-pointer transition-colors ${
-                  rId === activeReportId ? "bg-secondary border-l-[3px] border-l-purple-accent" : "hover:bg-secondary"
+                className={`px-5 py-4 border-b border-card-border cursor-pointer transition-colors ${
+                  rId === activeReportId ? "bg-purple-accent/[0.08] border-l-[3px] border-l-purple-accent" : "hover:bg-secondary"
                 }`}
                 onClick={() => selectReport(rId)}
               >
@@ -141,20 +137,20 @@ export default function Reports() {
                     {val(r.title || r.summary_ultra_short || `Rapport #${rId}`)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-1.5">
+                <div className="flex items-center gap-2 mt-2">
                   <RegimeBadge regime={r.macro_regime} />
                   {r.confidence_score != null && (
                     <span className="bg-purple-accent/10 text-purple-accent px-1.5 py-[1px] text-[8px] rounded font-mono font-bold">{r.confidence_score}/10</span>
                   )}
-                  <span className="ml-auto text-[9px] text-label">{fmtDate(r.report_date || r.analysis_date)}</span>
+                  <span className="ml-auto text-[10px] text-label">{fmtDate(r.report_date || r.analysis_date)}</span>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* RIGHT PANEL — Report Detail */}
-        <div className="flex-1 p-4 md:p-7 overflow-y-auto">
+        {/* RIGHT PANEL */}
+        <div className="flex-1 overflow-y-auto">
           {!activeReportId ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 py-10 md:py-0">
               <FileText size={32} className="text-label" />
@@ -164,55 +160,52 @@ export default function Reports() {
             <div className="flex items-center justify-center h-full text-[13px] text-label">Laden...</div>
           ) : (
             <>
-              {/* Mobile back button */}
-              <button
-                className="md:hidden flex items-center gap-1 text-[11px] text-purple-accent font-semibold mb-3"
-                onClick={() => { setActiveReportId(null); setSearchParams({}); }}
-              >
-                ← Terug naar lijst
-              </button>
-              {/* HEADER */}
-              <div className="mb-2">
-                <div className="text-[18px] font-bold text-foreground leading-snug">{val(detail.title)}</div>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {/* STICKY HEADER */}
+              <div className="sticky-header px-6 py-4">
+                <button
+                  className="md:hidden flex items-center gap-1 text-[11px] text-purple-accent font-semibold mb-3"
+                  onClick={() => { setActiveReportId(null); setSearchParams({}); }}
+                >
+                  ← Terug naar lijst
+                </button>
+                <div className="text-[18px] font-bold text-foreground leading-snug mb-2">{val(detail.title)}</div>
+                <div className="flex items-center gap-2 flex-wrap mb-3">
                   <span className="text-[11px] text-label">{fmtDate(detail.analysis_date)}</span>
                   <RegimeBadge regime={detail.macro_regime} />
                   <RiskChip regime={detail.risk_regime} />
                   <div className="flex items-center gap-1.5 ml-2">
-                    <span className="text-[18px] font-extrabold text-purple-accent font-mono">{val(detail.confidence_score)}</span>
+                    <span className="text-[20px] font-extrabold text-purple-accent font-mono">{val(detail.confidence_score)}</span>
                     <span className="text-[11px] text-label">/10</span>
-                    <div className="w-[120px] h-[4px] bg-[#E5E7EB] rounded-full overflow-hidden">
+                    <div className="w-[120px] h-[4px] bg-secondary rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-purple-accent transition-all" style={{ width: `${convictionPct}%` }} />
                     </div>
                   </div>
                 </div>
-                <div className="text-[12px] text-sub-text mt-2">{safeText(textVal(detail.core_driver, "—"))}</div>
-              </div>
-
-              {/* 5. METADATA BAR */}
-              <div className="flex items-center gap-2 flex-wrap mb-6">
-                <span className="text-[8px] text-label bg-neutral-bg px-1.5 py-[1px] rounded font-mono">v: {val(detail.workflow_version)}</span>
-                <StatusTag label="P1" status={detail.pass1_status} />
-                <StatusTag label="P2" status={detail.pass2_status} />
-                {detail.status && <StatusTag label="Status" status={detail.status} />}
-              </div>
-
-              {/* TABS */}
-              <div className="flex gap-2 mb-4">
-                {([["Compact","compact"],["Dashboard","dashboard"],["Volledig","volledig"]] as const).map(([label, key]) => (
-                  <button key={key} onClick={() => setTab(key as any)}
-                    className={`px-[14px] py-1 text-[12px] font-semibold rounded-md transition-colors ${
-                      key === tab ? "bg-purple-accent text-white" : "bg-transparent text-label hover:text-foreground"
-                    }`}>{label}</button>
-                ))}
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <span className="text-[8px] text-label bg-neutral-bg px-1.5 py-[1px] rounded font-mono">v: {val(detail.workflow_version)}</span>
+                  <StatusTag label="P1" status={detail.pass1_status} />
+                  <StatusTag label="P2" status={detail.pass2_status} />
+                  {detail.status && <StatusTag label="Status" status={detail.status} />}
+                </div>
+                {/* TABS */}
+                <div className="flex gap-2">
+                  {([["Compact","compact"],["Dashboard","dashboard"],["Volledig","volledig"]] as const).map(([label, key]) => (
+                    <button key={key} onClick={() => setTab(key as any)}
+                      className={`px-4 py-1.5 text-[12px] font-semibold rounded-md transition-colors ${
+                        key === tab ? "bg-purple-accent text-white" : "bg-transparent text-label hover:text-foreground"
+                      }`}>{label}</button>
+                  ))}
+                </div>
               </div>
 
               {/* TAB CONTENT */}
-              <DataCard className="p-5 mb-6">
-                {tab === "compact" && <CompactTab detail={detail} />}
-                {tab === "dashboard" && <DashboardTab detail={detail} biasData={biasData} />}
-                {tab === "volledig" && <VolledigTab detail={detail} />}
-              </DataCard>
+              <div className="p-6">
+                <DataCard className="p-6">
+                  {tab === "compact" && <CompactTab detail={detail} />}
+                  {tab === "dashboard" && <DashboardTab detail={detail} biasData={biasData} />}
+                  {tab === "volledig" && <VolledigTab detail={detail} />}
+                </DataCard>
+              </div>
             </>
           )}
         </div>
@@ -221,7 +214,6 @@ export default function Reports() {
   );
 }
 
-/* ---- Shared prose wrapper ---- */
 function Prose({ children }: { children: React.ReactNode }) {
   return <div className="max-w-[720px] text-[14px] text-sub-text leading-[1.7]">{children}</div>;
 }
@@ -229,32 +221,30 @@ function SHead({ icon: Icon, label }: { icon: React.ElementType; label: string }
   return (
     <div className="flex items-center gap-2 mb-3">
       <Icon size={15} className="text-label" />
-      <span className="text-[0.7rem] text-label uppercase tracking-[0.08em] font-semibold">{label}</span>
+      <span className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold">{label}</span>
     </div>
   );
 }
 function Spacer() {
-  return <hr className="border-card-border my-7" />;
+  return <hr className="border-card-border my-8" />;
 }
 
-/* ===================== COMPACT TAB ===================== */
 function CompactTab({ detail }: { detail: any }) {
   return (
     <>
       <h2 className="text-[20px] font-bold text-foreground leading-snug mb-1">{textVal(detail.title, "—")}</h2>
       {detail.core_driver && (
-        <div className="text-[13px] text-label mb-3">{detail.core_driver}</div>
+        <div className="text-[13px] text-label mb-4">{detail.core_driver}</div>
       )}
 
       {detail.summary_short && (
-        <div className="max-w-[720px] text-[13px] text-sub-text leading-[1.6] mb-4 italic border-l-2 border-purple-accent/30 pl-4">
+        <div className="max-w-[720px] text-[14px] text-sub-text leading-[1.7] mb-6 italic border-l-2 border-purple-accent/30 pl-4">
           {detail.summary_short}
         </div>
       )}
 
-      {/* 6. Flow chain summary */}
       {detail.flow_chain_summary && (
-        <div className="text-[12px] text-label italic mb-4">{detail.flow_chain_summary}</div>
+        <div className="text-[12px] text-label italic mb-6">{detail.flow_chain_summary}</div>
       )}
 
       <Spacer />
@@ -264,7 +254,6 @@ function CompactTab({ detail }: { detail: any }) {
         <MarkdownBlock content={detail.summary_micro || detail.summary_short} fallback="Nog geen compacte samenvatting beschikbaar" />
       </Prose>
 
-      {/* What Stands Out */}
       {detail.what_stands_out && (
         <>
           <Spacer />
@@ -275,7 +264,6 @@ function CompactTab({ detail }: { detail: any }) {
         </>
       )}
 
-      {/* Forward Implications */}
       {detail.forward_implications && (
         <>
           <Spacer />
@@ -284,7 +272,6 @@ function CompactTab({ detail }: { detail: any }) {
         </>
       )}
 
-      {/* Transmission Mechanism */}
       {detail.transmission_mechanism && (
         <>
           <Spacer />
@@ -293,7 +280,6 @@ function CompactTab({ detail }: { detail: any }) {
         </>
       )}
 
-      {/* Priced-in block */}
       {(detail.priced_in_assessment || detail.priced_in) && (
         <>
           <Spacer />
@@ -314,7 +300,7 @@ function CompactTab({ detail }: { detail: any }) {
           { label: "NEERWAARTS", value: detail.scenario_downside, borderColor: "#DC2626" },
         ].map(s => (
           <div key={s.label} className="bg-secondary border border-card-border rounded-lg p-4" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
-            <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mb-2 font-medium">{s.label}</div>
+            <div className="text-[10px] text-label uppercase tracking-[0.12em] mb-2 font-semibold">{s.label}</div>
             <div className="text-[13px] text-sub-text leading-[1.7]"><MarkdownBlock content={s.value} /></div>
           </div>
         ))}
@@ -323,7 +309,6 @@ function CompactTab({ detail }: { detail: any }) {
   );
 }
 
-/* ===================== DASHBOARD TAB ===================== */
 function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
   const FX_CODES = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
   const ASSETS = [
@@ -345,32 +330,28 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
       </Prose>
 
       <Spacer />
-
       <SHead icon={ArrowRight} label="Flow Chain" />
       <Prose><MarkdownBlock content={detail.flow_chain} /></Prose>
 
       <Spacer />
-
       <SHead icon={Building2} label="Central Bank Narrative" />
       <Prose><MarkdownBlock content={detail.cb_narrative} /></Prose>
 
       <Spacer />
-
       <SHead icon={RefreshCw} label="What Changed" />
       <Prose><MarkdownBlock content={detail.what_changed} /></Prose>
 
       <Spacer />
 
-      {/* FX BIAS with cleaned reasons */}
       <SHead icon={DollarSign} label="FX Bias" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {FX_CODES.map(code => {
           const bias = detail[`${code.toLowerCase()}_bias`];
           const reason = detail[`${code.toLowerCase()}_reason`];
           const color = getBiasColor(bias);
           const displayReason = cleanReason(code, bias, reason);
           return (
-            <div key={code} className="bg-secondary border border-card-border rounded-lg p-3">
+            <div key={code} className="bg-secondary border border-card-border rounded-lg p-4">
               <div className="flex items-center gap-1.5 mb-1">
                 <DollarSign size={12} className="text-label" />
                 <span className="text-[11px] font-bold uppercase" style={{ color }}>{code}</span>
@@ -384,14 +365,13 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       <Spacer />
 
-      {/* ASSET BIAS with cleaned reasons */}
-      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ASSET BIAS</div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+      <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mb-3">ASSET BIAS</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {ASSETS.map(({ label, bias, reason, icon: Icon }) => {
           const color = getBiasColor(bias);
           const displayReason = cleanAssetReason(label, bias, reason);
           return (
-            <div key={label} className="bg-secondary border border-card-border rounded-lg p-3">
+            <div key={label} className="bg-secondary border border-card-border rounded-lg p-4">
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon size={12} className="text-label" />
                 <span className="text-[11px] font-bold uppercase">{label}</span>
@@ -405,14 +385,13 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       <Spacer />
 
-      {/* RATES */}
-      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">RENTES</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+      <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mb-3">RENTES</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {RATES.map(({ label, bias, reason }) => {
           const color = getBiasColor(bias);
           const displayReason = cleanAssetReason(label, bias, reason);
           return (
-            <div key={label} className="bg-secondary border border-card-border rounded-lg p-3">
+            <div key={label} className="bg-secondary border border-card-border rounded-lg p-4">
               <div className="flex items-center gap-1.5 mb-1">
                 <Percent size={12} className="text-label" />
                 <span className="text-[11px] font-bold uppercase">{label}</span>
@@ -426,20 +405,19 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
 
       <Spacer />
 
-      {/* ENTITY BIAS TABLE — enhanced */}
-      <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-3">ENTITY BIAS</div>
+      <div className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold mb-3">ENTITY BIAS</div>
       {biasData.length === 0 ? (
-        <div className="text-[11px] text-label italic">Nog geen entity bias data voor dit rapport</div>
+        <div className="text-[12px] text-label italic">Nog geen entity bias data voor dit rapport</div>
       ) : (
         <div className="border border-card-border rounded-lg overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead className="bg-secondary">
               <tr>
-                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Klasse</th>
-                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Code</th>
-                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Bias</th>
-                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Strength</th>
-                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Driver</th>
+                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Klasse</th>
+                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Code</th>
+                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Bias</th>
+                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Strength</th>
+                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Driver</th>
               </tr>
             </thead>
             <tbody>
@@ -451,18 +429,18 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
                 const driverText = textVal(b.main_driver, "—");
                 const driverDisplay = driverText === "—" && biasLower !== "neutral" ? "(zie rapport context)" : driverText;
                 return (
-                  <tr key={i} className="border-b border-card-border last:border-b-0 hover:bg-secondary">
-                    <td className="text-[10px] text-sub-text px-3 py-2">
+                  <tr key={i} className="border-b border-card-border last:border-b-0 hover:bg-secondary zebra-row">
+                    <td className="text-[10px] text-sub-text px-4 py-2.5">
                       <span className="flex items-center gap-1"><ClassIcon size={11} className="text-label" />{val(b.entity_class)}</span>
                     </td>
-                    <td className="text-[10px] text-foreground font-bold px-3 py-2">{val(b.entity_code)}</td>
-                    <td className="px-3 py-2">
+                    <td className="text-[11px] text-foreground font-bold px-4 py-2.5">{val(b.entity_code)}</td>
+                    <td className="px-4 py-2.5">
                       <span className="px-2 py-[2px] text-[9px] rounded uppercase font-semibold" style={{ backgroundColor: biasColor + "1A", color: biasColor }}>
                         {val(b.bias)}
                       </span>
                     </td>
-                    <td className="text-[10px] text-sub-text px-3 py-2">{val(b.bias_strength)}</td>
-                    <td className="text-[11px] text-sub-text px-3 py-2 italic">{safeText(driverDisplay)}</td>
+                    <td className="text-[10px] text-sub-text px-4 py-2.5">{val(b.bias_strength)}</td>
+                    <td className="text-[11px] text-sub-text px-4 py-2.5 italic">{safeText(driverDisplay)}</td>
                   </tr>
                 );
               })}
@@ -474,7 +452,6 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
   );
 }
 
-/* ===================== VOLLEDIG TAB ===================== */
 function VolledigTab({ detail }: { detail: any }) {
   const sections = [
     { label: "UITGEBREIDE SAMENVATTING", value: detail.summary_detailed || detail.summary_full, icon: FileText, fallback: "Uitgebreide samenvatting nog niet beschikbaar" },
@@ -505,7 +482,7 @@ function VolledigTab({ detail }: { detail: any }) {
   ].filter(s => s.value && String(s.value).trim() !== "" && s.value !== "null");
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-8">
       {sections.map(({ label, value, icon: Icon, fallback }) => (
         <div key={label}>
           <SHead icon={Icon} label={label} />
