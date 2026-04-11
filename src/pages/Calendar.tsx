@@ -337,8 +337,50 @@ export default function Calendar() {
                 </div>
               )}
 
+              {/* Message */}
+              {selectedEvent.message && (
+                <div className="mb-4 bg-secondary rounded px-3 py-2">
+                  <div className="text-[10px] text-sub-text">{selectedEvent.message}</div>
+                </div>
+              )}
+
+              {/* Market Reactions */}
+              {(() => {
+                const reactions = [
+                  { label: "YIELDS", value: selectedEvent.yields_reaction },
+                  { label: "DXY", value: selectedEvent.dxy_reaction },
+                  { label: "AANDELEN", value: selectedEvent.equity_reaction },
+                  { label: "GOUD", value: selectedEvent.gold_reaction },
+                  { label: "OLIE", value: selectedEvent.oil_reaction },
+                ];
+                const hasAny = reactions.some(r => r.value);
+                if (!hasAny) return null;
+                const reactionColor = (v: string | null) => {
+                  if (!v) return "text-label";
+                  const l = v.toLowerCase();
+                  if (l.includes("stijg") || l.includes("omhoog") || l.includes("+")) return "text-bullish-text";
+                  if (l.includes("daal") || l.includes("omlaag") || l.includes("-")) return "text-bearish-text";
+                  return "text-label";
+                };
+                return (
+                  <div className="mb-4">
+                    <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">MARKTREACTIES</div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {reactions.map(r => (
+                        <div key={r.label} className="bg-secondary rounded p-2 text-center">
+                          <div className="text-[7px] text-label uppercase font-medium mb-1">{r.label}</div>
+                          <div className={`text-[9px] font-semibold leading-tight ${reactionColor(r.value)}`}>
+                            {r.value || "—"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {!selectedEvent.interpretation && !selectedEvent.market_impact_narrative && (
-                <span className="text-[11px] text-label italic">Geen details beschikbaar voor dit event</span>
+                <span className="text-[11px] text-label italic">Marktimpact wordt bijgewerkt na release van het cijfer.</span>
               )}
             </DataCard>
           </div>
