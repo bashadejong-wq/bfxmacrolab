@@ -13,6 +13,7 @@ import MacroData from "./pages/MacroData";
 import Calendar from "./pages/Calendar";
 import EventHistory from "./pages/EventHistory";
 import TradeIdeas from "./pages/TradeIdeas";
+import CBDivergence from "./pages/CBDivergence";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/event-history" element={<EventHistory />} />
           <Route path="/trade-ideas" element={<TradeIdeas />} />
+          <Route path="/cb-divergence" element={<CBDivergence />} />
           <Route path="/regime-timeline" element={<Navigate to="/alignment" replace />} />
           <Route path="/correlations" element={<Navigate to="/currencies/USD" replace />} />
           <Route path="*" element={<NotFound />} />
