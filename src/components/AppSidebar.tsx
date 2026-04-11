@@ -1,19 +1,23 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, DollarSign, Layers, GitMerge, FileText,
   TrendingUp, BarChart2, CalendarDays, History,
-  Lightbulb,
+  Lightbulb, Building2,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useSidebar } from "./DashboardLayout";
+import { supabase } from "@/lib/supabase";
+import { fmtDate } from "@/components/ui-helpers";
 
 const navItems = [
   { label: "Overview", path: "/", icon: LayoutDashboard },
   { label: "Currencies", path: "/currencies", icon: DollarSign },
   { label: "Macro Analysis", path: "/dwm", icon: Layers },
   { label: "Regime & Alignment", path: "/alignment", icon: GitMerge },
-  { label: "Reports", path: "/reports", icon: FileText },
   { label: "Markets & Yields", path: "/markets", icon: TrendingUp },
+  { label: "CB Divergentie", path: "/cb-divergence", icon: Building2 },
+  { label: "Reports", path: "/reports", icon: FileText },
   { label: "Macro Data", path: "/macro-data", icon: BarChart2 },
   { label: "Calendar", path: "/calendar", icon: CalendarDays },
   { label: "Event History", path: "/event-history", icon: History },
@@ -30,6 +34,14 @@ export function AppSidebar() {
   const location = useLocation();
   const { collapsed, setCollapsed } = useSidebar();
   const width = collapsed ? 60 : 220;
+  const [liveDate, setLiveDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("alignment_engine").select("alignment_date").order("alignment_date", { ascending: false }).limit(1)
+      .then(({ data }) => {
+        if (data && data[0]?.alignment_date) setLiveDate(data[0].alignment_date);
+      });
+  }, []);
 
   return (
     <aside
@@ -71,6 +83,7 @@ export function AppSidebar() {
                 justifyContent: collapsed ? "center" : "flex-start",
                 gap: collapsed ? 0 : 10,
                 transition: "background 150ms ease",
+                borderLeft: active ? "3px solid #7C3AED" : "3px solid transparent",
               }}
               onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "#1A1A1A"; }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
@@ -85,7 +98,11 @@ export function AppSidebar() {
       <div className="pb-4 flex flex-col gap-3" style={{ paddingLeft: collapsed ? 0 : 16, paddingRight: collapsed ? 0 : 16 }}>
         <div className="flex items-center gap-2" style={{ justifyContent: collapsed ? "center" : "flex-start" }}>
           <div className="w-[6px] h-[6px] rounded-full bg-live-green animate-pulse-dot" />
-          {!collapsed && <span className="text-[10px]" style={{ color: "#6B7280" }}>Live</span>}
+          {!collapsed && (
+            <span className="text-[10px]" style={{ color: "#6B7280" }}>
+              Live{liveDate ? ` • ${fmtDate(liveDate)}` : ""}
+            </span>
+          )}
         </div>
         <button
           onClick={() => setCollapsed(c => !c)}

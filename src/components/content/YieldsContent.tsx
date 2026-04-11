@@ -78,6 +78,7 @@ export default function YieldsContent() {
   const [y, setY] = useState<any>(null);
   const [pattern, setPattern] = useState<any>(null);
   const [delta, setDelta] = useState<any>(null);
+  const [curveRegime, setCurveRegime] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -85,10 +86,12 @@ export default function YieldsContent() {
       queryWithRetry(() => supabase.from("yields_live").select("*").order("fetch_date", { ascending: false }).limit(1), "Yields/yields_live"),
       queryWithRetry(() => supabase.from("v_yield_pattern_intelligence").select("*").limit(1), "Yields/pattern"),
       queryWithRetry(() => supabase.from("v_yield_delta").select("*").limit(1), "Yields/delta"),
-    ]).then(([yl, pt, dl]) => {
+      queryWithRetry(() => supabase.from("yield_curve_regime").select("curve_signal,curve_interpretation,fetch_date").order("fetch_date", { ascending: false }).limit(1), "Yields/curve_regime"),
+    ]).then(([yl, pt, dl, cr]) => {
       setY((yl as any[])?.[0] || null);
       setPattern((pt as any[])?.[0] || null);
       setDelta((dl as any[])?.[0] || null);
+      setCurveRegime((cr as any[])?.[0] || null);
       setLoaded(true);
     });
   }, []);
@@ -289,6 +292,22 @@ export default function YieldsContent() {
                 {s.fxImpl && <div className="text-[9px] text-sub-text italic leading-tight mt-1">{s.fxImpl}</div>}
               </div>
             ))}
+          </div>
+        </DataCard>
+      )}
+
+      {/* CURVE SIGNAL from yield_curve_regime */}
+      {curveRegime && (curveRegime.curve_signal || curveRegime.curve_interpretation) && (
+        <DataCard className="px-4 py-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">CURVE SIGNAAL</div>
+              <div className="text-[14px] font-bold text-foreground">{val(curveRegime.curve_signal)}</div>
+            </div>
+            <div>
+              <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">INTERPRETATIE</div>
+              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(curveRegime.curve_interpretation, "—")}</div>
+            </div>
           </div>
         </DataCard>
       )}
