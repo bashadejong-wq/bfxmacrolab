@@ -392,10 +392,10 @@ export default function Currencies() {
                     <tr>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Confidence</th>
+                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bull / Bear</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Main Driver</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Score</th>
                     </tr>
                   </thead>
                   <tbody>
