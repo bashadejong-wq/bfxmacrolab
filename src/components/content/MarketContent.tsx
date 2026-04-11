@@ -179,7 +179,7 @@ export default function MarketContent() {
       <hr className="border-card-border mb-6" />
 
       <SectionLabel><span className="inline-flex items-center gap-1.5"><Package size={13} className="text-label" /> GRONDSTOFFEN</span></SectionLabel>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         {[
           { l: "GOLD", v: m.gold, pct: m.gold_pct },
           { l: "SILVER", v: m.silver, pct: m.silver_delta },
@@ -192,7 +192,7 @@ export default function MarketContent() {
           </DataCard>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         {[
           { l: "OIL BRENT", v: m.oil_brent, pct: null },
           { l: "COPPER", v: m.copper, pct: m.copper_delta },

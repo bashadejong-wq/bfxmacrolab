@@ -137,7 +137,7 @@ export default function YieldsContent() {
       </div>
 
       <SectionLabel>US TREASURY CURVE</SectionLabel>
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
           { label: "2 JAAR", value: y.us_2y, sub: null, deltaKey: "us_2y_delta_bp" },
           { label: "5 JAAR", value: y.us_5y, sub: null, deltaKey: null },
@@ -175,7 +175,7 @@ export default function YieldsContent() {
       <hr className="border-card-border mb-4" />
 
       <SectionLabel>KEY METRICS</SectionLabel>
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
           { label: "2S10S", value: y.us_2s10s, colored: true, key: "2s10s", deltaVal: d.us_2s10s_delta_bp },
           { label: "REËEL 10J", value: y.us_real_10y || y.us_real_yield_10y, colored: false, key: "real", deltaVal: null },
