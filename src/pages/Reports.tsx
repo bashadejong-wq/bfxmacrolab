@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, fmtDate, queryWithRetry, getBiasColor } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, fmtDate, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
 import {
   FileText, DollarSign, Package, BarChart2, Percent,
   Building2, Target, Eye, RefreshCw, ArrowRightLeft, ArrowRight,
@@ -182,7 +182,7 @@ export default function Reports() {
                     const rs = getRegimeStyle(detail.macro_regime);
                     return (
                       <span className="flex items-center gap-1 px-2 py-[2px] text-[9px] rounded uppercase font-semibold" style={{ backgroundColor: rs.bg, color: rs.text }}>
-                        <RegimeIcon size={11} /> {val(detail.macro_regime)}
+                        <RegimeIcon size={11} /> {formatLabel(detail.macro_regime) || "—"}
                       </span>
                     );
                   })()}
@@ -195,7 +195,7 @@ export default function Reports() {
                     </div>
                   </div>
                 </div>
-                <div className="text-[12px] text-sub-text mt-2">{textVal(detail.core_driver, "—")}</div>
+                <div className="text-[12px] text-sub-text mt-2">{safeText(textVal(detail.core_driver, "—"))}</div>
               </div>
 
               {/* 5. METADATA BAR */}
@@ -321,7 +321,7 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
     <>
       <SHead icon={FileText} label="Dashboard Samenvatting" />
       <Prose>
-        <MarkdownBlock content={detail.summary_dashboard || detail.summary_full} fallback="Nog geen dashboard samenvatting beschikbaar" />
+        <MarkdownBlock content={renderDashboardText(detail.summary_dashboard || detail.summary_full)} fallback="Nog geen dashboard samenvatting beschikbaar" />
       </Prose>
 
       <Spacer />
@@ -432,17 +432,17 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
                 const driverDisplay = driverText === "—" && biasLower !== "neutral" ? "(zie rapport context)" : driverText;
                 return (
                   <tr key={i} className="border-b border-card-border last:border-b-0 hover:bg-secondary">
-                    <td className="text-[10px] text-sub-text px-4 py-2">
+                    <td className="text-[10px] text-sub-text px-3 py-2">
                       <span className="flex items-center gap-1"><ClassIcon size={11} className="text-label" />{val(b.entity_class)}</span>
                     </td>
-                    <td className="text-[10px] text-foreground font-bold px-4 py-2">{val(b.entity_code)}</td>
-                    <td className="px-4 py-2">
+                    <td className="text-[10px] text-foreground font-bold px-3 py-2">{val(b.entity_code)}</td>
+                    <td className="px-3 py-2">
                       <span className="px-2 py-[2px] text-[9px] rounded uppercase font-semibold" style={{ backgroundColor: biasColor + "1A", color: biasColor }}>
                         {val(b.bias)}
                       </span>
                     </td>
-                    <td className="text-[10px] text-sub-text px-4 py-2">{val(b.bias_strength)}</td>
-                    <td className="text-[11px] text-sub-text px-4 py-2 italic">{driverDisplay}</td>
+                    <td className="text-[10px] text-sub-text px-3 py-2">{val(b.bias_strength)}</td>
+                    <td className="text-[11px] text-sub-text px-3 py-2 italic">{safeText(driverDisplay)}</td>
                   </tr>
                 );
               })}
