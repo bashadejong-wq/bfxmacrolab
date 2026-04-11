@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/components/ui-helpers";
-import { ChevronDown, ChevronUp, Zap, Check, MailX } from "lucide-react";
+import { DataCard, SectionLabel, val, fmtDate, MarkdownBlock, ImpactChip, SurpriseChip, queryWithRetry } from "@/components/ui-helpers";
+import { ChevronDown, ChevronUp, Zap, Check, MailX, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /* ── constants ─────────────────────────────────────────── */
@@ -55,6 +55,7 @@ export default function EventHistory() {
   const [releases, setReleases] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedRelease, setSelectedRelease] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"reactions" | "releases">("reactions");
 
   // filters
@@ -281,48 +282,146 @@ export default function EventHistory() {
           })}
         </div>
       ) : (
-        /* RELEASES: Table view */
-        <DataCard className="overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-secondary">
-              <tr>
-                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Datum</th>
-                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Event</th>
-                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Land</th>
-                <th className="text-[8px] text-label uppercase text-left px-3 py-2">Verr.</th>
-                <th className="text-[8px] text-label uppercase text-right px-3 py-2">Verwacht</th>
-                <th className="text-[8px] text-label uppercase text-right px-3 py-2">Actueel</th>
-                <th className="text-[8px] text-label uppercase text-right px-3 py-2">DXY</th>
-                <th className="text-[8px] text-label uppercase text-right px-3 py-2">US2Y</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredReleases.map((e) => {
-                const dir = surpriseDir(e.surprise_direction);
-                return (
-                  <tr key={e.id} className="border-b border-card-border hover:bg-secondary/50">
-                    <td className="text-[10px] text-sub-text px-3 py-2 font-mono">{fmtDate(e.release_date)}</td>
-                    <td className="text-[10px] text-foreground px-3 py-2 font-medium max-w-[200px] truncate">{val(e.event_name)}</td>
-                    <td className="px-3 py-2">
-                      <span className="text-[9px] font-bold">{FLAG[e.country] || ""} {val(e.country)}</span>
-                    </td>
-                    <td className="px-3 py-2"><SurprisePill direction={dir} /></td>
-                    <td className="text-[10px] text-sub-text px-3 py-2 text-right font-mono">{val(e.expected_value)}</td>
-                    <td className={`text-[10px] font-bold px-3 py-2 text-right font-mono ${dir === "beat" || dir === "positive" ? "text-bullish-text" : dir === "miss" || dir === "negative" ? "text-bearish-text" : "text-foreground"}`}>
-                      {val(e.actual_value)}
-                    </td>
-                    <td className={`text-[10px] px-3 py-2 text-right font-mono ${chgColor(e.reaction_dxy)}`}>
-                      {e.reaction_dxy != null ? fmtPct(e.reaction_dxy) || "—" : "—"}
-                    </td>
-                    <td className={`text-[10px] px-3 py-2 text-right font-mono ${chgColor(e.reaction_us2y)}`}>
-                      {e.reaction_us2y != null ? fmtBp(e.reaction_us2y) || "—" : "—"}
-                    </td>
+        /* RELEASES: Table + detail panel */
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className={`${selectedRelease ? "flex-1 min-w-0" : "w-full"} transition-all`}>
+            <DataCard className="overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-secondary">
+                  <tr>
+                    <th className="text-[8px] text-label uppercase text-left px-3 py-2">Datum</th>
+                    <th className="text-[8px] text-label uppercase text-left px-3 py-2">Event</th>
+                    <th className="text-[8px] text-label uppercase text-left px-3 py-2">Land</th>
+                    <th className="text-[8px] text-label uppercase text-left px-3 py-2">Verr.</th>
+                    <th className="text-[8px] text-label uppercase text-right px-3 py-2">Verwacht</th>
+                    <th className="text-[8px] text-label uppercase text-right px-3 py-2">Actueel</th>
+                    <th className="text-[8px] text-label uppercase text-right px-3 py-2">DXY</th>
+                    <th className="text-[8px] text-label uppercase text-right px-3 py-2">US2Y</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </DataCard>
+                </thead>
+                <tbody>
+                  {filteredReleases.map((e) => {
+                    const dir = surpriseDir(e.surprise_direction);
+                    const isSelected = selectedRelease?.id === e.id;
+                    return (
+                      <tr key={e.id}
+                        className={`border-b border-card-border cursor-pointer transition-colors ${isSelected ? "bg-purple-accent/5" : "hover:bg-secondary/50"}`}
+                        onClick={() => setSelectedRelease(isSelected ? null : e)}>
+                        <td className="text-[10px] text-sub-text px-3 py-2 font-mono">{fmtDate(e.release_date)}</td>
+                        <td className="text-[10px] text-foreground px-3 py-2 font-medium max-w-[200px] truncate">{val(e.event_name)}</td>
+                        <td className="px-3 py-2">
+                          <span className="text-[9px] font-bold">{FLAG[e.country] || ""} {val(e.country)}</span>
+                        </td>
+                        <td className="px-3 py-2"><SurprisePill direction={dir} /></td>
+                        <td className="text-[10px] text-sub-text px-3 py-2 text-right font-mono">{val(e.expected_value)}</td>
+                        <td className={`text-[10px] font-bold px-3 py-2 text-right font-mono ${dir === "beat" || dir === "positive" ? "text-bullish-text" : dir === "miss" || dir === "negative" ? "text-bearish-text" : "text-foreground"}`}>
+                          {val(e.actual_value)}
+                        </td>
+                        <td className={`text-[10px] px-3 py-2 text-right font-mono ${chgColor(e.reaction_dxy)}`}>
+                          {e.reaction_dxy != null ? fmtPct(e.reaction_dxy) || "—" : "—"}
+                        </td>
+                        <td className={`text-[10px] px-3 py-2 text-right font-mono ${chgColor(e.reaction_us2y)}`}>
+                          {e.reaction_us2y != null ? fmtBp(e.reaction_us2y) || "—" : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </DataCard>
+          </div>
+
+          {/* Release Detail Panel */}
+          {selectedRelease && (
+            <div className="w-full md:w-[340px] md:min-w-[340px] md:sticky md:top-0 md:self-start">
+              <DataCard className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="text-[14px] font-bold text-foreground leading-snug">{val(selectedRelease.event_name)}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-label">{fmtDate(selectedRelease.release_date)}</span>
+                      <span className="text-[9px] font-bold text-foreground bg-secondary px-1.5 py-0.5 rounded">{val(selectedRelease.currency || selectedRelease.country)}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedRelease(null)} className="text-label hover:text-foreground p-1">
+                    <X size={14} />
+                  </button>
+                </div>
+                <hr className="border-card-border mb-3" />
+
+                {/* Values */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div>
+                    <div className="text-[8px] text-label uppercase">Verwacht</div>
+                    <div className="text-[14px] font-bold text-sub-text font-mono mt-0.5">{val(selectedRelease.expected_value)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] text-label uppercase">Actueel</div>
+                    <div className="text-[14px] font-bold text-foreground font-mono mt-0.5">{val(selectedRelease.actual_value)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] text-label uppercase">Vorig</div>
+                    <div className="text-[14px] font-bold text-sub-text font-mono mt-0.5">{val(selectedRelease.previous_value)}</div>
+                  </div>
+                </div>
+
+                {/* Surprise */}
+                {selectedRelease.surprise_direction && (
+                  <div className="mb-4">
+                    <div className="text-[8px] text-label uppercase mb-1">Verrassing</div>
+                    <SurprisePill direction={surpriseDir(selectedRelease.surprise_direction)} />
+                    {selectedRelease.surprise_size != null && (
+                      <span className="text-[11px] text-sub-text font-mono ml-2">Score: {selectedRelease.surprise_size}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Market Reactions */}
+                {(() => {
+                  const reactions = [
+                    { label: "DXY", value: selectedRelease.reaction_dxy, fmt: fmtPct },
+                    { label: "EUR/USD", value: selectedRelease.reaction_eurusd, fmt: fmtPct },
+                    { label: "USD/JPY", value: selectedRelease.reaction_usdjpy, fmt: fmtPct },
+                    { label: "SPX", value: selectedRelease.reaction_spx, fmt: fmtPct },
+                    { label: "GOLD", value: selectedRelease.reaction_gold, fmt: fmtPct },
+                    { label: "US10Y", value: selectedRelease.reaction_us10y, fmt: fmtBp },
+                    { label: "US2Y", value: selectedRelease.reaction_us2y, fmt: fmtBp },
+                    { label: "OIL", value: selectedRelease.reaction_oil, fmt: fmtPct },
+                  ];
+                  const hasAny = reactions.some(r => r.value != null);
+                  if (!hasAny) return null;
+                  return (
+                    <div className="mb-4">
+                      <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">MARKTREACTIES (D+0)</div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {reactions.map(r => (
+                          <div key={r.label} className="bg-secondary rounded p-2 text-center">
+                            <div className="text-[7px] text-label uppercase font-medium mb-1">{r.label}</div>
+                            <div className={`text-[10px] font-mono font-semibold ${chgColor(r.value)}`}>
+                              {r.value != null ? r.fmt(r.value) || "—" : "—"}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Analyst note */}
+                {selectedRelease.analyst_note && (
+                  <div className="mb-4 border-l-[3px] border-purple-accent pl-3">
+                    <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">ANALYSE</div>
+                    <div className="text-[11px] text-sub-text leading-relaxed">{selectedRelease.analyst_note}</div>
+                  </div>
+                )}
+
+                {!selectedRelease.analyst_note && selectedRelease.reaction_dxy == null && selectedRelease.reaction_spx == null && (
+                  <span className="text-[11px] text-label italic">Marktimpact wordt bijgewerkt na release van het cijfer.</span>
+                )}
+              </DataCard>
+            </div>
+          )}
+        </div>
       )}
       <div className="text-[11px] text-[#4B5563] italic mt-4 mb-2">
         D+3 en D+5 data wordt toegevoegd naarmate er meer events zijn verwerkt
