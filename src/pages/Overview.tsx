@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, ImpactChip, fmtDate, fmtDateTime, queryWithRetry, safeText, renderDashboardText, formatLabel } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, ImpactChip, fmtDate, fmtDateTime, queryWithRetry, safeText, renderDashboardText, formatLabel, RegimeBadge } from "@/components/ui-helpers";
 import {
   Zap, TrendingUp, TrendingDown, Sun, RefreshCw, GitMerge, HelpCircle,
   Shield, AlertTriangle, AlertOctagon, ShieldAlert, ShieldCheck,
@@ -213,9 +213,9 @@ export default function Overview() {
       <DataCard className="px-4 py-3 mb-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-secondary px-3 py-1.5 rounded-md">
+            <div className="flex items-center gap-2">
               <RegimeIcon size={16} className="text-purple-accent" />
-              <span className="text-[14px] md:text-[16px] font-black text-foreground uppercase tracking-tight">{formatLabel(a?.macro_regime) || FALLBACK}</span>
+              <RegimeBadge regime={a?.macro_regime} />
             </div>
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${riskColor}`}>
               <RiskIcon size={13} />
