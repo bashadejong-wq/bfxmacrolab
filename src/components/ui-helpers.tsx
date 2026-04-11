@@ -63,8 +63,11 @@ export function getBiasColor(bias: string | null): string {
 export function getBiasBackground(bias: string | null): string {
   const b = (bias || "").toLowerCase();
   if (b === "bullish") return "#F0FDF4";
+  if (b === "licht bullish") return "#F0FDF4";
   if (b === "bearish") return "#FEF2F2";
+  if (b === "licht bearish") return "#FFF7ED";
   if (b === "mixed") return "#FFFBEB";
+  if (b === "niet relevant") return "#F9FAFB";
   return "#F9FAFB";
 }
 
@@ -72,8 +75,12 @@ export function getBiasBackground(bias: string | null): string {
 export function getBiasClasses(bias: string | null): string {
   const b = (bias || "").toLowerCase();
   if (b === "bullish") return "bg-bullish-bg text-bullish-text";
+  if (b === "licht bullish") return "bg-bullish-bg text-[#4ADE80]";
   if (b === "bearish") return "bg-bearish-bg text-bearish-text";
+  if (b === "licht bearish") return "bg-[#FFF7ED] text-[#F97316]";
   if (b === "mixed") return "bg-mixed-bg text-mixed-text";
+  if (b === "niet relevant") return "bg-neutral-bg text-[#D1D5DB] italic";
+  if (b === "neutraal") return "bg-neutral-bg text-neutral-text";
   return "bg-neutral-bg text-neutral-text";
 }
 
