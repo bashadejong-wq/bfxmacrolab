@@ -40,7 +40,7 @@ function parseCurrencyRanking(raw: string | null): { rank: number; code: string;
 
 function parseHighConviction(raw: string | null): string[] {
   if (!raw) return [];
-  return raw.split("|").map(s => s.trim()).filter(s => s.length > 0);
+  return raw.split("|").map(s => s.replace(/^[\s—–\-]+/, '').trim()).filter(s => s.length > 0);
 }
 
 function parseSummaryDashboard(raw: string | null): { header: string; body: string }[] {
@@ -317,44 +317,52 @@ export default function Overview() {
       {/* 5. CURRENCY RANKING (parsed from cockpit) */}
       <SectionLabel>CURRENCY RANKING</SectionLabel>
       <DataCard className="overflow-hidden mb-3 overflow-x-auto">
-        {/* Mobile: stacked cards */}
-        <div className="block sm:hidden">
-          {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
-            const biasClass = getBiasClassForRanking(fx.bias);
-            return (
-              <div key={fx.rank} className="flex items-center gap-3 px-4 py-2.5 border-b border-card-border last:border-0">
-                <span className="text-[11px] font-mono font-bold text-label w-5">{fx.rank}</span>
-                <span className="text-[12px] font-bold text-foreground w-10">{fx.code}</span>
-                <span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{fx.bias}</span>
-                <span className="text-[10px] text-sub-text ml-auto uppercase">{fx.conviction}</span>
-              </div>
-            );
-          })}
-        </div>
-        {/* Desktop: table */}
-        <table className="w-full hidden sm:table">
-          <thead className="bg-secondary">
-            <tr>
-              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
-              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
-              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
-              <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
-              const biasClass = getBiasClassForRanking(fx.bias);
-              return (
-                <tr key={fx.rank} className="border-b border-card-border last:border-0">
-                  <td className="text-[11px] font-mono font-bold text-label px-4 py-2">{fx.rank}</td>
-                  <td className="text-[12px] font-bold text-foreground px-4 py-2">{fx.code}</td>
-                  <td className="px-4 py-2"><span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{fx.bias}</span></td>
-                  <td className="text-[10px] text-sub-text px-4 py-2 uppercase">{fx.conviction}</td>
+        {parseCurrencyRanking(a?.currency_ranking).length === 0 ? (
+          <div className="text-center text-[#4B5563] text-[13px] italic py-6">
+            Ranking wordt berekend op basis van recente rapporten — nog geen data
+          </div>
+        ) : (
+          <>
+            {/* Mobile: stacked cards */}
+            <div className="block sm:hidden">
+              {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
+                const biasClass = getBiasClassForRanking(fx.bias);
+                return (
+                  <div key={fx.rank} className="flex items-center gap-3 px-4 py-2.5 border-b border-card-border last:border-0">
+                    <span className="text-[11px] font-mono font-bold text-label w-5">{fx.rank}</span>
+                    <span className="text-[12px] font-bold text-foreground w-10">{fx.code}</span>
+                    <span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{fx.bias}</span>
+                    <span className="text-[10px] text-sub-text ml-auto uppercase">{fx.conviction}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Desktop: table */}
+            <table className="w-full hidden sm:table">
+              <thead className="bg-secondary">
+                <tr>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+                  <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
+                  const biasClass = getBiasClassForRanking(fx.bias);
+                  return (
+                    <tr key={fx.rank} className="border-b border-card-border last:border-0">
+                      <td className="text-[11px] font-mono font-bold text-label px-4 py-2">{fx.rank}</td>
+                      <td className="text-[12px] font-bold text-foreground px-4 py-2">{fx.code}</td>
+                      <td className="px-4 py-2"><span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{fx.bias}</span></td>
+                      <td className="text-[10px] text-sub-text px-4 py-2 uppercase">{fx.conviction}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
       </DataCard>
 
       {/* HIGH CONVICTION TRADES */}
@@ -386,12 +394,12 @@ export default function Overview() {
       {parseSummaryDashboard(a?.summary_dashboard).length > 0 && (
         <>
           <SectionLabel>DAILY SUMMARY</SectionLabel>
-          <DataCard className="px-4 py-3 mb-3">
+          <DataCard className="px-4 py-3 mb-3 border-l-[3px] border-l-purple-accent">
             <div className="space-y-3">
               {parseSummaryDashboard(a?.summary_dashboard).map((section, i) => (
                 <div key={i}>
                   {section.header && <div className="text-[9px] text-label uppercase tracking-wider font-bold mb-0.5">{section.header}</div>}
-                  <div className="text-[11px] text-sub-text leading-relaxed">{safeText(section.body)}</div>
+                  <div className="text-[14px] text-sub-text leading-[1.7]">{safeText(section.body)}</div>
                 </div>
               ))}
             </div>

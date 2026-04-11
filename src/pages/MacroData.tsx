@@ -8,7 +8,7 @@ import {
   Flame, Eye, Droplets, DollarSign, MoreHorizontal
 } from "lucide-react";
 
-const COUNTRIES = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF","CNY","SEK"];
+const COUNTRIES = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
 
 const KPI_ICONS: Record<string, React.ElementType> = {
   BBP: TrendingUp, CPI: Activity, PMI: BarChart2, WERKLOOSHEID: Users, BELEIDSRENTE: Percent,

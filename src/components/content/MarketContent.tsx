@@ -5,19 +5,19 @@ import { DataCard, SectionLabel, val, fmtDate, queryWithRetry } from "@/componen
 import { BarChart2, DollarSign, Package, Activity, AlertTriangle, Clock, Shield } from "lucide-react";
 
 function DeltaLabel({ value, inverted = false }: { value: number | null | undefined; inverted?: boolean }) {
-  if (value === null || value === undefined) return null;
+  if (value === null || value === undefined) return <span className="text-[10px] font-mono text-[#6B7280]">0.00%</span>;
   const positive = value > 0;
-  const color = inverted ? (positive ? "#DC2626" : "#16A34A") : (positive ? "#16A34A" : "#DC2626");
-  const sign = positive ? "+" : "";
-  return <span className="text-[10px] font-mono font-bold" style={{ color }}>{sign}{value.toFixed(2)}%</span>;
+  const color = inverted ? (positive ? "#F87171" : "#4ADE80") : (positive ? "#4ADE80" : "#F87171");
+  const prefix = positive ? "▲ " : value < 0 ? "▼ " : "";
+  return <span className="text-[10px] font-mono font-bold" style={{ color }}>{prefix}{Math.abs(value).toFixed(2)}%</span>;
 }
 
 function DeltaPts({ value, inverted = false }: { value: number | null | undefined; inverted?: boolean }) {
   if (value === null || value === undefined) return null;
   const positive = value > 0;
-  const color = inverted ? (positive ? "#DC2626" : "#16A34A") : (positive ? "#16A34A" : "#DC2626");
-  const sign = positive ? "+" : "";
-  return <span className="text-[10px] font-mono font-bold" style={{ color }}>{sign}{Number(value).toFixed(2)}</span>;
+  const color = inverted ? (positive ? "#F87171" : "#4ADE80") : (positive ? "#4ADE80" : "#F87171");
+  const prefix = positive ? "▲ " : value < 0 ? "▼ " : "";
+  return <span className="text-[10px] font-mono font-bold" style={{ color }}>{prefix}{Math.abs(Number(value)).toFixed(2)}</span>;
 }
 
 function daysSince(dateStr: string | null): number {
@@ -140,7 +140,10 @@ export default function MarketContent() {
           <DataCard key={l} className="p-5">
             <div className="text-[24px] font-bold text-foreground font-mono">{val(v)}</div>
             <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] mt-1">{l}</div>
-            <div className="flex items-center gap-2 mt-1.5"><DeltaLabel value={pct} /></div>
+            <div className="flex items-center gap-2 mt-1.5">
+              <DeltaLabel value={pct} />
+              {v == null && l === "DJI" && <span className="text-[10px] text-[#4B5563] italic">niet beschikbaar</span>}
+            </div>
           </DataCard>
         ))}
       </div>

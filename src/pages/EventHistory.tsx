@@ -324,6 +324,9 @@ export default function EventHistory() {
           </table>
         </DataCard>
       )}
+      <div className="text-[11px] text-[#4B5563] italic mt-4 mb-2">
+        D+3 en D+5 data wordt toegevoegd naarmate er meer events zijn verwerkt
+      </div>
     </DashboardLayout>
   );
 }
