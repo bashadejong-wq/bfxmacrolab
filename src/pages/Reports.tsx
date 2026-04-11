@@ -415,11 +415,11 @@ function DashboardTab({ detail, biasData }: { detail: any; biasData: any[] }) {
           <table className="w-full">
             <thead className="bg-secondary">
               <tr>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Klasse</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Code</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Bias</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Strength</th>
-                <th className="text-[9px] text-label uppercase text-left px-4 py-2">Driver</th>
+                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Klasse</th>
+                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Code</th>
+                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Bias</th>
+                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Strength</th>
+                <th className="text-[9px] text-label uppercase text-left px-3 py-1.5">Driver</th>
               </tr>
             </thead>
             <tbody>
