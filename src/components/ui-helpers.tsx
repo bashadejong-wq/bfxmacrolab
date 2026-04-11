@@ -112,7 +112,6 @@ export const fmtDateTime = (v: any): string => {
 /** Null-safe value display — for numeric/data fields returns "—" */
 export const val = (v: any, suffix = "") => {
   if (v === null || v === undefined || v === "" || v === "null" || v === "undefined" || (typeof v === "string" && v.trim() === "")) return "—";
-  if (v === 0 && suffix === "") return "—";
   return `${v}${suffix}`;
 };
 
@@ -123,9 +122,9 @@ export const textVal = (v: any, fallback = FALLBACK_TEXT) => {
 };
 
 /** Null-safe numeric value — treats 0 as "—" */
-export const numVal = (v: any, suffix = "") => {
-  if (v === null || v === undefined || v === "" || v === 0) return "—";
-  return `${v}${suffix}`;
+export const numVal = (v: number | null | undefined, suffix = "", decimals = 2): string => {
+  if (v === null || v === undefined) return "—";
+  return v.toFixed(decimals) + (suffix ? ` ${suffix}` : "");
 };
 
 /** Supabase query with 1 retry */

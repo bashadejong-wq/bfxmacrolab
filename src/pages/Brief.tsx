@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, val, textVal, MarkdownBlock, RiskChip, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
+import { DataCard, val, textVal, MarkdownBlock, RiskChip, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints, fmtDate } from "@/components/ui-helpers";
 import {
   BookOpen, GitMerge, CheckCircle, XCircle, AlertTriangle,
   Eye, Target, Star, Building2,
@@ -9,11 +9,6 @@ import {
 } from "lucide-react";
 
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
-const MONTHS_NL = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
-function fmtDate(v: any) {
-  if (!v) return "—";
-  try { const d = new Date(v); return isNaN(d.getTime()) ? String(v) : `${d.getDate()} ${MONTHS_NL[d.getMonth()]} ${d.getFullYear()}`; } catch { return String(v); }
-}
 
 const REGIME_MAP: Record<string, React.ElementType> = {
   energy_shock: Zap, stagflation: TrendingUp, goldilocks: Sun,
@@ -120,11 +115,10 @@ function PeriodBrief({ snap, period }: { snap: any; period: string }) {
   const RegimeIcon = regimeIcon(snap.macro_regime);
   const convictionPct = snap.conviction_score ? Math.min(Math.max((snap.conviction_score / 10) * 100, 0), 100) : 0;
 
-  // FIX 1 + 8: Combine macro summaries with renderDashboardText, fallback chain
-  const rawStory = snap.summary_micro || snap.summary_dashboard || snap.summary;
-  const macroStory = renderDashboardText(rawStory) || 
-    renderDashboardText(snap.summary) || 
-    renderDashboardText(snap.summary_micro) || "";
+  const macroStory = renderDashboardText(snap.summary_micro) 
+    || renderDashboardText(snap.summary_dashboard) 
+    || renderDashboardText(snap.summary) 
+    || "";
 
   const watchpoints = snap.what_to_watch || snap.what_to_watch_next || snap.next_watchpoints;
 

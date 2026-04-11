@@ -104,7 +104,7 @@ export default function Reports() {
     const analysisId = report?.analysis_id || activeReportId;
     Promise.all([
       queryWithRetry(() => supabase.from("report_analysis").select("*").eq("id", analysisId).limit(1), "Reports/detail"),
-      queryWithRetry(() => supabase.from("entity_bias").select("*").eq("context_id", analysisId).eq("context_type", "report").order("entity_class"), "Reports/entity_bias"),
+      queryWithRetry(() => supabase.from("entity_bias").select("*").eq("context_id", String(analysisId)).eq("context_type", "report").order("entity_class"), "Reports/entity_bias"),
     ]).then(([d, b]) => {
       setDetail((d as any[])?.[0] || null);
       setBiasData((b as any[]) || []);
