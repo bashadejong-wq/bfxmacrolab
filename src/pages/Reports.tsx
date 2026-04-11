@@ -273,7 +273,36 @@ function CompactTab({ detail }: { detail: any }) {
         <MarkdownBlock content={detail.summary_micro || detail.summary_short} fallback="Nog geen compacte samenvatting beschikbaar" />
       </Prose>
 
-      {/* 6. Priced-in block */}
+      {/* What Stands Out */}
+      {detail.what_stands_out && (
+        <>
+          <Spacer />
+          <SHead icon={Eye} label="Wat valt op" />
+          <div className="bg-secondary border border-card-border rounded-lg p-4 max-w-[720px]">
+            <div className="text-[13px] text-foreground leading-[1.7] font-semibold"><MarkdownBlock content={detail.what_stands_out} /></div>
+          </div>
+        </>
+      )}
+
+      {/* Forward Implications */}
+      {detail.forward_implications && (
+        <>
+          <Spacer />
+          <SHead icon={ArrowRightLeft} label="Forward Implications" />
+          <Prose><MarkdownBlock content={detail.forward_implications} /></Prose>
+        </>
+      )}
+
+      {/* Transmission Mechanism */}
+      {detail.transmission_mechanism && (
+        <>
+          <Spacer />
+          <SHead icon={ArrowRight} label="Transmission Mechanism" />
+          <Prose><MarkdownBlock content={detail.transmission_mechanism} /></Prose>
+        </>
+      )}
+
+      {/* Priced-in block */}
       {(detail.priced_in_assessment || detail.priced_in) && (
         <>
           <Spacer />

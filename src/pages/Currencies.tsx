@@ -62,11 +62,11 @@ export default function Currencies() {
     setLoaded(false);
     Promise.all([
       queryWithRetry(
-        () => supabase.from("currency_macro_snapshots").select("*").eq("currency_code", activeCurrency).order("snapshot_date", { ascending: false }).limit(1),
+        () => supabase.from("latest_currency_macro").select("*").eq("currency_code", activeCurrency).limit(1),
         `Currencies/snap/${activeCurrency}`
       ),
       queryWithRetry(
-        () => supabase.from("v_fx_currency_ranking").select("*").eq("currency_code", activeCurrency).limit(1),
+        () => supabase.from("v_fx_currency_ranking").select("*").eq("entity_code", activeCurrency).limit(1),
         `Currencies/ranking/${activeCurrency}`
       ),
       queryWithRetry(
@@ -74,7 +74,7 @@ export default function Currencies() {
         `Currencies/entity_bias/${activeCurrency}`
       ),
       queryWithRetry(
-        () => supabase.from("v_fx_currency_ranking").select("*").order("rank_position", { ascending: true }).limit(8),
+        () => supabase.from("v_fx_currency_ranking").select("*").order("rank", { ascending: true }).limit(8),
         "Currencies/fx_ranking"
       ),
       queryWithRetry(
@@ -91,7 +91,7 @@ export default function Currencies() {
     });
   }, [activeCurrency]);
 
-  const effectiveBias = ranking?.bias || snap?.bias || biasHistory[0]?.bias || null;
+  const effectiveBias = ranking?.bias_label || snap?.bias || biasHistory[0]?.bias || null;
   const r = ranking; // alias
   const ccy = activeCurrency.toLowerCase();
 
@@ -158,14 +158,14 @@ export default function Currencies() {
                       <span className="text-[32px] font-black text-foreground tracking-tight">{activeCurrency}</span>
                     </div>
                     <BiasChip bias={effectiveBias} />
-                    {r?.confidence && (
+                    {r?.conviction && (
                       <span className="bg-secondary text-label px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
-                        conviction: {r.confidence}
+                        conviction: {r.conviction}
                       </span>
                     )}
-                    {r?.rank_position && (
+                    {r?.rank && (
                       <span className="bg-purple-accent/10 text-purple-accent px-2 py-[2px] text-[9px] rounded font-mono font-bold">
-                        #{r.rank_position} / 8
+                        #{r.rank} / 8
                       </span>
                     )}
                   </div>
@@ -392,46 +392,47 @@ export default function Currencies() {
                     <tr>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Currency</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Confidence</th>
+                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bias</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Conviction</th>
                       <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Bull / Bear</th>
-                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Main Driver</th>
+                      <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">Score</th>
                     </tr>
                   </thead>
                   <tbody>
                     {fxRanking.map((c, i) => {
-                      const isActive = c.currency_code === activeCurrency;
-                      const biasClass = c.bias === "bullish" ? "bg-bullish-bg text-bullish-text" : c.bias === "bearish" ? "bg-bearish-bg text-bearish-text" : "bg-neutral-bg text-neutral-text";
-                      const confClass = c.confidence === "high" ? "text-bullish-text" : c.confidence === "low" ? "text-bearish-text" : "text-mixed-text";
+                      const code = c.entity_code;
+                      const isActive = code === activeCurrency;
+                      const bl = (c.bias_label || "neutral").toLowerCase();
+                      const biasClass = bl === "bullish" ? "bg-bullish-bg text-bullish-text" : bl === "bearish" ? "bg-bearish-bg text-bearish-text" : bl.includes("weinig") ? "bg-neutral-bg text-[#D1D5DB] italic" : "bg-neutral-bg text-neutral-text";
                       const FLAG: Record<string, string> = { USD: "🇺🇸", EUR: "🇪🇺", JPY: "🇯🇵", GBP: "🇬🇧", AUD: "🇦🇺", NZD: "🇳🇿", CAD: "🇨🇦", CHF: "🇨🇭" };
                       return (
-                        <tr key={c.currency_code || i}
+                        <tr key={code || i}
                           className={`border-b border-card-border cursor-pointer hover:bg-secondary transition-colors ${
                             isActive ? "bg-secondary border-l-[3px] border-l-purple-accent" : ""
                           }`}
-                          onClick={() => navigate(`/currencies/${c.currency_code}`)}
+                          onClick={() => navigate(`/currencies/${code}`)}
                         >
-                          <td className="text-[11px] font-mono font-bold text-label px-4 py-2.5">{c.rank_position || i + 1}</td>
+                          <td className="text-[11px] font-mono font-bold text-label px-4 py-2.5">{c.rank || i + 1}</td>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
-                              <span className="text-[14px]">{FLAG[c.currency_code] || ""}</span>
-                              <span className="text-[12px] font-bold text-foreground">{c.currency_code}</span>
+                              <span className="text-[14px]">{FLAG[code] || ""}</span>
+                              <span className="text-[12px] font-bold text-foreground">{code}</span>
                             </div>
                           </td>
                           <td className="px-4 py-2.5">
-                            <span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{c.bias || "neutral"}</span>
+                            <span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{c.bias_label || "neutral"}</span>
                           </td>
                           <td className="px-4 py-2.5">
-                            <span className={`text-[10px] font-semibold uppercase ${confClass}`}>{c.confidence || "—"}</span>
+                            <span className="text-[10px] font-semibold uppercase text-label">{c.conviction || "—"}</span>
                           </td>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-mono text-bullish-text font-semibold">{c.bullish_count ?? 0}</span>
+                              <span className="text-[10px] font-mono text-bullish-text font-semibold">{c.bull_count ?? 0}</span>
                               <span className="text-[8px] text-label">/</span>
-                              <span className="text-[10px] font-mono text-bearish-text font-semibold">{c.bearish_count ?? 0}</span>
+                              <span className="text-[10px] font-mono text-bearish-text font-semibold">{c.bear_count ?? 0}</span>
                             </div>
                           </td>
-                          <td className="text-[10px] text-sub-text px-4 py-2.5 max-w-[220px] truncate">{c.main_driver || "—"}</td>
+                          <td className="text-[10px] text-sub-text px-4 py-2.5 max-w-[220px] truncate">{val(c.raw_score)}</td>
                         </tr>
                       );
                     })}

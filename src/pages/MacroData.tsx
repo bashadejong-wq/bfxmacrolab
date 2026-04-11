@@ -78,17 +78,17 @@ export default function MacroData() {
   return (
     <DashboardLayout>
       {/* Country selector */}
-      <div className="bg-card border-b border-card-border px-7 flex -mx-7 -mt-7 mb-8">
+      <div className="bg-card border-b border-card-border px-4 md:px-7 flex overflow-x-auto -mx-4 md:-mx-7 -mt-4 md:-mt-7 mb-8">
         {COUNTRIES.map(c => (
           <button key={c} onClick={() => setActiveCountry(c)}
-            className={`px-4 py-3 text-[12px] font-semibold border-b-2 transition-colors ${
+            className={`px-3 md:px-4 py-3 text-[12px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
               c === activeCountry ? "text-purple-accent border-b-purple-accent" : "text-label border-b-transparent hover:text-foreground"
             }`}>{c}</button>
         ))}
       </div>
 
       {/* Top KPI cards */}
-      <div className="grid grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {kpis.map(kpi => {
           const Icon = KPI_ICONS[kpi.label] || BarChart2;
           const color = trendColor(kpi.item?.latest, kpi.item?.t_minus_1);
@@ -113,7 +113,7 @@ export default function MacroData() {
       {loaded && indicators.length === 0 ? (
         <div className="text-center text-label text-[14px] mt-10">Geen macro data beschikbaar voor deze selectie</div>
       ) : indicators.length > 0 && (
-        <DataCard className="overflow-hidden">
+        <DataCard className="overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-secondary">
