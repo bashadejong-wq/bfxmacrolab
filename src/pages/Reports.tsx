@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, fmtDate, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, fmtDate, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, parseWatchpoints, RegimeBadge } from "@/components/ui-helpers";
 import {
   FileText, DollarSign, Package, BarChart2, Percent,
   Building2, Target, Eye, RefreshCw, ArrowRightLeft, ArrowRight,
