@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, MarkdownBlock, queryWithRetry, getBiasColor } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, MarkdownBlock, queryWithRetry, getBiasColor, safeText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
 import {
   GitMerge, CheckCircle, XCircle, TrendingUp, AlertTriangle,
   DollarSign, BookOpen, Star, Eye, Target, GitCommit,
@@ -22,8 +22,12 @@ function fmtDate(v: any) {
 function getViewBias(text: string | null): string {
   const t = (text || "").toLowerCase();
   if (t.includes("bullish") || t === "bullish") return "bullish";
+  if (t.includes("licht bullish")) return "licht bullish";
   if (t.includes("bearish") || t === "bearish") return "bearish";
+  if (t.includes("licht bearish")) return "licht bearish";
+  if (t.includes("niet relevant")) return "niet relevant";
   if (t.includes("mixed")) return "mixed";
+  if (t.includes("neutraal")) return "neutraal";
   return "neutral";
 }
 
@@ -69,13 +73,7 @@ function timeframeBg(text: string | null) {
 /** Parse chips from comma/newline separated text */
 function parseChips(text: string | null): string[] {
   if (!text) return [];
-  return text.split(/[,\n•\-]/).map(s => s.trim()).filter(s => s.length > 2);
-}
-
-/** Parse bullets */
-function parseBullets(text: string | null): string[] {
-  if (!text) return [];
-  return text.split(/\n|•|–/).map(s => s.trim()).filter(s => s.length > 3);
+  return text.split(/[,\n•\-]/).map(s => safeText(s)).filter(s => s.length > 2);
 }
 
 /** Parse currency ranking to get order */
@@ -141,7 +139,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
   const convictionPct = al.conviction_score ? Math.min(Math.max((al.conviction_score / 10) * 100, 0), 100) : 0;
 
   // Flow chain steps
-  const flowSteps = al.flow_chain ? al.flow_chain.split(/→|->|➜/).map((s: string) => s.trim()).filter(Boolean) : [];
+  const flowSteps = al.flow_chain ? al.flow_chain.split(/→|->|➜/).map((s: string) => safeText(s)).filter(Boolean) : [];
 
   // Currency order
   const orderedFx = parseCurrencyRanking(al.currency_ranking);
@@ -157,7 +155,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded" style={{ background: stateBg }}>
             <StateIcon size={20} style={{ color: stateColor }} />
-            <span className="text-[20px] font-black uppercase tracking-wide" style={{ color: stateColor }}>{val(al.alignment_state)}</span>
+            <span className="text-[20px] font-black uppercase tracking-wide" style={{ color: stateColor }}>{formatLabel(al.alignment_state) || "—"}</span>
           </div>
           <span className="text-[11px] text-label">{fmtDate(al.alignment_date)}</span>
           <div className="ml-auto flex items-center gap-2">
@@ -171,10 +169,10 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
           </div>
         </div>
         {al.risk_sentiment && (
-          <div className="text-[11px] text-sub-text italic mt-1.5">{al.risk_sentiment}</div>
+          <div className="text-[11px] text-sub-text italic mt-1.5">{safeText(al.risk_sentiment)}</div>
         )}
         {al.summary_micro && (
-          <div className="text-[12px] text-foreground mt-1 leading-relaxed max-w-[720px]">{al.summary_micro}</div>
+          <div className="text-[12px] text-foreground mt-1 leading-relaxed max-w-[720px]">{safeText(al.summary_micro)}</div>
         )}
       </DataCard>
 
@@ -187,7 +185,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
       {al.core_driver && (
         <DataCard className="px-4 py-3 mb-2 border-l-[3px]" style={{ borderLeftColor: "#C4673A" }}>
           <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-0.5">CORE DRIVER</div>
-          <div className="text-[13px] text-foreground font-bold leading-snug">{al.core_driver}</div>
+          <div className="text-[13px] text-foreground font-bold leading-snug">{safeText(al.core_driver)}</div>
         </DataCard>
       )}
 
@@ -217,7 +215,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
           {storyOpen && (
             <div className="bg-secondary border border-card-border rounded-lg p-4">
               <div className="max-w-[720px] text-[13px] text-sub-text leading-[1.7]">
-                <MarkdownBlock content={al.macro_story} />
+                <MarkdownBlock content={safeText(al.macro_story)} />
               </div>
             </div>
           )}
@@ -240,7 +238,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
                 <GitCommit size={13} className="text-label" />
                 <span className="text-[8px] text-label uppercase tracking-wider font-medium">{label}</span>
               </div>
-              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(value, "Geen vergelijkingsdata beschikbaar")}</div>
+              <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(value, "Geen vergelijkingsdata beschikbaar"))}</div>
             </DataCard>
           );
         })}
@@ -266,7 +264,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
                 <span className="text-[8px] text-label uppercase tracking-wider font-medium">{label}</span>
                 <div className="ml-auto"><BiasChip bias={bias} /></div>
               </div>
-              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(displayValue)}</div>
+              <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(displayValue))}</div>
             </DataCard>
           );
         })}
@@ -288,7 +286,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-sub-text">{textVal(al.high_conviction_assets)}</div>
+            <div className="text-[11px] text-sub-text">{safeText(textVal(al.high_conviction_assets))}</div>
           )}
         </DataCard>
         <DataCard className="px-4 py-3" style={{ borderLeft: "3px solid #DC2626" }}>
@@ -303,7 +301,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-sub-text">{textVal(al.low_conviction_assets || al.what_to_avoid)}</div>
+            <div className="text-[11px] text-sub-text">{safeText(textVal(al.low_conviction_assets || al.what_to_avoid))}</div>
           )}
         </DataCard>
       </div>
@@ -316,14 +314,14 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
               <CheckCircle size={13} className="text-bullish-text" />
               <span className="text-[8px] text-label uppercase tracking-wider font-medium">WAT TE DOEN</span>
             </div>
-            <div className="text-[11px] text-sub-text leading-relaxed">{textVal(al.what_to_do, "Zie macro verhaal voor positioneringsrichting")}</div>
+            <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(al.what_to_do, "Zie macro verhaal voor positioneringsrichting"))}</div>
           </DataCard>
           <DataCard className="px-4 py-3" style={{ borderLeft: "3px solid #DC2626" }}>
             <div className="flex items-center gap-2 mb-1.5">
               <XCircle size={13} className="text-bearish-text" />
               <span className="text-[8px] text-label uppercase tracking-wider font-medium">TE VERMIJDEN</span>
             </div>
-            <div className="text-[11px] text-sub-text leading-relaxed">{textVal(al.what_to_avoid, "Geen specifieke risico's geïdentificeerd")}</div>
+            <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(al.what_to_avoid, "Geen specifieke risico's geïdentificeerd"))}</div>
           </DataCard>
         </div>
       )}
@@ -343,7 +341,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
                 <span className="text-[16px] font-black text-foreground">{c}</span>
                 <div className="ml-auto"><BiasChip bias={bias} /></div>
               </div>
-              <div className="text-[10px] text-sub-text leading-relaxed">{textVal(view, "Geen specifieke view")}</div>
+              <div className="text-[10px] text-sub-text leading-relaxed">{safeText(textVal(view, "Geen specifieke view"))}</div>
             </DataCard>
           );
         })}
@@ -362,7 +360,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
           <DataCard key={s.label} className="px-4 py-3" style={{ borderLeft: `3px solid ${s.borderColor}` }}>
             <div className="text-[8px] text-label uppercase tracking-[0.08em] mb-1.5 font-medium">{s.label}</div>
             <div className="text-[11px] text-sub-text leading-relaxed">
-              {textVal(s.value, "Zie daily brief voor scenario context.")}
+              {safeText(textVal(s.value, "Zie daily brief voor scenario context."))}
             </div>
           </DataCard>
         ))}
@@ -378,19 +376,20 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
             <Eye size={13} className="text-label" />
             <span className="text-[8px] text-label uppercase tracking-wider font-medium">KEY WATCHPOINTS</span>
           </div>
+          {/* FIX 4: bullet list for watchpoints */}
           {(() => {
-            const bullets = parseBullets(al.key_watchpoints);
-            return bullets.length > 0 ? (
+            const items = parseWatchpoints(al.key_watchpoints);
+            return items.length > 0 ? (
               <ul className="space-y-1">
-                {bullets.slice(0, 5).map((b, i) => (
+                {items.slice(0, 5).map((item, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     <span className="text-purple-accent mt-[3px] shrink-0">•</span>
-                    <span className="text-[11px] text-sub-text leading-relaxed">{b}</span>
+                    <span className="text-[11px] text-sub-text leading-relaxed">{safeText(item)}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <div className="text-[11px] text-sub-text leading-relaxed">{textVal(al.key_watchpoints, "Volg regime-indicatoren en CB communicatie")}</div>
+              <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(al.key_watchpoints, "Volg regime-indicatoren en CB communicatie"))}</div>
             );
           })()}
         </DataCard>
@@ -400,7 +399,7 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
             <span className="text-[8px] text-label uppercase tracking-wider font-medium">TRADING IMPLICATIES</span>
           </div>
           <div className="text-[11px] text-sub-text leading-relaxed">
-            {textVal(al.trading_implications, "Positioneer conform macro regime — geen specifieke trade calls beschikbaar")}
+            {safeText(textVal(al.trading_implications, "Positioneer conform macro regime — geen specifieke trade calls beschikbaar"))}
           </div>
         </DataCard>
       </div>

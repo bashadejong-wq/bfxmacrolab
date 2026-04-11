@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, ImpactChip, fmtDate, fmtDateTime, queryWithRetry } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, ImpactChip, fmtDate, fmtDateTime, queryWithRetry, safeText, renderDashboardText, formatLabel } from "@/components/ui-helpers";
 import {
   Zap, TrendingUp, TrendingDown, Sun, RefreshCw, GitMerge, HelpCircle,
   Shield, AlertTriangle, AlertOctagon, ShieldAlert, ShieldCheck,
@@ -32,9 +32,9 @@ const ALIGNMENT_COLORS: Record<string, string> = {
 function parseCurrencyRanking(raw: string | null): { rank: number; code: string; bias: string; conviction: string }[] {
   if (!raw) return [];
   return raw.split("|").map(part => {
-    const m = part.trim().match(/^(\d+)\.\s*(\w+)\s*\((\w+),\s*(\w+)\)$/);
+    const m = part.trim().match(/^(\d+)\.\s*(\w+)\s*\(([^,]+),\s*(\w+)\)$/);
     if (!m) return null;
-    return { rank: Number(m[1]), code: m[2], bias: m[3].toLowerCase(), conviction: m[4].toLowerCase() };
+    return { rank: Number(m[1]), code: m[2], bias: m[3].toLowerCase().trim(), conviction: m[4].toLowerCase() };
   }).filter(Boolean) as any[];
 }
 
@@ -45,11 +45,14 @@ function parseHighConviction(raw: string | null): string[] {
 
 function parseSummaryDashboard(raw: string | null): { header: string; body: string }[] {
   if (!raw) return [];
+  // Handle object type
+  const text = renderDashboardText(raw);
+  if (!text) return [];
   const sections: { header: string; body: string }[] = [];
-  const lines = raw.split("\n");
+  const lines = text.split("\n");
   let current: { header: string; body: string } | null = null;
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = safeText(line);
     if (!trimmed) continue;
     if (trimmed === trimmed.toUpperCase() && trimmed.length > 2 && !trimmed.includes(".")) {
       if (current) sections.push(current);
@@ -107,6 +110,19 @@ function DeltaValue({ value, invert = false }: { value: number | null | undefine
   );
 }
 
+// FIX 3 — bias color for currency ranking supporting Dutch values
+function getBiasClassForRanking(bias: string): string {
+  const b = bias.toLowerCase().trim();
+  if (b === "bullish") return "bg-bullish-bg text-bullish-text";
+  if (b === "licht bullish") return "bg-bullish-bg text-[#4ADE80]";
+  if (b === "bearish") return "bg-bearish-bg text-bearish-text";
+  if (b === "licht bearish") return "bg-[#FFF7ED] text-[#F97316]";
+  if (b === "neutraal") return "bg-neutral-bg text-neutral-text";
+  if (b === "niet relevant") return "bg-neutral-bg text-[#D1D5DB] italic text-[8px]";
+  if (b === "mixed") return "bg-mixed-bg text-mixed-text";
+  return "bg-neutral-bg text-neutral-text";
+}
+
 const FALLBACK = "Nog geen data beschikbaar";
 
 export default function Overview() {
@@ -160,7 +176,7 @@ export default function Overview() {
   // Parse what_changed into bullet points
   const whatChanged = a?.daily_what_changed || "";
   const changeBullets = whatChanged
-    ? whatChanged.split(/[.\n]/).map((s: string) => s.trim()).filter((s: string) => s.length > 5)
+    ? whatChanged.split(/[.\n]/).map((s: string) => safeText(s)).filter((s: string) => s.length > 5)
     : [];
 
   // Market snapshot items with deltas
@@ -199,11 +215,11 @@ export default function Overview() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-secondary px-3 py-1.5 rounded-md">
               <RegimeIcon size={16} className="text-purple-accent" />
-              <span className="text-[14px] md:text-[16px] font-black text-foreground uppercase tracking-tight">{a?.macro_regime || FALLBACK}</span>
+              <span className="text-[14px] md:text-[16px] font-black text-foreground uppercase tracking-tight">{formatLabel(a?.macro_regime) || FALLBACK}</span>
             </div>
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${riskColor}`}>
               <RiskIcon size={13} />
-              <span className="text-[10px] font-semibold uppercase">{a?.risk_regime || "—"}</span>
+              <span className="text-[10px] font-semibold uppercase">{formatLabel(a?.risk_regime) || "—"}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -211,7 +227,7 @@ export default function Overview() {
               <ConvictionBar score={a?.conviction_score} />
               <div className="flex flex-col items-start gap-0.5">
                 <span className={`${alignColor} px-2 py-[1px] text-[8px] rounded font-bold uppercase`}>
-                  {a?.alignment_state || "—"}
+                  {formatLabel(a?.alignment_state) || "—"}
                 </span>
                 <span className="text-[8px] text-label">D/W/M convergentie</span>
               </div>
@@ -224,10 +240,10 @@ export default function Overview() {
       <DataCard className="px-4 py-3 mb-3 border-l-[3px] border-l-purple-accent">
         <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">TRANSMISSIE FLOW</div>
         <div className="text-[14px] font-bold text-foreground leading-snug mb-1.5 font-mono">
-          {textVal(a?.flow_chain, "—")}
+          {safeText(textVal(a?.flow_chain, "—"))}
         </div>
         <div className="text-[12px] text-sub-text leading-relaxed max-w-[720px]">
-          {textVal(a?.macro_story, "—")}
+          {safeText(textVal(a?.macro_story, "—"))}
         </div>
       </DataCard>
 
@@ -238,14 +254,14 @@ export default function Overview() {
             <CheckCircle size={12} className="text-bullish-text" />
             <span className="text-[8px] text-label uppercase tracking-wider font-medium">WAT TE DOEN</span>
           </div>
-          <div className="text-[11px] text-sub-text leading-relaxed">{textVal(a?.what_to_do)}</div>
+          <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(a?.what_to_do))}</div>
         </DataCard>
         <DataCard className="px-4 py-3 border-l-[3px] border-l-bearish-text">
           <div className="flex items-center gap-1.5 mb-1.5">
             <XCircle size={12} className="text-bearish-text" />
             <span className="text-[8px] text-label uppercase tracking-wider font-medium">VERMIJD</span>
           </div>
-          <div className="text-[11px] text-sub-text leading-relaxed">{textVal(a?.what_to_avoid)}</div>
+          <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(a?.what_to_avoid))}</div>
         </DataCard>
       </div>
 
@@ -269,7 +285,7 @@ export default function Overview() {
               ) : item.delta != null ? (
                 <DeltaValue value={item.delta} invert={item.invert} />
               ) : null}
-              {item.sub && <span className={`text-[8px] font-semibold uppercase ${vixColor(item.sub)}`}>{item.sub}</span>}
+              {item.sub && <span className={`text-[8px] font-semibold uppercase ${vixColor(item.sub)}`}>{formatLabel(item.sub)}</span>}
             </div>
           </DataCard>
         ))}
@@ -301,7 +317,22 @@ export default function Overview() {
       {/* 5. CURRENCY RANKING (parsed from cockpit) */}
       <SectionLabel>CURRENCY RANKING</SectionLabel>
       <DataCard className="overflow-hidden mb-3 overflow-x-auto">
-        <table className="w-full">
+        {/* Mobile: stacked cards */}
+        <div className="block sm:hidden">
+          {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
+            const biasClass = getBiasClassForRanking(fx.bias);
+            return (
+              <div key={fx.rank} className="flex items-center gap-3 px-4 py-2.5 border-b border-card-border last:border-0">
+                <span className="text-[11px] font-mono font-bold text-label w-5">{fx.rank}</span>
+                <span className="text-[12px] font-bold text-foreground w-10">{fx.code}</span>
+                <span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{fx.bias}</span>
+                <span className="text-[10px] text-sub-text ml-auto uppercase">{fx.conviction}</span>
+              </div>
+            );
+          })}
+        </div>
+        {/* Desktop: table */}
+        <table className="w-full hidden sm:table">
           <thead className="bg-secondary">
             <tr>
               <th className="text-[8px] text-label uppercase text-left px-4 py-1.5">#</th>
@@ -312,12 +343,12 @@ export default function Overview() {
           </thead>
           <tbody>
             {parseCurrencyRanking(a?.currency_ranking).map((fx) => {
-              const biasColor = fx.bias === "bullish" ? "bg-bullish-bg text-bullish-text" : fx.bias === "bearish" ? "bg-bearish-bg text-bearish-text" : "bg-neutral-bg text-neutral-text";
+              const biasClass = getBiasClassForRanking(fx.bias);
               return (
                 <tr key={fx.rank} className="border-b border-card-border last:border-0">
                   <td className="text-[11px] font-mono font-bold text-label px-4 py-2">{fx.rank}</td>
                   <td className="text-[12px] font-bold text-foreground px-4 py-2">{fx.code}</td>
-                  <td className="px-4 py-2"><span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasColor}`}>{fx.bias}</span></td>
+                  <td className="px-4 py-2"><span className={`px-2 py-[2px] rounded text-[9px] font-bold uppercase ${biasClass}`}>{fx.bias}</span></td>
                   <td className="text-[10px] text-sub-text px-4 py-2 uppercase">{fx.conviction}</td>
                 </tr>
               );
@@ -336,7 +367,7 @@ export default function Overview() {
               const isShort = idea.toLowerCase().startsWith("short");
               const borderColor = isLong ? "border-l-bullish-text" : isShort ? "border-l-bearish-text" : "border-l-label";
               const icon = isLong ? <TrendingUp size={13} className="text-bullish-text" /> : isShort ? <TrendingDown size={13} className="text-bearish-text" /> : <Minus size={13} className="text-label" />;
-              const parts = idea.split("—").map(s => s.trim());
+              const parts = idea.split("—").map(s => safeText(s));
               return (
                 <DataCard key={i} className={`px-4 py-3 border-l-[3px] ${borderColor}`}>
                   <div className="flex items-center gap-2 mb-1">
@@ -360,7 +391,7 @@ export default function Overview() {
               {parseSummaryDashboard(a?.summary_dashboard).map((section, i) => (
                 <div key={i}>
                   {section.header && <div className="text-[9px] text-label uppercase tracking-wider font-bold mb-0.5">{section.header}</div>}
-                  <div className="text-[11px] text-sub-text leading-relaxed">{section.body}</div>
+                  <div className="text-[11px] text-sub-text leading-relaxed">{safeText(section.body)}</div>
                 </div>
               ))}
             </div>
@@ -392,7 +423,7 @@ export default function Overview() {
                 {events.map((e) => (
                   <tr key={e.id} className="hover:bg-secondary cursor-pointer border-b border-card-border last:border-0" onClick={() => navigate("/calendar")}>
                     <td className="text-[10px] text-sub-text px-4 py-2">{fmtDateTime(e.event_datetime)}</td>
-                    <td className="text-[10px] text-sub-text px-4 py-2">{val(e.event_name)}</td>
+                    <td className="text-[10px] text-sub-text px-4 py-2">{safeText(val(e.event_name))}</td>
                     <td className="text-[10px] text-sub-text px-4 py-2">{val(e.event_currency)}</td>
                     <td className="px-4 py-2"><div className="flex items-center gap-1"><ImpactChip impact={e.event_impact} /></div></td>
                   </tr>
@@ -428,9 +459,9 @@ export default function Overview() {
                   <tr key={r.id} className="hover:bg-secondary cursor-pointer border-b border-card-border last:border-0" onClick={() => navigate(`/reports?id=${r.id}`)}>
                     <td className="text-[10px] text-sub-text px-4 py-2">{fmtDate(r.analysis_date)}</td>
                     <td className="text-[10px] text-sub-text px-4 py-2 max-w-[200px] truncate">
-                      <div className="flex items-center gap-1.5"><FileText size={11} className="text-label shrink-0" />{val(r.title)}</div>
+                      <div className="flex items-center gap-1.5"><FileText size={11} className="text-label shrink-0" />{safeText(val(r.title))}</div>
                     </td>
-                    <td className="px-4 py-2"><span className="bg-secondary text-purple-accent px-1.5 py-[1px] text-[8px] rounded uppercase font-semibold">{val(r.macro_regime)}</span></td>
+                    <td className="px-4 py-2"><span className="bg-secondary text-purple-accent px-1.5 py-[1px] text-[8px] rounded uppercase font-semibold">{formatLabel(r.macro_regime) || "—"}</span></td>
                     <td className="text-[10px] text-foreground font-mono font-semibold px-4 py-2">{r.confidence_score != null ? `${r.confidence_score}/10` : "—"}</td>
                   </tr>
                 ))}
