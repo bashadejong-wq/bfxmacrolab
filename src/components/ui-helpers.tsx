@@ -153,8 +153,10 @@ export async function queryWithRetry<T>(
 
 /** Bias chip */
 export function BiasChip({ bias, size = "sm" }: { bias: string | null; size?: "sm" | "lg" }) {
+  const b = (bias || "").toLowerCase();
+  const isNietRelevant = b === "niet relevant";
   const styles = getBiasClasses(bias);
-  const padding = size === "lg" ? "px-5 py-3 text-[14px]" : "px-2 py-[2px] text-[9px]";
+  const padding = size === "lg" ? "px-5 py-3 text-[14px]" : isNietRelevant ? "px-2 py-[2px] text-[8px]" : "px-2 py-[2px] text-[9px]";
   return (
     <span className={`${styles} ${padding} rounded uppercase font-semibold inline-block`}>
       {bias || "NEUTRAL"}
