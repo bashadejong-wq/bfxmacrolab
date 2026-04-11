@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, MarkdownBlock, queryWithRetry, getBiasColor, safeText, formatLabel, parseWatchpoints } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, MarkdownBlock, queryWithRetry, getBiasColor, safeText, formatLabel, parseWatchpoints, fmtDate } from "@/components/ui-helpers";
 import {
   GitMerge, CheckCircle, XCircle, TrendingUp, AlertTriangle,
   DollarSign, BookOpen, Star, Eye, Target, GitCommit,
@@ -13,11 +13,7 @@ import RegimeTimelineContent from "@/components/content/RegimeTimelineContent";
 
 const FX = ["USD","EUR","JPY","GBP","AUD","NZD","CAD","CHF"];
 
-const MONTHS_NL = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
-function fmtDate(v: any) {
-  if (!v) return "—";
-  try { const d = new Date(v); return isNaN(d.getTime()) ? String(v) : `${d.getDate()} ${MONTHS_NL[d.getMonth()]} ${d.getFullYear()}`; } catch { return String(v); }
-}
+// fmtDate imported from ui-helpers
 
 function getViewBias(text: string | null): string {
   const t = (text || "").toLowerCase();

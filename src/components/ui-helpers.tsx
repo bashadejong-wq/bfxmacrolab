@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import React, { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 
 const MONTHS_NL = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
@@ -217,17 +217,21 @@ export function SurpriseChip({ direction, score }: { direction: string | null; s
 }
 
 /** Data card wrapper */
-export function DataCard({ children, className = "", onClick, style }: { children: ReactNode; className?: string; onClick?: () => void; style?: React.CSSProperties }) {
-  return (
-    <div
-      className={`bg-card border border-card-border rounded-lg ${onClick ? "cursor-pointer hover:border-purple-accent/30 transition-colors" : ""} ${className}`}
-      onClick={onClick}
-      style={style}
-    >
-      {children}
-    </div>
-  );
-}
+export const DataCard = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string; onClick?: () => void; style?: React.CSSProperties }>(
+  ({ children, className = "", onClick, style }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={`bg-card border border-card-border rounded-lg ${onClick ? "cursor-pointer hover:border-purple-accent/30 transition-colors" : ""} ${className}`}
+        onClick={onClick}
+        style={style}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+DataCard.displayName = "DataCard";
 
 /** Section label */
 export function SectionLabel({ children, subtitle }: { children: ReactNode; subtitle?: string }) {
