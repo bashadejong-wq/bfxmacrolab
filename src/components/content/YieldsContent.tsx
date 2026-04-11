@@ -137,7 +137,7 @@ export default function YieldsContent() {
       </div>
 
       <SectionLabel>US TREASURY CURVE</SectionLabel>
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
           { label: "2 JAAR", value: y.us_2y, sub: null, deltaKey: "us_2y_delta_bp" },
           { label: "5 JAAR", value: y.us_5y, sub: null, deltaKey: null },
@@ -175,7 +175,7 @@ export default function YieldsContent() {
       <hr className="border-card-border mb-4" />
 
       <SectionLabel>KEY METRICS</SectionLabel>
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
           { label: "2S10S", value: y.us_2s10s, colored: true, key: "2s10s", deltaVal: d.us_2s10s_delta_bp },
           { label: "REËEL 10J", value: y.us_real_10y || y.us_real_yield_10y, colored: false, key: "real", deltaVal: null },
@@ -201,8 +201,8 @@ export default function YieldsContent() {
       <hr className="border-card-border mb-4" />
 
       <SectionLabel>G10 YIELDS</SectionLabel>
-      <DataCard className="overflow-hidden mb-4">
-        <table className="w-full">
+      <DataCard className="overflow-hidden overflow-x-auto mb-4">
+        <table className="w-full min-w-[700px]">
           <thead className="bg-secondary">
             <tr>
               <th className="text-[8px] text-label uppercase text-left px-4 py-2">Currency</th>
@@ -250,7 +250,7 @@ export default function YieldsContent() {
 
       <DataCard className="px-4 py-3 mb-3">
         <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1">REAL YIELD SIGNAAL</div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <div className="text-[8px] text-label uppercase">US REËEL 10J</div>
             <div className="text-[16px] font-bold text-foreground font-mono mt-0.5">{val(y.us_real_10y || y.us_real_yield_10y, "%")}</div>
@@ -277,7 +277,7 @@ export default function YieldsContent() {
       {spreads.length > 0 && (
         <DataCard className="px-4 py-3 mb-3">
           <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-2">USD DIFFERENTIAL — TOP 3 EXTREMEN</div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {spreads.map(s => (
               <div key={s.code} className="border border-card-border rounded px-3 py-2">
                 <div className="flex items-center justify-between mb-0.5">

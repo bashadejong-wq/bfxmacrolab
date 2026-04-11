@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel } from "@/components/ui-helpers";
+import { DataCard, SectionLabel, val, textVal, BiasChip, RiskChip, MarkdownBlock, queryWithRetry, getBiasColor, safeText, renderDashboardText, formatLabel, fmtDate } from "@/components/ui-helpers";
 import {
   CalendarDays, CalendarRange, Calendar as CalIcon,
   BookOpen, Package, BarChart2, Activity, Percent,
@@ -42,15 +42,7 @@ function getCurveIcon(curve: string | null) {
   return Minus;
 }
 
-const MONTHS_NL = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
-function fmtShortDate(v: any) {
-  if (!v) return "—";
-  try {
-    const d = new Date(v);
-    if (isNaN(d.getTime())) return String(v);
-    return `${d.getDate()} ${MONTHS_NL[d.getMonth()]} ${d.getFullYear()}`;
-  } catch { return String(v); }
-}
+// Use fmtDate from ui-helpers (imported above)
 
 function convictionColor(score: number | null) {
   if (!score) return "#6B7280";
@@ -170,7 +162,7 @@ export default function DWM() {
           <DataCard className="px-4 py-3 mb-3">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="text-[16px] font-bold text-foreground">{safeText(val(snap.period_label))}</span>
-              <span className="text-[11px] text-label">{fmtShortDate(snap.period_start)}</span>
+              <span className="text-[11px] text-label">{fmtDate(snap.period_start)}</span>
               <span className="flex items-center gap-1 bg-neutral-bg text-neutral-text px-2 py-[2px] text-[9px] rounded uppercase font-semibold">
                 <RegimeIcon size={11} />
                 {formatLabel(snap.macro_regime) || "—"}

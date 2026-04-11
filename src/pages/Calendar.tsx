@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DataCard, val, ImpactChip, MarkdownBlock, SurpriseChip, queryWithRetry } from "@/components/ui-helpers";
@@ -190,8 +190,8 @@ export default function Calendar() {
                 </thead>
                 <tbody>
                   {grouped.map((group) => (
-                    <>
-                      <tr key={`sep-${group.date}`}>
+                    <React.Fragment key={`group-${group.date}`}>
+                      <tr>
                         <td colSpan={isUpcoming ? 6 : 8} className="bg-secondary/70 px-3 py-1">
                           <span className="text-[9px] text-label font-semibold uppercase tracking-wide">{group.label}</span>
                         </td>
@@ -235,7 +235,7 @@ export default function Calendar() {
                           </tr>
                         );
                       })}
-                    </>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

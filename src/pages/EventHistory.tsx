@@ -133,7 +133,7 @@ export default function EventHistory() {
       {/* HEADER */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-[22px] font-bold text-foreground" style={{ fontFamily: "Syne, sans-serif" }}>Event History</h1>
+          <h1 className="text-[22px] font-bold text-foreground">Event History</h1>
           <p className="text-[12px] text-label mt-0.5">Marktreacties op macro events</p>
         </div>
         <span className="bg-purple-accent/10 text-purple-accent text-[11px] font-bold px-3 py-1.5 rounded-full">
@@ -250,8 +250,8 @@ export default function EventHistory() {
                   </div>
 
                   {e.analyst_note && (
-                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded p-3 mt-3">
-                      <p className="text-[12px] text-blue-800 dark:text-blue-300">{e.analyst_note}</p>
+                    <div className="bg-secondary border border-card-border rounded p-3 mt-3">
+                      <p className="text-[12px] text-sub-text">{e.analyst_note}</p>
                     </div>
                   )}
 

@@ -102,7 +102,7 @@ export default function MarketContent() {
       </div>
 
       <SectionLabel>VOLATILITEIT & DOLLAR</SectionLabel>
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <DataCard className="p-5">
           <div className="flex items-center gap-1.5 mb-1">
             <Activity size={14} className="text-label" />
@@ -131,7 +131,7 @@ export default function MarketContent() {
       <hr className="border-card-border mb-6" />
 
       <SectionLabel><span className="inline-flex items-center gap-1.5"><BarChart2 size={13} className="text-label" /> AANDELEN</span></SectionLabel>
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         {[
           { l: "SPX", v: m.spx, pct: m.spx_pct, delta: m.spx_delta },
           { l: "NDX", v: m.ndx, pct: m.ndx_pct, delta: m.ndx_delta },
@@ -148,7 +148,7 @@ export default function MarketContent() {
       <hr className="border-card-border mb-6" />
 
       <SectionLabel><span className="inline-flex items-center gap-1.5"><DollarSign size={13} className="text-label" /> FX</span></SectionLabel>
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {[
           { label: "EURUSD", value: m.eurusd, pct: m.eurusd_pct, nav: "/currencies/EUR" },
           { label: "USDJPY", value: m.usdjpy, pct: m.usdjpy_pct, nav: "/currencies/JPY" },
@@ -179,7 +179,7 @@ export default function MarketContent() {
       <hr className="border-card-border mb-6" />
 
       <SectionLabel><span className="inline-flex items-center gap-1.5"><Package size={13} className="text-label" /> GRONDSTOFFEN</span></SectionLabel>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         {[
           { l: "GOLD", v: m.gold, pct: m.gold_pct },
           { l: "SILVER", v: m.silver, pct: m.silver_delta },
@@ -192,7 +192,7 @@ export default function MarketContent() {
           </DataCard>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         {[
           { l: "OIL BRENT", v: m.oil_brent, pct: null },
           { l: "COPPER", v: m.copper, pct: m.copper_delta },
@@ -212,7 +212,7 @@ export default function MarketContent() {
       <div className="flex items-center gap-2 mb-3">
         <span className={`${creditColor(m.credit_regime)} px-3 py-1 text-[11px] rounded uppercase font-bold`}>{val(m.credit_regime)}</span>
       </div>
-      <div className="grid grid-cols-2 gap-4 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
         <DataCard className="p-5">
           <div className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium mb-1">HY SPREAD</div>
           <div className="text-[20px] font-bold text-foreground font-mono">{val(m.hy_spread)}</div>
