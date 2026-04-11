@@ -246,11 +246,11 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
       <SectionLabel>MACRO PILAREN</SectionLabel>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: "GROEI", alignment: al.growth_alignment, view: al.growth_view, icon: TrendingUp },
-          { label: "INFLATIE", alignment: al.inflation_alignment, view: al.inflation_view, icon: Flame },
-          { label: "CENTRALE BANK", alignment: al.cb_alignment_narrative, view: al.cb_view, icon: Building2 },
-          { label: "LIQUIDITEIT", alignment: al.liquidity_alignment, view: al.liquidity_view, icon: Droplets },
-        ].map(({ label, alignment, view, icon: Icon }) => {
+          { label: "GROEI", alignment: al.growth_alignment, view: al.growth_view, icon: TrendingUp, sublabel: "groei momentum" },
+          { label: "INFLATIE", alignment: al.inflation_alignment, view: al.inflation_view, icon: Flame, sublabel: "inflatiedruk" },
+          { label: "CENTRALE BANK", alignment: al.cb_alignment_narrative, view: al.cb_view, icon: Building2, sublabel: "CB houding" },
+          { label: "LIQUIDITEIT", alignment: al.liquidity_alignment, view: al.liquidity_view, icon: Droplets, sublabel: "liquiditeitsconditie" },
+        ].map(({ label, alignment, view, icon: Icon, sublabel }) => {
           const displayValue = alignment || view;
           const bias = getViewBias(displayValue);
           return (
@@ -260,7 +260,8 @@ function AlignmentContent({ al, navigate, storyOpen, setStoryOpen }: { al: any; 
                 <span className="text-[8px] text-label uppercase tracking-wider font-medium">{label}</span>
                 <div className="ml-auto"><BiasChip bias={bias} /></div>
               </div>
-              <div className="text-[11px] text-sub-text leading-relaxed">{safeText(textVal(displayValue))}</div>
+              <div className="text-[15px] font-semibold text-foreground leading-snug">{safeText(textVal(displayValue))}</div>
+              <div className="text-[9px] text-label mt-1">{sublabel}</div>
             </DataCard>
           );
         })}

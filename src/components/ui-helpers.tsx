@@ -74,14 +74,14 @@ export function getBiasBackground(bias: string | null): string {
 /** Bias tailwind class utility */
 export function getBiasClasses(bias: string | null): string {
   const b = (bias || "").toLowerCase();
-  if (b === "bullish") return "bg-bullish-bg text-bullish-text";
-  if (b === "licht bullish") return "bg-bullish-bg text-[#4ADE80]";
-  if (b === "bearish") return "bg-bearish-bg text-bearish-text";
-  if (b === "licht bearish") return "bg-[#FFF7ED] text-[#F97316]";
-  if (b === "mixed") return "bg-mixed-bg text-mixed-text";
-  if (b === "niet relevant") return "bg-neutral-bg text-[#D1D5DB] italic";
-  if (b === "neutraal") return "bg-neutral-bg text-neutral-text";
-  return "bg-neutral-bg text-neutral-text";
+  if (b === "bullish") return "bg-[#14532D] text-[#4ADE80]";
+  if (b === "licht bullish") return "bg-[#14532D]/70 text-[#4ADE80]";
+  if (b === "bearish") return "bg-[#7F1D1D] text-[#F87171]";
+  if (b === "licht bearish") return "bg-[#7F1D1D]/70 text-[#F87171]";
+  if (b === "mixed") return "bg-[#2E1065] text-[#A78BFA]";
+  if (b === "niet relevant") return "bg-[#1F2937] text-[#9CA3AF] italic";
+  if (b === "neutraal") return "bg-[#1F2937] text-[#9CA3AF]";
+  return "bg-[#1F2937] text-[#9CA3AF]";
 }
 
 const FALLBACK_TEXT = "Nog geen analyse beschikbaar";
@@ -155,9 +155,9 @@ export function BiasChip({ bias, size = "sm" }: { bias: string | null; size?: "s
   const b = (bias || "").toLowerCase();
   const isNietRelevant = b === "niet relevant";
   const styles = getBiasClasses(bias);
-  const padding = size === "lg" ? "px-5 py-3 text-[14px]" : isNietRelevant ? "px-2 py-[2px] text-[8px]" : "px-2 py-[2px] text-[9px]";
+  const padding = size === "lg" ? "px-5 py-3 text-[14px]" : isNietRelevant ? "px-2 py-[2px] text-[8px]" : "px-[8px] py-[2px] text-[10px]";
   return (
-    <span className={`${styles} ${padding} rounded uppercase font-semibold inline-block`}>
+    <span className={`${styles} ${padding} rounded tracking-[0.05em] uppercase font-bold inline-block`}>
       {bias || "NEUTRAL"}
     </span>
   );
@@ -235,9 +235,9 @@ DataCard.displayName = "DataCard";
 /** Section label */
 export function SectionLabel({ children, subtitle }: { children: ReactNode; subtitle?: string }) {
   return (
-    <div className="mb-3">
-      <span className="text-[0.65rem] text-label uppercase tracking-[0.08em] font-medium">{children}</span>
-      {subtitle && <span className="text-[0.65rem] text-neutral-text ml-2">{subtitle}</span>}
+    <div className="mb-3 pb-1.5 border-b border-card-border">
+      <span className="text-[10px] text-label uppercase tracking-[0.12em] font-semibold">{children}</span>
+      {subtitle && <span className="text-[10px] text-label ml-2">{subtitle}</span>}
     </div>
   );
 }

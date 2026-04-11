@@ -69,6 +69,7 @@ function countdownLabel(daysUntil: number | null, datetime: string | null): { te
 }
 
 type ImpactFilter = "all" | "high" | "medium" | "low";
+const CURRENCY_FILTERS = ["ALL", "USD", "EUR", "JPY", "GBP", "AUD", "CAD", "NZD", "CHF"];
 
 export default function Calendar() {
   const [activeTab, setActiveTab] = useState("upcoming");
@@ -76,6 +77,7 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
   const [impactFilter, setImpactFilter] = useState<ImpactFilter>("all");
+  const [currencyFilter, setCurrencyFilter] = useState("ALL");
 
   useEffect(() => {
     setLoaded(false);
@@ -83,13 +85,15 @@ export default function Calendar() {
       ? () => supabase.from("v_upcoming_events").select("*").order("event_date", { ascending: true }).limit(100)
       : () => supabase.from("macro_events_calendar").select("*").eq("event_status", "released").order("event_datetime", { ascending: false }).limit(100);
     queryWithRetry(fn, `Calendar/${activeTab}`)
-      .then(data => { setEvents((data as any[]) || []); setSelectedEvent(null); setLoaded(true); });
+      .then(data => { setEvents((data as any[]) || []); setSelectedEvent(null); setLoaded(true); setCurrencyFilter("ALL"); });
   }, [activeTab]);
 
   const filtered = useMemo(() => {
-    if (impactFilter === "all") return events;
-    return events.filter(e => (e.event_impact || "").toLowerCase() === impactFilter);
-  }, [events, impactFilter]);
+    let data = events;
+    if (impactFilter !== "all") data = data.filter(e => (e.event_impact || "").toLowerCase() === impactFilter);
+    if (currencyFilter !== "ALL") data = data.filter(e => (e.event_currency || "").toUpperCase() === currencyFilter);
+    return data;
+  }, [events, impactFilter, currencyFilter]);
 
   const grouped = useMemo(() => {
     const result: { date: string; label: string; items: any[] }[] = [];
@@ -145,7 +149,7 @@ export default function Calendar() {
       )}
 
       {/* Impact filter */}
-      <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         {(["all","high","medium","low"] as ImpactFilter[]).map(f => (
           <button key={f} onClick={() => setImpactFilter(f)}
             className={`px-3 py-1 text-[10px] uppercase font-semibold rounded transition-colors ${
@@ -154,6 +158,20 @@ export default function Calendar() {
                 : "bg-secondary text-label hover:text-foreground"
             }`}>
             {f === "all" ? "Alle" : f}
+          </button>
+        ))}
+      </div>
+
+      {/* Currency filter */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        {CURRENCY_FILTERS.map(c => (
+          <button key={c} onClick={() => setCurrencyFilter(c)}
+            className={`px-3 py-1 text-[10px] uppercase font-semibold rounded-md transition-colors ${
+              c === currencyFilter
+                ? "bg-purple-accent text-white"
+                : "bg-[#1F2937] text-[#9CA3AF] hover:text-foreground"
+            }`}>
+            {c}
           </button>
         ))}
       </div>
@@ -210,11 +228,21 @@ export default function Calendar() {
                             onClick={() => setSelectedEvent(isSelected ? null : e)}
                           >
                             <td className="text-[10px] text-sub-text px-3 py-2 font-mono">{fmtTime(e.event_datetime)}</td>
-                            <td className="text-[10px] text-foreground px-3 py-2 font-medium truncate max-w-[200px]">{val(e.event_name)}</td>
+                            <td className="text-[10px] text-foreground px-3 py-2 font-medium truncate max-w-[200px]">
+                              {val(e.event_name)}
+                              {e.surprise_direction && (() => {
+                                const sd = (e.surprise_direction || "").toLowerCase();
+                                if (sd === "positive" || sd === "beat") return <span className="text-[#4ADE80] text-[9px] font-bold ml-1.5">▲ {e.surprise_score != null ? e.surprise_score : ""}</span>;
+                                if (sd === "negative" || sd === "miss") return <span className="text-[#F87171] text-[9px] font-bold ml-1.5">▼ {e.surprise_score != null ? e.surprise_score : ""}</span>;
+                                return null;
+                              })()}
+                            </td>
                             <td className="px-3 py-2">
                               <span className="text-[9px] font-bold text-foreground bg-secondary px-1.5 py-0.5 rounded">{val(e.event_currency)}</span>
                             </td>
-                            <td className="text-[10px] text-sub-text px-3 py-2 text-right font-mono">{val(e.expected_value)}</td>
+                            <td className="text-[10px] text-sub-text px-3 py-2 text-right font-mono">
+                              {e.expected_value != null ? val(e.expected_value) : <span className="text-[#4B5563] italic text-[9px]">verwacht</span>}
+                            </td>
                             <td className="text-[10px] text-sub-text px-3 py-2 text-right font-mono">{val(e.previous_value)}</td>
                             {!isUpcoming && (
                               <td className="text-[10px] text-foreground font-bold px-3 py-2 text-right font-mono">{val(e.actual_value)}</td>

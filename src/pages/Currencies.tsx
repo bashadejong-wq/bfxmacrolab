@@ -293,10 +293,10 @@ export default function Currencies() {
                 ].map(({ label, value }) => {
                   const driver = r?.main_driver || snap?.main_driver;
                   return (
-                    <DataCard key={label} className="px-3 py-3 text-center">
+                    <DataCard key={label} className="px-3 py-3 text-center min-h-[80px]">
                       <div className="text-[8px] text-label uppercase tracking-wider font-medium mb-1.5">{label}</div>
                       <BiasChip bias={value as string} />
-                      {driver && <div className="text-[9px] text-label mt-1.5 truncate">— {driver}</div>}
+                      {driver && <div className="text-[9px] text-label mt-1.5">— {driver}</div>}
                     </DataCard>
                   );
                 })}
@@ -445,6 +445,10 @@ export default function Currencies() {
 
         <TabsContent value="correlations">
           <CorrelationsContent />
+          {/* Fallback if empty */}
+          <div className="text-center text-[#4B5563] text-[13px] italic py-6 hidden last:block">
+            Correlatie data wordt binnenkort toegevoegd
+          </div>
         </TabsContent>
       </Tabs>
     </DashboardLayout>

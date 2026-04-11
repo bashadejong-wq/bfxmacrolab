@@ -61,7 +61,16 @@ function riskOnOffBadge(bias: string | null) {
 /** Parse bullets from text */
 function parseBullets(text: string | null): string[] {
   if (!text) return [];
-  return text.split(/\n|•|–|-|\*/).map(s => s.trim()).filter(s => s.length > 3);
+  const raw = text.split(/\n/).map(s => s.replace(/^[\s•–\-*]+/, '').trim()).filter(s => s.length > 0);
+  const result: string[] = [];
+  for (const item of raw) {
+    if (item.length < 15 && result.length > 0) {
+      result[result.length - 1] += " " + item;
+    } else {
+      result.push(item);
+    }
+  }
+  return result.filter(s => s.length > 3);
 }
 
 /** Flow chain strip */
