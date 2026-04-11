@@ -415,7 +415,7 @@ export default function EventHistory() {
                   </div>
                 )}
 
-                {!selectedRelease.analyst_note && !reactions.some(r => r.value != null) && (
+                {!selectedRelease.analyst_note && selectedRelease.reaction_dxy == null && selectedRelease.reaction_spx == null && (
                   <span className="text-[11px] text-label italic">Marktimpact wordt bijgewerkt na release van het cijfer.</span>
                 )}
               </DataCard>
