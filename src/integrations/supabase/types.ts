@@ -1035,6 +1035,165 @@ export type Database = {
         }
         Relationships: []
       }
+      macro_event_aliases: {
+        Row: {
+          alias_name: string
+          created_at: string | null
+          currency_code: string
+          event_code: string
+          id: string
+          source_name: string | null
+        }
+        Insert: {
+          alias_name: string
+          created_at?: string | null
+          currency_code: string
+          event_code: string
+          id?: string
+          source_name?: string | null
+        }
+        Update: {
+          alias_name?: string
+          created_at?: string | null
+          currency_code?: string
+          event_code?: string
+          id?: string
+          source_name?: string | null
+        }
+        Relationships: []
+      }
+      macro_event_definitions: {
+        Row: {
+          created_at: string | null
+          currency_code: string
+          event_category: string
+          event_code: string
+          event_group: string | null
+          event_name: string
+          id: string
+          importance_tier: number | null
+          is_business_activity: boolean | null
+          is_central_bank: boolean | null
+          is_consumption: boolean | null
+          is_growth: boolean | null
+          is_housing: boolean | null
+          is_inflation: boolean | null
+          is_labor: boolean | null
+          is_policy: boolean | null
+          is_sentiment: boolean | null
+          is_trade: boolean | null
+          notes: string | null
+          parent_entity: string | null
+          region_code: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency_code: string
+          event_category: string
+          event_code: string
+          event_group?: string | null
+          event_name: string
+          id?: string
+          importance_tier?: number | null
+          is_business_activity?: boolean | null
+          is_central_bank?: boolean | null
+          is_consumption?: boolean | null
+          is_growth?: boolean | null
+          is_housing?: boolean | null
+          is_inflation?: boolean | null
+          is_labor?: boolean | null
+          is_policy?: boolean | null
+          is_sentiment?: boolean | null
+          is_trade?: boolean | null
+          notes?: string | null
+          parent_entity?: string | null
+          region_code?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency_code?: string
+          event_category?: string
+          event_code?: string
+          event_group?: string | null
+          event_name?: string
+          id?: string
+          importance_tier?: number | null
+          is_business_activity?: boolean | null
+          is_central_bank?: boolean | null
+          is_consumption?: boolean | null
+          is_growth?: boolean | null
+          is_housing?: boolean | null
+          is_inflation?: boolean | null
+          is_labor?: boolean | null
+          is_policy?: boolean | null
+          is_sentiment?: boolean | null
+          is_trade?: boolean | null
+          notes?: string | null
+          parent_entity?: string | null
+          region_code?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      macro_event_history: {
+        Row: {
+          actual_value: number | null
+          consensus: number | null
+          event_currency: string | null
+          event_date: string
+          event_datetime: string | null
+          event_impact: string | null
+          event_name: string
+          event_type: string | null
+          expected_value: number | null
+          id: number
+          previous_value: number | null
+          release_status: string | null
+          saved_at: string | null
+          source: string | null
+          surprise_direction: string | null
+          surprise_score: number | null
+        }
+        Insert: {
+          actual_value?: number | null
+          consensus?: number | null
+          event_currency?: string | null
+          event_date: string
+          event_datetime?: string | null
+          event_impact?: string | null
+          event_name: string
+          event_type?: string | null
+          expected_value?: number | null
+          id?: number
+          previous_value?: number | null
+          release_status?: string | null
+          saved_at?: string | null
+          source?: string | null
+          surprise_direction?: string | null
+          surprise_score?: number | null
+        }
+        Update: {
+          actual_value?: number | null
+          consensus?: number | null
+          event_currency?: string | null
+          event_date?: string
+          event_datetime?: string | null
+          event_impact?: string | null
+          event_name?: string
+          event_type?: string | null
+          expected_value?: number | null
+          id?: number
+          previous_value?: number | null
+          release_status?: string | null
+          saved_at?: string | null
+          source?: string | null
+          surprise_direction?: string | null
+          surprise_score?: number | null
+        }
+        Relationships: []
+      }
       macro_event_reactions: {
         Row: {
           actual_value: string | null
@@ -1390,6 +1549,99 @@ export type Database = {
           surprise_magnitude?: string | null
           surprise_score?: number | null
           yields_reaction?: string | null
+        }
+        Relationships: []
+      }
+      macro_indicators_history: {
+        Row: {
+          actual_value: number | null
+          country_code: string
+          country_name: string | null
+          created_at: string | null
+          forecast_value: number | null
+          fred_series_id: string | null
+          frequency: string | null
+          id: number
+          indicator_code: string
+          indicator_group: string | null
+          indicator_name: string | null
+          is_preliminary: boolean | null
+          metadata: Json | null
+          mom_change: number | null
+          period_date: string | null
+          period_label: string | null
+          previous_value: number | null
+          release_date: string
+          revision_value: number | null
+          seasonal_adjustment: string | null
+          source: string | null
+          source_series_id: string | null
+          source_url: string | null
+          surprise_direction: string | null
+          surprise_score: number | null
+          units: string | null
+          updated_at: string | null
+          yoy_change: number | null
+        }
+        Insert: {
+          actual_value?: number | null
+          country_code: string
+          country_name?: string | null
+          created_at?: string | null
+          forecast_value?: number | null
+          fred_series_id?: string | null
+          frequency?: string | null
+          id?: number
+          indicator_code: string
+          indicator_group?: string | null
+          indicator_name?: string | null
+          is_preliminary?: boolean | null
+          metadata?: Json | null
+          mom_change?: number | null
+          period_date?: string | null
+          period_label?: string | null
+          previous_value?: number | null
+          release_date: string
+          revision_value?: number | null
+          seasonal_adjustment?: string | null
+          source?: string | null
+          source_series_id?: string | null
+          source_url?: string | null
+          surprise_direction?: string | null
+          surprise_score?: number | null
+          units?: string | null
+          updated_at?: string | null
+          yoy_change?: number | null
+        }
+        Update: {
+          actual_value?: number | null
+          country_code?: string
+          country_name?: string | null
+          created_at?: string | null
+          forecast_value?: number | null
+          fred_series_id?: string | null
+          frequency?: string | null
+          id?: number
+          indicator_code?: string
+          indicator_group?: string | null
+          indicator_name?: string | null
+          is_preliminary?: boolean | null
+          metadata?: Json | null
+          mom_change?: number | null
+          period_date?: string | null
+          period_label?: string | null
+          previous_value?: number | null
+          release_date?: string
+          revision_value?: number | null
+          seasonal_adjustment?: string | null
+          source?: string | null
+          source_series_id?: string | null
+          source_url?: string | null
+          surprise_direction?: string | null
+          surprise_score?: number | null
+          units?: string | null
+          updated_at?: string | null
+          yoy_change?: number | null
         }
         Relationships: []
       }
@@ -2926,6 +3178,18 @@ export type Database = {
         }
         Relationships: []
       }
+      v_cb_rate_comparison: {
+        Row: {
+          cb_rate: number | null
+          cb_rate_prev: number | null
+          country_code: string | null
+          country_name: string | null
+          last_meeting: string | null
+          last_move: number | null
+          stance: string | null
+        }
+        Relationships: []
+      }
       v_dwm_currency_bias: {
         Row: {
           aud_bias: string | null
@@ -3237,6 +3501,33 @@ export type Database = {
         }
         Relationships: []
       }
+      v_growth_inflation_matrix: {
+        Row: {
+          country_code: string | null
+          gdp_growth: number | null
+          inflation_latest: number | null
+          inflation_momentum: number | null
+          macro_regime: string | null
+          unemp_change: number | null
+          unemployment: number | null
+        }
+        Relationships: []
+      }
+      v_inflation_momentum: {
+        Row: {
+          country_code: string | null
+          country_name: string | null
+          cpi_latest: number | null
+          cpi_prev_1: number | null
+          cpi_prev_3: number | null
+          cpi_prev_6: number | null
+          inflation_regime: string | null
+          momentum_3m: number | null
+          momentum_6m: number | null
+          release_date: string | null
+        }
+        Relationships: []
+      }
       v_latest_alignment: {
         Row: {
           alignment_date: string | null
@@ -3475,6 +3766,84 @@ export type Database = {
         }
         Relationships: []
       }
+      v_macro_indicators_latest: {
+        Row: {
+          actual_value: number | null
+          country_code: string | null
+          country_name: string | null
+          forecast_value: number | null
+          indicator_code: string | null
+          indicator_group: string | null
+          indicator_name: string | null
+          mom_change: number | null
+          period_label: string | null
+          previous_value: number | null
+          release_date: string | null
+          source: string | null
+          surprise_direction: string | null
+          surprise_score: number | null
+          yoy_change: number | null
+        }
+        Relationships: []
+      }
+      v_macro_indicators_trend: {
+        Row: {
+          actual_value: number | null
+          country_code: string | null
+          indicator_code: string | null
+          indicator_group: string | null
+          indicator_name: string | null
+          mom_change: number | null
+          period_label: string | null
+          release_date: string | null
+          surprise_direction: string | null
+          yoy_change: number | null
+        }
+        Insert: {
+          actual_value?: number | null
+          country_code?: string | null
+          indicator_code?: string | null
+          indicator_group?: string | null
+          indicator_name?: string | null
+          mom_change?: number | null
+          period_label?: string | null
+          release_date?: string | null
+          surprise_direction?: string | null
+          yoy_change?: number | null
+        }
+        Update: {
+          actual_value?: number | null
+          country_code?: string | null
+          indicator_code?: string | null
+          indicator_group?: string | null
+          indicator_name?: string | null
+          mom_change?: number | null
+          period_label?: string | null
+          release_date?: string | null
+          surprise_direction?: string | null
+          yoy_change?: number | null
+        }
+        Relationships: []
+      }
+      v_macro_scorecard: {
+        Row: {
+          actual_value: number | null
+          country_code: string | null
+          country_name: string | null
+          forecast_value: number | null
+          fred_series_id: string | null
+          indicator_code: string | null
+          indicator_group: string | null
+          indicator_name: string | null
+          momentum_3m: number | null
+          period_label: string | null
+          previous_value: number | null
+          release_date: string | null
+          source: string | null
+          surprise_direction: string | null
+        }
+        Relationships: []
+      }
       v_market_delta: {
         Row: {
           audusd: number | null
@@ -3708,6 +4077,20 @@ export type Database = {
         }
         Relationships: []
       }
+      v_surprise_index: {
+        Row: {
+          beat_pct: number | null
+          beats: number | null
+          country_code: string | null
+          country_name: string | null
+          indicator_group: string | null
+          inline_count: number | null
+          misses: number | null
+          net_surprise_score: number | null
+          releases: number | null
+        }
+        Relationships: []
+      }
       v_upcoming_events: {
         Row: {
           consensus: number | null
@@ -3811,6 +4194,17 @@ export type Database = {
           us_2y_delta_bp: number | null
           us_2y_prev: number | null
           us_real_yield_10y: number | null
+        }
+        Relationships: []
+      }
+      v_yield_differentials: {
+        Row: {
+          carry_signal: string | null
+          country_code: string | null
+          diff_vs_usd: number | null
+          release_date: string | null
+          usd_yield: number | null
+          yield_2y: number | null
         }
         Relationships: []
       }
