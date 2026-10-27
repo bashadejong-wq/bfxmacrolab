@@ -1,0 +1,182 @@
+//@version=6
+// BFX-MACRO-OVERLAY
+// Dit script wordt automatisch vervangen door tradingview/bfx-tv.mjs. Handmatige wijzigingen gaan verloren.
+// Versie: 2026-10-27 15:00 UTC
+indicator("BFX Macro Overlay", shorttitle = "BFX Macro", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+// ─── Instellingen ───────────────────────────────────────────────
+const string GV = "Weergave"
+const string GC = "Kleuren"
+i_ccys      = input.string("", "Valuta's (leeg = automatisch)", tooltip = "Bijv. EUR,USD. Leeg = basis- en noteringsvaluta van de chart.", group = GV)
+i_minImpact = input.int(2, "Minimale impact", minval = 1, maxval = 3, tooltip = "1 = laag, 2 = medium, 3 = hoog", group = GV)
+i_pastDays  = input.int(7, "Afgelopen events tonen (dagen)", minval = 0, maxval = 30, group = GV)
+i_lines     = input.bool(true, "Verticale eventlijnen", group = GV)
+i_labels    = input.bool(true, "Eventlabels", group = GV)
+i_table     = input.bool(true, "Overzichtstabel", group = GV)
+i_rows      = input.int(8, "Max. events in tabel", minval = 1, maxval = 20, group = GV)
+i_tablePos  = input.string("Rechtsboven", "Positie tabel", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GV)
+i_staleDays = input.int(3, "Waarschuw als data ouder is dan (dagen)", minval = 1, maxval = 30, group = GV)
+c_high      = input.color(#E5484D, "Hoge impact", group = GC)
+c_med       = input.color(#F5A524, "Medium impact", group = GC)
+c_low       = input.color(#8B8D98, "Lage impact", group = GC)
+c_bull      = input.color(#30A46C, "Bullish", group = GC)
+c_bear      = input.color(#E5484D, "Bearish", group = GC)
+
+// ─── Datatypes ──────────────────────────────────────────────────
+type MacroEvent
+    int    t
+    string ccy
+    int    impact
+    string title
+    string stats
+    string detail
+
+type CcyBias
+    string ccy
+    string bias
+    string strength
+    string driver
+    string invalidation
+
+var array<MacroEvent> events = array.new<MacroEvent>()
+var array<CcyBias>    biases = array.new<CcyBias>()
+
+addEv(int t, string ccy, int impact, string title, string stats, string detail) =>
+    events.push(MacroEvent.new(t, ccy, impact, title, stats, detail))
+
+addBias(string ccy, string b, string strength, string driver, string invalidation) =>
+    biases.push(CcyBias.new(ccy, b, strength, driver, invalidation))
+
+// ═══ DATA-START (automatisch gegenereerd) ═══
+const string VERSION    = "2026-10-27 15:00 UTC"
+const int    GENERATED  = 1793113200000
+const string DATA_LABEL = "Week 44 · FOMC + ECB"
+if barstate.isfirst
+    int _count = 25
+    addEv(1793104200000, "USD", 3, "Durable goods m/m +1", "Durable goods m/m: act 1.8 | cons 1.5 | vorig 0.1 · Durable goods ex transport: act 0.5 | cons 0.6 | vorig 0.3", "")
+    addEv(1793109600000, "USD", 2, "Nieuwbouwverkopen m/m", "act -0.6 | cons -3.5 | vorig 6.4", "")
+    addEv(1793170800000, "EUR", 2, "DE consumentenvertrouwen", "cons -30.9 | vorig -30.6", "")
+    addEv(1793210400000, "USD", 3, "Fed rentebesluit", "cons 4 | vorig 4", "Hawkish (geen cut-signaal, dots hoger) → USD↑ yields↑ EURUSD↓ risk-off. Dovish → USD↓ EURUSD↑ risk-on.")
+    addEv(1793212200000, "USD", 3, "Powell persconferentie", "", "Toon over december en balans bepaalt de tweede beweging na het besluit.")
+    addEv(1793277000000, "USD", 3, "US Core PCE m/m +4", "US Core PCE m/m: cons 0.3 | vorig 0.2 · US BBP Q3 (q/q ann.): cons 3.2 | vorig 2.2 · Consumentenbestedingen m/m: cons 0.5 | vorig 0.9 · Job…", "Hoger dan verwacht → USD↑ yields↑ EURUSD↓. Lager → USD↓ en ruimte voor Fed-cuts. Sterke groei bevestigt 'higher for longer' → USD↑. Tegenvaller → USD↓ risk-off.")
+    addEv(1793279700000, "EUR", 3, "ECB rentebesluit (depo)", "cons 2.5 | vorig 2.5", "Hawkish (geen verdere cuts) → EUR↑ Bund-yields↑. Dovish (deur open voor cut) → EUR↓.")
+    addEv(1793281500000, "EUR", 3, "Lagarde persconferentie", "", "Focus op inflatie (3.8% headline) versus zwakke groei: bepaalt EURUSD-richting richting december.")
+    addEv(1793341800000, "EUR", 2, "FR BBP Q3", "cons 0.1 | vorig 0", "")
+    addEv(1793346300000, "EUR", 2, "FR inflatie j/j", "cons 3.2 | vorig 3.1", "")
+    addEv(1793350500000, "EUR", 2, "DE werkgelegenheid +1", "DE werkgelegenheid: cons 8 | vorig 12 · DE werkloosheid: cons 6.4 | vorig 6.4", "")
+    addEv(1793350800000, "EUR", 2, "DE BBP Q3", "cons 0.1 | vorig 0.3", "Duitse krimp/stagnatie → druk op EUR en meer ruimte voor ECB-cuts.")
+    addEv(1793354400000, "EUR", 3, "EZ BBP Q3 +2", "EZ BBP Q3: cons 0.2 | vorig 0.6 · IT inflatie j/j: cons 4.7 | vorig 4.2 · EZ werkloosheid: cons 6.4 | vorig 6.4", "Zwakke groei (cons 0.2% na 0.6%) → EUR↓ en dovish ECB-verwachting. Verrassing omhoog → EUR↑.")
+    addEv(1793365200000, "EUR", 3, "DE inflatie j/j", "cons 3 | vorig 3.3", "Boven verwachting → EUR↑ (minder ruimte voor ECB-cuts). Onder → EUR↓.")
+    addEv(1793602800000, "EUR", 2, "DE retail sales m/m", "cons 0.1 | vorig 1.3", "")
+    addEv(1793628000000, "USD", 3, "ISM industrie", "vorig 54.5", "Boven 50 en stijgend → USD↑. Daling → groeizorgen, USD↓.")
+    addEv(1793664000000, "USD", 3, "US midterms", "", "Machtsverdeling Congres → fiscale verwachtingen, term premium en volatiliteit in USD/yields.")
+    addEv(1793718000000, "USD", 2, "JOLTS vacatures", "cons 7 | vorig 7.079", "")
+    addEv(1793786400000, "EUR", 3, "EZ inflatie j/j +1", "EZ inflatie j/j: cons 3.8 | vorig 3.8 · EZ core inflatie j/j: cons 2.6 | vorig 2.5", "Boven verwachting → EUR↑ (minder ruimte voor ECB-cuts). Onder → EUR↓.")
+    addEv(1793798100000, "USD", 3, "ADP banen", "vorig 90", "Voorbode NFP.")
+    addEv(1793800800000, "USD", 3, "ISM diensten", "vorig 54.9", "Prijzencomponent extra belangrijk voor inflatieverwachting.")
+    addEv(1793885400000, "USD", 2, "Jobless claims", "", "")
+    addEv(1793959200000, "EUR", 2, "EZ retail sales m/m", "cons 0.3 | vorig 0.1", "")
+    addEv(1793971800000, "USD", 3, "NFP +1", "NFP: vorig 29 · US werkloosheid: vorig 4.2", "Sterk banenrapport → USD↑ yields↑ EURUSD↓. Zwak (vorige: 29K) → USD↓ cut-verwachting↑.")
+    addEv(1793977200000, "USD", 2, "Michigan sentiment", "cons 47 | vorig 48", "Let op inflatieverwachtingen.")
+// ═══ DATA-EINDE ═══
+
+// ─── Helpers ────────────────────────────────────────────────────
+impactColor(int imp) =>
+    imp >= 3 ? c_high : imp == 2 ? c_med : c_low
+
+biasColor(string b) =>
+    string s = str.lower(b)
+    str.contains(s, "bull") or str.contains(s, "long") ? c_bull : str.contains(s, "bear") or str.contains(s, "short") ? c_bear : color.gray
+
+// Geeft ",EUR,USD," terug zodat we op ",CCY," kunnen zoeken.
+activeCcys() =>
+    string s = str.upper(str.replace_all(i_ccys, " ", ""))
+    if s == ""
+        string b = syminfo.basecurrency
+        string q = syminfo.currency
+        s := b == "" or b == q ? q : b + "," + q
+    "," + s + ","
+
+isRelevant(string ccy, string ccys) =>
+    ccy == "ALL" or str.contains(ccys, "," + ccy + ",")
+
+tablePos() =>
+    switch i_tablePos
+        "Rechtsonder" => position.bottom_right
+        "Linksboven"  => position.top_left
+        "Linksonder"  => position.bottom_left
+        => position.top_right
+
+// ─── Eventlijnen en labels ──────────────────────────────────────
+atrv  = ta.atr(14)
+hiRef = ta.highest(high, 50)
+
+var array<line>  evLines  = array.new<line>()
+var array<label> evLabels = array.new<label>()
+
+if barstate.islast
+    for l in evLines
+        l.delete()
+    evLines.clear()
+    for lb in evLabels
+        lb.delete()
+    evLabels.clear()
+
+    string ccys  = activeCcys()
+    int    fromT = timenow - i_pastDays * 86400000
+    int    k     = 0
+    for e in events
+        if e.impact >= i_minImpact and e.t >= fromT and isRelevant(e.ccy, ccys)
+            color col  = impactColor(e.impact)
+            bool  past = e.t < timenow
+            if i_lines
+                evLines.push(line.new(e.t, close, e.t, close + atrv, xloc = xloc.bar_time, extend = extend.both, color = color.new(col, past ? 70 : 35), style = line.style_dotted, width = 1))
+            if i_labels
+                float  y    = hiRef + atrv * (0.6 + 0.9 * (k % 3))
+                string when = str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone)
+                string tip  = e.ccy + " · " + when + "\n" + e.title + "\n" + e.stats + (e.detail != "" ? "\n\n" + e.detail : "")
+                evLabels.push(label.new(e.t, y, e.ccy + " " + e.title, xloc = xloc.bar_time, yloc = yloc.price, color = color.new(col, past ? 75 : 15), textcolor = color.white, style = label.style_label_down, size = size.small, tooltip = tip))
+            k += 1
+
+// ─── Overzichtstabel ────────────────────────────────────────────
+const int MAX_ROWS = 40
+var table tbl = table.new(tablePos(), 3, MAX_ROWS, bgcolor = color.new(#111318, 8), border_color = color.new(#2A2D35, 0), border_width = 1, frame_color = color.new(#2A2D35, 0), frame_width = 1)
+
+if barstate.islast and i_table
+    tbl.clear(0, 0, 2, MAX_ROWS - 1)
+    string ccys = activeCcys()
+    string upd  = str.format_time(GENERATED, "dd/MM HH:mm", syminfo.timezone)
+    int    r    = 0
+
+    tbl.cell(0, r, "BFX Macro", text_color = color.white, text_size = size.small, text_halign = text.align_left)
+    tbl.cell(1, r, DATA_LABEL, text_color = color.white, text_size = size.small, text_halign = text.align_left)
+    tbl.cell(2, r, "bijgewerkt " + upd, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+    r += 1
+
+    if timenow - GENERATED > i_staleDays * 86400000
+        tbl.cell(0, r, "⚠", text_color = color.white, bgcolor = color.new(c_bear, 20), text_size = size.small)
+        tbl.cell(1, r, "Data verouderd", text_color = color.white, bgcolor = color.new(c_bear, 20), text_size = size.small, text_halign = text.align_left)
+        tbl.cell(2, r, "laatste update " + upd, text_color = color.white, bgcolor = color.new(c_bear, 20), text_size = size.small, text_halign = text.align_left)
+        r += 1
+
+    for b in biases
+        if r < MAX_ROWS and isRelevant(b.ccy, ccys)
+            string bTxt = b.bias + (b.strength != "" ? " (" + b.strength + ")" : "")
+            tbl.cell(0, r, b.ccy, text_color = color.white, text_size = size.small)
+            tbl.cell(1, r, bTxt, text_color = biasColor(b.bias), text_size = size.small, text_halign = text.align_left)
+            tbl.cell(2, r, b.driver, text_color = color.silver, text_size = size.small, text_halign = text.align_left, tooltip = b.invalidation != "" ? "Invalidatie: " + b.invalidation : "")
+            r += 1
+
+    int shown = 0
+    for e in events
+        if shown < i_rows and r < MAX_ROWS and e.t >= timenow and e.impact >= i_minImpact and isRelevant(e.ccy, ccys)
+            tbl.cell(0, r, str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone), text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+            tbl.cell(1, r, e.ccy + " " + e.title, text_color = impactColor(e.impact), text_size = size.small, text_halign = text.align_left, tooltip = e.detail)
+            tbl.cell(2, r, e.stats, text_color = color.silver, text_size = size.small, text_halign = text.align_left, tooltip = e.detail)
+            shown += 1
+            r += 1
+
+    if shown == 0 and r < MAX_ROWS
+        tbl.cell(0, r, "—", text_color = color.silver, text_size = size.small)
+        tbl.cell(1, r, "Geen komende events", text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+        tbl.cell(2, r, str.replace_all(str.substring(ccys, 1, str.length(ccys) - 1), ",", " / "), text_color = color.silver, text_size = size.small, text_halign = text.align_left)

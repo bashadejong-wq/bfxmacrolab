@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+// BFX Macro Overlay voor TradingView
+//   node bfx-tv.mjs login                   eenmalig inloggen bij TradingView
+//   node bfx-tv.mjs generate [--input x]    alleen Pine-code maken (out/bfx_macro_overlay.pine)
+//   node bfx-tv.mjs run [--input x]         maken + in TradingView zetten + melding
+import { config } from "./src/config.mjs";
+import { generate } from "./src/generate.mjs";
+import { notify } from "./src/notify.mjs";
+
+const [command = "run", ...rest] = process.argv.slice(2);
+const inputIdx = rest.indexOf("--input");
+const input = inputIdx >= 0 ? rest[inputIdx + 1] : undefined;
+
+async function main() {
+  if (command === "login") {
+    const { login } = await import("./src/deliver.mjs");
+    await login();
+    return;
+  }
+
+  if (command !== "generate" && command !== "run") {
+    console.error(`Onbekend commando '${command}'. Gebruik: login | generate | run`);
+    process.exit(2);
+  }
+
+  let gen;
+  try {
+    gen = await generate({ input });
+  } catch (err) {
+    await notify(`⚠️ BFX Macro: data ophalen mislukt.\n${err.message}`);
+    process.exit(1);
+  }
+  const summary = `${gen.label} · ${gen.eventCount} events · ${gen.biasCount} bias-regels`;
+  console.log(`Pine-code gemaakt: ${gen.file}\n${summary}`);
+
+  if (command === "generate") return;
+
+  if (config.delivery === "manual") {
+    await notify(`📈 BFX Macro klaar om te plakken\n${summary}`, { document: gen.file });
+    return;
+  }
+
+  const { deliver } = await import("./src/deliver.mjs");
+  const result = await deliver(gen.file);
+  if (result.ok) {
+    await notify(`✅ BFX Macro bijgewerkt in TradingView\n${summary}`, { photo: result.screenshot });
+  } else {
+    await notify(`⚠️ BFX Macro: automatisch bijwerken mislukt\n${result.message}\nPlak de bijlage handmatig in de Pine Editor.`, {
+      photo: result.screenshot,
+      document: gen.file,
+    });
+    process.exit(1);
+  }
+}
+
+main();
