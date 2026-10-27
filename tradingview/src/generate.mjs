@@ -1,6 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { config, ROOT } from "./config.mjs";
+import { dayMs, expectedBiasDate, freshness, pickInvalidation, strategyStatus, usableConsensus, validateBias } from "./logic.mjs";
+
+export { expectedBiasDate };
 
 const DAY = 86_400_000;
 const MONTHS_NL = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
@@ -39,20 +43,26 @@ function impactLevel(impact, score) {
 async function loadEvents(now) {
   if (!config.supabaseUrl || !config.supabaseKey) {
     console.warn("SUPABASE_URL/SUPABASE_KEY niet ingesteld: geen events, alleen BIAS 5.0.");
-    return [];
+    return { events: [], agendaTs: null };
   }
   const from = new Date(now - config.daysBack * DAY).toISOString();
   const to = new Date(now + config.daysAhead * DAY).toISOString();
-  const rows = await restGet(
-    config.supabaseUrl,
-    config.supabaseKey,
-    `mirror_agenda_events_site?select=event_datetime,event_currency,impact,event_name,consensus_waarde,previous_value,actual_value,interpretation,market_impact_narrative,upside_scenario_nl,downside_scenario_nl` +
-      `&event_datetime=gte.${from}&event_datetime=lte.${to}&event_currency=in.(${config.currencies.join(",")})&order=event_datetime.asc&limit=1000`,
-    config.supabaseSchema,
-  );
-  return rows
+  const sel = `&event_datetime=gte.${from}&event_datetime=lte.${to}&event_currency=in.(${config.currencies.join(",")})&order=event_datetime.asc`;
+  const [rows, paden] = await Promise.all([
+    restGet(
+      config.supabaseUrl,
+      config.supabaseKey,
+      `mirror_agenda_events_site?select=event_datetime,event_currency,impact,event_name,consensus_waarde,previous_value,actual_value,interpretation,market_impact_narrative,upside_scenario_nl,downside_scenario_nl,cache_ververst_op${sel}&limit=1000`,
+      config.supabaseSchema,
+    ),
+    // In-lijn- en gemengd-scenario per event (mag leeg zijn)
+    restGet(config.supabaseUrl, config.supabaseKey, `mirror_event_paden?select=event_datetime,event_currency,event_name,inline_scenario_nl,mixed_scenario_nl${sel}&limit=1000`, config.supabaseSchema).catch(() => []),
+  ]);
+  const pad = new Map(paden.map((r) => [`${r.event_datetime}|${r.event_currency}|${r.event_name}`, r]));
+  const agendaTs = rows.map((r) => r.cache_ververst_op).filter(Boolean).sort().at(-1) ?? null;
+  const events = rows
     .map((r) => {
-      const scen = [r.upside_scenario_nl && `↑ ${r.upside_scenario_nl}`, r.downside_scenario_nl && `↓ ${r.downside_scenario_nl}`].filter(Boolean).join("\n");
+      const p = pad.get(`${r.event_datetime}|${r.event_currency}|${r.event_name}`) ?? {};
       return {
         time: parseEventTime(r.event_datetime),
         ccy: String(r.event_currency ?? "").toUpperCase(),
@@ -61,17 +71,22 @@ async function loadEvents(now) {
         consensus: r.consensus_waarde,
         previous: r.previous_value,
         actual: r.actual_value,
-        detail: r.market_impact_narrative || r.interpretation || scen,
+        detail: r.market_impact_narrative || r.interpretation || "",
+        up: r.upside_scenario_nl ?? "",
+        down: r.downside_scenario_nl ?? "",
+        inl: p.inline_scenario_nl ?? "",
+        mix: p.mixed_scenario_nl ?? "",
       };
     })
     .filter((e) => e.time && e.ccy && e.name);
+  return { events, agendaTs: agendaTs ? Date.parse(agendaTs) : null };
 }
 
 /** BIAS 5.0 uit mirror_bias50_paar, mirror_bias50 en mirror_bias50_samenvatting. */
 async function loadBias() {
   if (!config.biasUrl || !config.biasKey) {
     console.warn("BIAS_SUPABASE_URL/BIAS_SUPABASE_KEY niet ingesteld: geen BIAS 5.0.");
-    return { pairs: [], currencies: [], biasDatum: null, biasVersie: "", history: [], consensus: [] };
+    return { pairs: [], currencies: [], biasDatum: null, biasVersie: "", history: [], consensus: [], outlookRows: [], raw: { datums: [], versies: [] } };
   }
   const get = (path) => restGet(config.biasUrl, config.biasKey, path);
   // De API geeft hooguit 1000 rijen per verzoek; haal grotere tabellen in pagina's op.
@@ -84,7 +99,7 @@ async function loadBias() {
     }
   };
   // select=* zodat een later toegevoegde kolom (bv. strategie_bevestiging per paar) vanzelf meekomt
-  const [pairRows, ccyRows, sumRows, histRows, consRows] = await Promise.all([
+  const [pairRows, ccyRows, sumRows, histRows, consRows, outRows] = await Promise.all([
     get("mirror_bias50_paar?select=*&order=sorteervolgorde.asc"),
     get("mirror_bias50?select=valuta,index,kernscore_100,label,dekking,zekerheid,conflict,datum,versie"),
     get("mirror_bias50_samenvatting?select=valuta,strategie_bevestiging,samenvatting_tekst,kantelpunt_tekst,onderzoeksstatus"),
@@ -92,8 +107,15 @@ async function loadBias() {
     getAll("mirror_bias50_historie?select=datum,valuta,index,bron&toonbaar=is.true&order=datum.asc,valuta.asc"),
     // Bankconsensus alleen bij minstens 3 banken
     get("mirror_fx_consensus?select=*&n_banken=gte.3"),
+    get("mirror_outlook_paar?select=paar_code,periode,laag,invalidatie,katalysator,katalysator_datum,horizon&order=periode.desc"),
   ]);
-  return { ...normalizeBias(pairRows, ccyRows, sumRows), history: histRows, consensus: consRows };
+  return {
+    ...normalizeBias(pairRows, ccyRows, sumRows),
+    history: histRows,
+    consensus: usableConsensus(consRows),
+    outlookRows: outRows,
+    raw: { datums: [...pairRows, ...ccyRows].map((r) => r.datum), versies: [...pairRows, ...ccyRows].map((r) => r.versie) },
+  };
 }
 
 export function normalizeBias(pairRows, ccyRows, sumRows = []) {
@@ -109,8 +131,8 @@ export function normalizeBias(pairRows, ccyRows, sumRows = []) {
       tekst: p.paar_richting_tekst ?? "",
       emmer: p.gelopen_emmer ?? "",
       z: Number(p.gelopen_z ?? 0),
-      bevestiging: p.strategie_bevestiging ?? "",
-      status: p.strategie_status ?? "",
+      // Eerlijke strategiestatus: tekst + code; alleen 'bevestigd' is positief
+      ...(({ text, code }) => ({ bevestiging: text, status: code }))(strategyStatus(p.strategie_bevestiging, p.strategie_status)),
     })),
     currencies: ccyRows.map((c) => ({
       ccy: c.valuta,
@@ -131,8 +153,8 @@ export function normalizeBias(pairRows, ccyRows, sumRows = []) {
 }
 
 export async function loadFromSupabase(now = Date.now()) {
-  const [events, bias] = await Promise.all([loadEvents(now), loadBias()]);
-  return { generatedAt: now, events, ...bias };
+  const [{ events, agendaTs }, bias] = await Promise.all([loadEvents(now), loadBias()]);
+  return { generatedAt: now, events, agendaTs, ...bias };
 }
 
 /** Leest een JSON-bestand (zie examples/): events + optioneel ruwe BIAS-rijen. */
@@ -150,16 +172,13 @@ export function loadFromFile(path) {
     onderzoeksstatus: "",
     history: [],
     consensus: [],
+    outlookRows: [],
+    raw: { datums: [], versies: [] },
+    agendaTs: null,
     ...bias,
   };
 }
 
-/** Laatste werkdag (UTC-datum) waarop BIAS 5.0 ververst had moeten zijn (05:13 NL ≈ 04:13 UTC). */
-export function expectedBiasDate(now = Date.now()) {
-  const d = new Date(now - 4.5 * 3_600_000);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-}
 
 // ─── Omzetten naar Pine ─────────────────────────────────────────
 
@@ -187,10 +206,12 @@ function pineStr(s) {
     .replace(/\r?\n/g, "\\n")}"`;
 }
 
+// Centralebankmomenten: besluit, statement, persconferentie, notulen
+const CB_EVENT = /rate decision|funds rate|cash rate|refinancing rate|deposit facility|bank rate|policy rate|overnight rate|fomc|ecb|boe |boj|rba|rbnz|snb|boc|monetary policy|press conference|mpc/i;
 const RATE_DECISION = /rate decision|funds rate|cash rate|refinancing rate|deposit facility|bank rate|policy rate|overnight rate/i;
 
 /** Events met dezelfde tijd en valuta worden één label (bv. PCE + BBP + claims om 14:30). */
-function groupEvents(events) {
+function groupEvents(events, nowMs = Date.now()) {
   const groups = new Map();
   for (const e of events) {
     if (e.impact < config.minImpact) continue;
@@ -220,7 +241,13 @@ function groupEvents(events) {
         impact: main.impact,
         title: truncate(title, 48),
         stats: truncate(stats.replace(/\n/g, " · "), 140),
-        detail: truncate(detail, 350),
+        detail: truncate(detail, 220),
+        cb: list.some((e) => CB_EVENT.test(e.name)),
+        surprise: fmtNum(main.actual) !== null && fmtNum(main.consensus) !== null ? Number(main.actual) - Number(main.consensus) : null,
+        // Scenario's alleen voor komende high-impact events (Pine-tokenlimiet)
+        ...(main.impact >= 3 && main.time >= nowMs && main.time <= nowMs + 10 * DAY
+          ? { up: truncate(main.up, 150), down: truncate(main.down, 150), inl: truncate(main.inl, 150), mix: truncate(main.mix, 150) }
+          : { up: "", down: "", inl: "", mix: "" }),
       };
     })
     .sort((a, b) => a.time - b.time);
@@ -242,10 +269,9 @@ function defaultLabel(events, generatedAt) {
   return `Week ${isoWeek(generatedAt)} · ${d(first)} – ${d(last)}`;
 }
 
-const HISTORY_DAYS = 130;
+const HISTORY_DAYS = 100;
 const CCYS = ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD"];
 const pineNum = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? "na" : num(v));
-const dayMs = (d) => Date.parse(`${d}T00:00:00Z`);
 
 /**
  * Historie per valuta als vaste Pine-arrays op één gedeelde datumas.
@@ -268,33 +294,47 @@ function historyLines(rows) {
   ];
 }
 
+/** Snapshot-id yyyymmddHHMM (UTC): staat in de legenda, zodat een herladen chart de versie bewijst. */
+export const snapshotId = (ms) => Number(new Date(ms).toISOString().slice(0, 16).replace(/[-T:]/g, ""));
+
 export function buildPine(data) {
   const template = readFileSync(resolve(ROOT, "template/bfx_macro_overlay.pine"), "utf8");
-  const events = groupEvents(data.events);
+  const events = groupEvents(data.events, data.generatedAt);
   const version = new Date(data.generatedAt).toISOString().slice(0, 16).replace("T", " ") + " UTC";
   const label = data.label || defaultLabel(events, data.generatedAt);
 
   const lines = [
     `const string VERSION    = ${pineStr(version)}`,
     `const int    GENERATED  = ${Math.round(data.generatedAt)}`,
+    `const int    SNAPSHOT_ID = ${snapshotId(data.generatedAt)}`,
     `const string DATA_LABEL = ${pineStr(label)}`,
     `const int    BIAS_DATUM = ${data.biasDatum ?? 0}`,
     `const string BIAS_VERSIE = ${pineStr(data.biasVersie)}`,
+    `const int    AGENDA_TS  = ${data.agendaTs ?? 0}`,
+    `const string AGENDA_STATUS = ${pineStr(freshness(data.agendaTs, 2 * 3_600_000, data.generatedAt))}`,
     `const string ONDERZOEKSSTATUS = ${pineStr(truncate(data.onderzoeksstatus || "Onderzoeksstatus: max 25% risico, alleen met strategiebevestiging.", 200))}`,
     ...historyLines(data.history ?? []),
     `if barstate.isfirst`,
     `    int _count = ${events.length}`,
     ...events.map(
       (e) =>
-        `    addEv(${e.time}, ${pineStr(e.ccy)}, ${e.impact}, ${pineStr(e.title)}, ${pineStr(e.stats)}, ${pineStr(e.detail)})`,
+        `    addEv(${e.time}, ${pineStr(e.ccy)}, ${e.impact}, ${pineStr(e.title)}, ${pineStr(e.stats)}, ${pineStr(e.detail)}, ${e.cb ? "true" : "false"}, ${pineNum(e.surprise)}, ${pineStr(e.up)}, ${pineStr(e.down)}, ${pineStr(e.inl)}, ${pineStr(e.mix)})`,
     ),
     ...data.pairs.map(
       (p) =>
-        `    addPair(${pineStr(p.basis)}, ${pineStr(p.quote)}, ${num(p.idx)}, ${pineStr(p.label)}, ${pineStr(truncate(p.tekst, 160))}, ${pineStr(p.emmer)}, ${num(p.z)}, ${pineStr(truncate(p.bevestiging, 40))}, ${pineStr(p.status)})`,
+        `    addPair(${pineStr(p.basis)}, ${pineStr(p.quote)}, ${num(p.idx)}, ${pineStr(p.label)}, ${pineStr(truncate(p.tekst, 160))}, ${pineStr(p.emmer)}, ${num(p.z)}, ${pineStr(p.bevestiging)}, ${pineStr(p.status)})`,
     ),
     ...data.currencies.map(
       (c) =>
         `    addCcy(${pineStr(c.ccy)}, ${num(c.idx)}, ${pineNum(c.kern)}, ${pineNum(c.dekking)}, ${pineStr(c.label)}, ${pineStr(c.zekerheid)}, ${c.conflict ? "true" : "false"}, ${pineStr(truncate(c.bevestiging, 60))}, ${pineStr(truncate(c.kantelpunt, 400))}, ${pineStr(truncate(c.samenvatting, 400))})`,
+    ),
+    ...data.pairs
+      .map((p) => pickInvalidation(data.outlookRows ?? [], `${p.basis}${p.quote}`, data.biasDatum ? new Date(data.biasDatum).toISOString().slice(0, 10) : null))
+      .filter(Boolean)
+      .map((o) => ({ paar_code: o.paar, invalidatie: o.tekst, katalysator: o.katalysator, horizon: o.horizon, periode: o.periode }))
+      .map(
+      (o) =>
+        `    addInv(${pineStr(o.paar_code)}, ${pineStr(truncate(o.invalidatie, 200))}, ${pineStr(truncate(o.katalysator, 120))}, ${pineStr(o.horizon ?? "")}, ${o.periode ? dayMs(o.periode) : 0})`,
     ),
     ...(data.consensus ?? []).map(
       (k) =>
@@ -315,14 +355,33 @@ export function buildPine(data) {
   lines.splice(start, lines.length - start, ...funcs, ...calls);
 
   const code = template.replace("{{VERSION}}", version).replace("{{DATA}}", lines.join("\n"));
-  return { code, version, label, eventCount: events.length, pairCount: data.pairs.length, biasDatum: data.biasDatum };
+  return {
+    code,
+    version,
+    snapshotId: snapshotId(data.generatedAt),
+    label,
+    eventCount: events.length,
+    pairCount: data.pairs.length,
+    ccyCount: data.currencies.length,
+    biasDatum: data.biasDatum,
+    biasVersie: data.biasVersie,
+    agendaTs: data.agendaTs ?? null,
+    invalidations: (code.match(/\n {4}addInv\(/g) ?? []).length,
+  };
 }
 
-export async function generate({ input } = {}) {
-  const data = input ? loadFromFile(input) : await loadFromSupabase();
+/**
+ * Haalt data op, valideert en schrijft de Pine-snapshot. Ongeldige data → alleen een diagnosebestand,
+ * nooit out/bfx_macro_overlay.pine overschrijven. Testdata (--input) wordt nooit met echte data gemengd.
+ */
+export async function generate({ input, now = Date.now() } = {}) {
+  const data = input ? loadFromFile(input) : await loadFromSupabase(now);
+  const validation = input ? { ok: true, reason: "testinvoer (niet voor aflevering)" } : validateBias({ pairs: data.pairs, currencies: data.currencies, ...data.raw }, now);
   const result = buildPine(data);
+  const hash = createHash("sha256").update(result.code).digest("hex");
   mkdirSync(config.outDir, { recursive: true });
-  const file = resolve(config.outDir, "bfx_macro_overlay.pine");
+  const name = input ? "bfx_macro_overlay.test.pine" : validation.ok ? "bfx_macro_overlay.pine" : "bfx_macro_overlay.diagnose.pine";
+  const file = resolve(config.outDir, name);
   writeFileSync(file, result.code);
-  return { ...result, file };
+  return { ...result, file, hash, validation, isTest: Boolean(input) };
 }

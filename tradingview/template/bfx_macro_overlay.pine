@@ -14,14 +14,18 @@ i_pastDays  = input.int(7, "Afgelopen events tonen (dagen)", minval = 0, maxval 
 i_lines     = input.bool(true, "Verticale eventlijnen", group = GV)
 i_labels    = input.bool(true, "Eventlabels", group = GV)
 i_zones     = input.bool(true, "Risicozones rond hoge-impact events", group = GV)
-i_zoneBef   = input.int(60, "Niet instappen: minuten vóór event", minval = 0, maxval = 720, group = GV)
-i_zoneAft   = input.int(60, "Niet instappen: minuten na event", minval = 0, maxval = 1440, group = GV)
+i_zoneBef   = input.int(30, "Eventrisico high impact: minuten vóór", minval = 0, maxval = 720, group = GV)
+i_zoneAft   = input.int(60, "Eventrisico high impact: minuten na", minval = 0, maxval = 1440, group = GV)
+i_cbBef     = input.int(60, "Eventrisico centrale bank: minuten vóór", minval = 0, maxval = 720, group = GV)
+i_cbAft     = input.int(120, "Eventrisico centrale bank: minuten na", minval = 0, maxval = 1440, group = GV)
+i_zoneMed   = input.bool(false, "Eventrisico ook bij medium impact", group = GV)
 i_band      = input.bool(true, "Band 'koers al gelopen' (±1σ/±2σ)", group = GV)
 i_bandLen   = input.int(20, "Band: ankerafstand (balken)", minval = 5, maxval = 200, group = GV)
 i_bandSd    = input.int(250, "Band: σ over balken", minval = 50, maxval = 1000, group = GV)
 i_cons      = input.bool(true, "Consensus bankkoersdoelen", group = GV)
 i_table     = input.bool(true, "Overzichtstabel", group = GV)
-i_rows      = input.int(8, "Max. events in tabel", minval = 0, maxval = 20, group = GV)
+i_ccyRows   = input.bool(false, "Regels per valuta tonen", group = GV)
+i_rows      = input.int(0, "Extra events onder de kaart", minval = 0, maxval = 20, group = GV)
 i_tablePos  = input.string("Rechtsboven", "Positie tabel", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GV)
 i_tz        = input.string("Europe/Amsterdam", "Tijdzone voor tijden", tooltip = "IANA-naam, bijv. Europe/Amsterdam of UTC. De beurstijdzone van het symbool (OANDA = New York) wijkt vaak af van je chart.", group = GV)
 i_staleDays = input.int(3, "Waarschuw als data ouder is dan (dagen)", minval = 1, maxval = 30, group = GV)
@@ -39,6 +43,12 @@ type MacroEvent
     string title
     string stats
     string detail
+    bool   cb
+    float  sur
+    string up
+    string down
+    string inl
+    string mix
 
 // BIAS 5.0 per paar (mirror_bias50_paar). idx > 0 = basisvaluta sterker.
 type PairBias
@@ -83,8 +93,21 @@ var array<Consensus>  cons   = array.new<Consensus>()
 var array<PairBias>   pairs  = array.new<PairBias>()
 var array<CcyBias>    ccyb   = array.new<CcyBias>()
 
-addEv(int t, string ccy, int impact, string title, string stats, string detail) =>
-    events.push(MacroEvent.new(t, ccy, impact, title, stats, detail))
+addEv(int t, string ccy, int impact, string title, string stats, string detail, bool cb, float sur, string up, string down, string inl, string mix) =>
+    events.push(MacroEvent.new(t, ccy, impact, title, stats, detail, cb, sur, up, down, inl, mix))
+
+// Paarthese uit mirror_outlook_paar (nieuwste periode)
+type Inval
+    string paar
+    string tekst
+    string katalysator
+    string horizon
+    int    periode
+
+var array<Inval> invs = array.new<Inval>()
+
+addInv(string paar, string tekst, string katalysator, string horizon, int periode) =>
+    invs.push(Inval.new(paar, tekst, katalysator, horizon, periode))
 
 addPair(string basis, string quote, float idx, string lbl, string tekst, string emmer, float z, string bevestiging, string status) =>
     pairs.push(PairBias.new(basis, quote, idx, lbl, tekst, emmer, z, bevestiging, status))
@@ -167,12 +190,16 @@ shortTxt(string s, int n) =>
     string first = str.length(s) > 0 ? array.get(str.split(s, " · "), 0) : ""
     str.length(first) > n ? str.substring(first, 0, n - 1) + "…" : first
 
-// Laatste werkdag (00:00 UTC) waarop BIAS_5.0 ververst had moeten zijn (05:13 NL ≈ 04:13 UTC)
+// Laatste werkdag (00:00 UTC van die datum) waarop BIAS_5.0 ververst had moeten zijn.
+// BIAS ververst 05:13 Europe/Amsterdam; vóór 05:30 NL telt de vorige dag. Zomer- en wintertijd via de tijdzone.
 expectedBiasDay() =>
-    int t   = timenow - 16200000
-    int dow = dayofweek(t, "UTC")
+    string tz = "Europe/Amsterdam"
+    int t = timenow
+    if hour(t, tz) * 60 + minute(t, tz) < 330
+        t := t - 86400000
+    int dow  = dayofweek(t, tz)
     int back = dow == dayofweek.sunday ? 2 : dow == dayofweek.saturday ? 1 : 0
-    timestamp("UTC", year(t, "UTC"), month(t, "UTC"), dayofmonth(t, "UTC")) - back * 86400000
+    timestamp("UTC", year(t, tz), month(t, tz), dayofmonth(t, tz)) - back * 86400000
 
 histArr(string c) =>
     switch c
@@ -185,9 +212,6 @@ histArr(string c) =>
         "NZD" => H_NZD
         "CAD" => H_CAD
         => array.new<float>()
-
-check(bool ok) =>
-    ok ? "✓" : "✗"
 
 [cb, cq] = chartPair()
 bool biasFresh = BIAS_DATUM > 0 and BIAS_DATUM >= expectedBiasDay()
@@ -212,6 +236,8 @@ hline(15, "+15", color = color.new(c_bull, 50), linestyle = hline.style_dashed)
 hline(-15, "−15", color = color.new(c_bear, 50), linestyle = hline.style_dashed)
 hline(40, "+40", color = color.new(c_bull, 70), linestyle = hline.style_dotted)
 hline(-40, "−40", color = color.new(c_bear, 70), linestyle = hline.style_dotted)
+// Snapshot-id alleen in de statusregel: bewijst na herladen welke versie op de chart staat
+plot(SNAPSHOT_ID, "snapshot", color = color.new(color.gray, 100), display = display.status_line, editable = false, precision = 0)
 // Onzichtbare plots houden de schaal op −100..100
 plot(100, "schaal", color = na, display = display.pane, editable = false)
 plot(-100, "schaal", color = na, display = display.pane, editable = false)
@@ -270,9 +296,11 @@ if barstate.islast
         if e.impact >= i_minImpact and e.t >= fromT and isRelevant(e.ccy, ccys)
             color col  = impactColor(e.impact)
             bool  past = e.t < timenow
-            // Rond hoge-impact events niet instappen (spread, slippage, uitschieters)
-            if i_zones and e.impact >= 3
-                evZones.push(box.new(e.t - i_zoneBef * 60000, hiRef + atrv * 3, e.t + i_zoneAft * 60000, loRef - atrv * 3, xloc = xloc.bar_time, border_width = 0, bgcolor = color.new(c_high, past ? 94 : 88), text = past ? "" : "niet instappen", text_size = size.tiny, text_color = color.new(c_high, 30), text_valign = text.align_bottom, force_overlay = true))
+            // Eventrisico: informatief, geen garantie op volatiliteit. Centralebankmomenten krijgen een ruimere zone.
+            if i_zones and (e.impact >= 3 or (i_zoneMed and e.impact == 2))
+                int zb = e.cb ? i_cbBef : i_zoneBef
+                int za = e.cb ? i_cbAft : i_zoneAft
+                evZones.push(box.new(e.t - zb * 60000, hiRef + atrv * 3, e.t + za * 60000, loRef - atrv * 3, xloc = xloc.bar_time, border_width = 0, bgcolor = color.new(c_high, past ? 94 : 88), text = past ? "" : "Eventrisico — geen nieuwe positie zonder herbeoordeling", text_size = size.tiny, text_color = color.new(c_high, 30), text_valign = text.align_bottom, text_wrap = text.wrap_auto, force_overlay = true))
             if i_lines
                 evLines.push(line.new(e.t, close, e.t, close + atrv, xloc = xloc.bar_time, extend = extend.both, color = color.new(col, past ? 70 : 35), style = line.style_dotted, width = 1, force_overlay = true))
             if i_labels
@@ -299,7 +327,7 @@ if barstate.islast and i_cons
             float hi2 = same ? c.bmax : 1 / c.bmin
             string herz = na(c.herziening) ? "" : " · herziening " + fmtIdx(same ? c.herziening : -c.herziening) + (str.contains(c.herzBasis, "gereconstrueerd") ? " (gereconstrueerd)" : "")
             string afst = na(c.afstandPct) ? "" : " · afstand " + fmtIdx(same ? c.afstandPct : -c.afstandPct) + "%"
-            string txt  = c.lbl + " n=" + str.tostring(c.n) + ": " + str.tostring(med, format.mintick) + " (" + str.tostring(lo, format.mintick) + "–" + str.tostring(hi2, format.mintick) + ")" + herz + afst
+            string txt  = "Externe bankencontext — geen BFX-signaal. n=" + str.tostring(c.n) + ": " + str.tostring(med, format.mintick) + " (" + str.tostring(lo, format.mintick) + "–" + str.tostring(hi2, format.mintick) + ")" + herz + afst
             consLine := line.new(time, med, c.eind, med, xloc = xloc.bar_time, color = color.new(#4C9AFF, 10), width = 2, force_overlay = true)
             consBand := box.new(time, hi2, c.eind, lo, xloc = xloc.bar_time, border_width = 0, bgcolor = color.new(#4C9AFF, 90), force_overlay = true)
             consLbl  := label.new(time, med, txt, xloc = xloc.bar_time, style = label.style_label_right, color = color.new(#4C9AFF, 25), textcolor = color.white, size = size.tiny, tooltip = "Mediaan van bankkoersdoelen tot " + str.format_time(c.eind, "dd-MM-yyyy", "UTC") + "; band = laagste–hoogste raming.", force_overlay = true)
@@ -312,18 +340,58 @@ var table tbl = table.new(tablePos(), 3, MAX_ROWS, bgcolor = color.new(#111318, 
 cellL(int col, int row, string txt, color tc, string tip = "", color bg = na) =>
     tbl.cell(col, row, txt, text_color = tc, text_size = size.small, text_halign = text.align_left, tooltip = tip, bgcolor = bg)
 
-// Hoge-impact event voor basis of quote binnen 24 uur?
-eventWithin24h(string ccys) =>
-    bool found = false
+// Eerstvolgende katalysator: eerst high impact, anders medium; alleen basis of quote
+nextCatalyst(string ccys) =>
+    MacroEvent hi = na
+    MacroEvent md = na
     for e in events
-        if e.impact >= 3 and e.t >= timenow and e.t <= timenow + 86400000 and isRelevant(e.ccy, ccys)
-            found := true
+        if e.t >= timenow and isRelevant(e.ccy, ccys)
+            if e.impact >= 3 and na(hi)
+                hi := e
+            if e.impact == 2 and na(md)
+                md := e
+    na(hi) ? md : hi
+
+// Eerstvolgend high-event met minstens één scenario
+nextScenarioEvent(string ccys) =>
+    MacroEvent found = na
+    for e in events
+        if e.impact >= 3 and e.t >= timenow and isRelevant(e.ccy, ccys) and (e.up != "" or e.down != "" or e.inl != "" or e.mix != "")
+            found := e
             break
     found
 
-emmerOk(string emmer) =>
+// Volgende events (compact, voor de tooltip)
+upcomingTip(string ccys, int n) =>
+    string tip = ""
+    int k = 0
+    for e in events
+        if k < n and e.t >= timenow and e.impact >= i_minImpact and isRelevant(e.ccy, ccys)
+            tip += str.format_time(e.t, "EEE dd/MM HH:mm", i_tz) + " · " + e.ccy + " " + e.title + (e.stats != "" ? " · " + shortTxt(e.stats, 40) : "") + "\n"
+            k += 1
+    tip
+
+gelopenTekst(string emmer) =>
     string m = str.replace_all(emmer, "–", "-")
-    m == "tegen" or m == "0-1"
+    m == "tegen" ? "koers liep tegen de bias in" : m == "0-1" ? "nog weinig gelopen" : m == "1-2" ? "al deels gelopen" : m == ">2" ? "al ver gevorderd" : "onbekend"
+
+findInv(string b, string q) =>
+    Inval found = na
+    for v in invs
+        if v.paar == b + q or v.paar == q + b
+            found := v
+            break
+    found
+
+firstSentence(string s, int n) =>
+    int i = str.pos(s, ". ")
+    string f = na(i) ? s : str.substring(s, 0, i + 1)
+    str.length(f) > n ? str.substring(f, 0, n - 1) + "…" : f
+
+scenRow(int r, string lbl, string txt, color c) =>
+    cellL(0, r, lbl, c)
+    cellL(1, r, txt == "" ? "ontbreekt" : shortTxt(txt, 62), txt == "" ? color.gray : c, txt == "" ? "Geen scenario in de bron voor deze uitkomst." : txt)
+    tbl.merge_cells(1, r, 2, r)
 
 if barstate.islast and i_table
     tbl.clear(0, 0, 2, MAX_ROWS - 1)
@@ -333,98 +401,154 @@ if barstate.islast and i_table
     color  dim  = color.gray
     int    r    = 0
 
-    cellL(0, r, "BFX Macro", color.white)
-    cellL(1, r, DATA_LABEL, color.white)
-    cellL(2, r, "bijgewerkt " + upd, color.silver)
-    r += 1
-
     if timenow - GENERATED > i_staleDays * 86400000
-        cellL(0, r, "⚠ Verouderd", color.white, "", warn)
-        cellL(1, r, "Indicator niet bijgewerkt", color.white, "", warn)
-        cellL(2, r, "laatste update " + upd, color.white, "", warn)
+        cellL(0, r, "⚠ Indicator niet bijgewerkt", color.white, "", warn)
+        cellL(1, r, "laatste update " + upd, color.white, "", warn)
+        tbl.merge_cells(1, r, 2, r)
         r += 1
 
-    // BIAS_5.0 voor dit paar. Niet van vandaag: alles grijs.
-    if BIAS_DATUM > 0
-        string bDate = str.format_time(BIAS_DATUM, "dd/MM", "UTC")
-        if not biasFresh
-            cellL(0, r, "BIAS_5.0 niet bijgewerkt", color.white, "", color.new(color.gray, 40))
-            cellL(1, r, "stand van " + bDate, color.white, "", color.new(color.gray, 40))
-            cellL(2, r, BIAS_VERSIE, color.white, "", color.new(color.gray, 40))
-            r += 1
+    PairBias p  = findPair(cb, cq)
+    CcyBias  xb = findCcy(cb)
+    CcyBias  xq = findCcy(cq)
+    color txtc  = biasFresh ? color.white : dim
+    color subc  = biasFresh ? color.silver : dim
+    string bDate = BIAS_DATUM > 0 ? str.format_time(BIAS_DATUM, "dd/MM", "UTC") : "–"
+    if not biasFresh
+        cellL(0, r, "⚠ BIAS_5.0 niet bijgewerkt", color.white, "", color.new(color.gray, 40))
+        cellL(1, r, "laatst beschikbaar: " + bDate + " · deze kaart toont die stand", color.white, "", color.new(color.gray, 40))
+        tbl.merge_cells(1, r, 2, r)
+        r += 1
 
-        PairBias p = findPair(cb, cq)
-        CcyBias  xb = findCcy(cb)
-        CcyBias  xq = findCcy(cq)
-        if not na(p)
-            bool   inv     = p.basis != cb
-            float  pIdx    = inv ? -p.idx : p.idx
-            string pLabel  = inv ? flipLabel(p.lbl) : p.lbl
-            // Regel: binnen ±15 geen actieve richting, ongeacht het label
-            bool   neutral = math.abs(pIdx) < 15
-            color  main    = not biasFresh ? dim : neutral ? color.gray : biasColor(pLabel)
-            color  txtc    = biasFresh ? color.white : dim
-            cellL(0, r, "BIAS_5.0 " + cb + cq, txtc, "Paarindex −100..+100; positief = " + cb + " sterker.")
-            cellL(1, r, fmtIdx(pIdx) + " · " + (neutral ? "Neutral" : pLabel), main, p.tekst)
-            cellL(2, r, bDate + " · " + BIAS_VERSIE, biasFresh ? color.silver : dim)
-            r += 1
-            cellL(0, r, neutral ? "geen richting" : "richting", biasFresh ? color.silver : dim)
-            cellL(1, r, neutral ? "binnen ±15: geen kant" : p.tekst, biasFresh ? color.silver : dim, p.tekst)
-            tbl.merge_cells(1, r, 2, r)
-            r += 1
+    if na(p)
+        cellL(0, r, "BIAS_5.0: geen gegevens voor " + cb + "/" + cq, dim)
+        tbl.merge_cells(0, r, 2, r)
+        r += 1
+    else
+        bool   inv     = p.basis != cb
+        float  pIdx    = inv ? -p.idx : p.idx
+        string pLabel  = inv ? flipLabel(p.lbl) : p.lbl
+        // Binnen strikt −15..+15 geen actieve richting, ongeacht het label
+        bool   neutral = math.abs(pIdx) < 15
+        string sterker = pIdx >= 0 ? cb : cq
+        color  main    = not biasFresh ? dim : neutral ? color.gray : biasColor(pLabel)
 
-            if not na(xb) and not na(xq)
-                string kernTxt = cb + " " + (na(xb.kern) ? "–" : fmtIdx(xb.kern)) + " / " + cq + " " + (na(xq.kern) ? "–" : fmtIdx(xq.kern)) + (na(xb.kern) or na(xq.kern) ? "" : " (Δ " + fmtIdx(xb.kern - xq.kern) + ")")
-                string dekTxt  = "dekking " + (na(xb.dekking) ? "–" : str.tostring(xb.dekking, "0.##")) + "/" + (na(xq.dekking) ? "–" : str.tostring(xq.dekking, "0.##")) + " · zekerheid " + xb.zekerheid + "/" + xq.zekerheid
-                cellL(0, r, "kern", biasFresh ? color.silver : dim, "kernscore_100: alleen de cijfers, zonder marktonderdelen")
-                cellL(1, r, kernTxt, biasFresh ? color.silver : dim)
-                cellL(2, r, dekTxt, biasFresh ? color.silver : dim)
-                r += 1
-
-            // Checklist
-            bool okIdx  = not neutral
-            bool okStr  = str.lower(p.bevestiging) == "bevestigd" or str.lower(p.status) == "bevestigd"
-            bool okEmr  = emmerOk(p.emmer)
-            bool okEvt  = not eventWithin24h(ccys)
-            cellL(0, r, check(okIdx) + " |index| ≥ 15", okIdx and biasFresh ? c_bull : dim)
-            cellL(1, r, check(okStr) + " strategie bevestigd", okStr and biasFresh ? c_bull : dim, p.bevestiging)
-            cellL(2, r, check(okEmr) + " gelopen " + p.emmer + " (z " + str.tostring(p.z, "0.00") + ")", okEmr and biasFresh ? c_bull : dim, "✓ als de koers nog niet (of tegen de bias in) is gelopen: emmer 'tegen' of '0–1'.")
-            r += 1
-            string kp = not na(xb) and xb.kantelpunt != "" ? xb.kantelpunt : not na(xq) ? xq.kantelpunt : ""
-            string kpTip = (not na(xb) ? cb + ": " + xb.kantelpunt : "") + (not na(xq) ? "\n\n" + cq + ": " + xq.kantelpunt : "")
-            cellL(0, r, check(okEvt) + " geen high-impact ≤24u", okEvt and biasFresh ? c_bull : dim)
-            cellL(1, r, "kantelpunt: " + shortTxt(kp, 46), biasFresh ? color.silver : dim, kpTip)
-            tbl.merge_cells(1, r, 2, r)
-            r += 1
-            if (not na(xb) and xb.conflict) or (not na(xq) and xq.conflict)
-                cellL(0, r, "⚠ max 25% risico (KCFI)", color.white, "conflict = true bij " + (not na(xb) and xb.conflict ? cb + " " : "") + (not na(xq) and xq.conflict ? cq : ""), warn)
-                tbl.merge_cells(0, r, 2, r)
-                r += 1
-
-        // Altijd tonen
-        cellL(0, r, "onderzoeksstatus – max 25% risico, alleen met strategiebevestiging", color.new(#F5A524, 0), ONDERZOEKSSTATUS)
+        // 1–3: paar en richting · paarindex en neutrale grens · versie en versheid
+        cellL(0, r, cb + "/" + cq + " · " + (neutral ? "geen actieve richting" : "richting " + sterker), txtc, "BIAS_5.0 is de primaire richtingsbron.")
+        cellL(1, r, "paarindex " + fmtIdx(pIdx) + (neutral ? " · binnen −15..+15" : " · " + pLabel), main, "Paarindex −100..+100 = (index " + cb + " − index " + cq + ") / 2; positief = " + cb + " sterker.")
+        cellL(2, r, BIAS_VERSIE + " · " + bDate + " · " + (biasFresh ? "actueel" : "verouderd"), subc)
+        r += 1
+        // 4: één uitlegzin
+        string uitleg = p.tekst
+        cellL(0, r, firstSentence(uitleg, 110), subc, uitleg)
+        tbl.merge_cells(0, r, 2, r)
+        r += 1
+        // 5: beweging al gelopen
+        cellL(0, r, "Al gelopen", subc)
+        cellL(1, r, gelopenTekst(p.emmer) + ": " + str.tostring(p.z, "0.00") + "σ richting " + sterker + " (emmer " + p.emmer + ")", subc, "gelopen_z en gelopen_emmer: hoe ver de koers al in de richting van de bias bewoog. Informatie, geen filter.")
+        tbl.merge_cells(1, r, 2, r)
+        r += 1
+        // 6: strategie (tekst komt uit de generator; alleen 'bevestigd' is positief)
+        bool stPos = p.status == "bevestigd"
+        cellL(0, r, p.bevestiging, stPos and biasFresh ? c_bull : p.status == "tegengesteld" ? c_bear : dim, "Bron: mirror_bias50_paar.strategie_bevestiging")
         tbl.merge_cells(0, r, 2, r)
         r += 1
 
+    // 7: volgende katalysator
+    MacroEvent kat = nextCatalyst(ccys)
+    if na(kat)
+        cellL(0, r, "Volgende toets: geen medium/high-event voor " + cb + "/" + cq + " in de agenda", dim)
+        tbl.merge_cells(0, r, 2, r)
+        r += 1
+    else
+        bool within24 = kat.t <= timenow + 86400000
+        string head = (within24 and kat.impact >= 3 ? "⚠ " : "") + "Volgende toets"
+        cellL(0, r, head, color.white, "Overige komende events:\n" + upcomingTip(ccys, 6))
+        cellL(1, r, str.format_time(kat.t, "EEE dd/MM HH:mm", i_tz) + " · " + kat.ccy + " " + kat.title, impactColor(kat.impact), kat.detail)
+        cellL(2, r, (kat.impact >= 3 ? "high impact" : "medium impact") + (kat.cb ? " · centrale bank" : ""), subc)
+        r += 1
+        string sur = na(kat.sur) ? "" : " · surprise " + fmtIdx(kat.sur)
+        cellL(0, r, "markt verwacht", subc)
+        cellL(1, r, (kat.stats == "" ? "geen consensus in de agenda" : shortTxt(kat.stats, 50)) + sur, subc, kat.stats)
+        tbl.merge_cells(1, r, 2, r)
+        r += 1
+        if kat.detail != ""
+            cellL(0, r, firstSentence(kat.detail, 110), subc, kat.detail)
+            tbl.merge_cells(0, r, 2, r)
+            r += 1
+
+    // 8: vier scenario's (alleen uit de bron; ontbrekend = 'ontbreekt')
+    MacroEvent sc = nextScenarioEvent(ccys)
+    if not na(sc)
+        cellL(0, r, "Scenario's · " + sc.ccy + " " + sc.title, color.white, "uitkomst → rente/beleid → valuta → mogelijk effect op BIAS_5.0")
+        tbl.merge_cells(0, r, 2, r)
+        r += 1
+        scenRow(r, "↑ hoger", sc.up, subc)
+        r += 1
+        scenRow(r, "= in lijn", sc.inl, subc)
+        r += 1
+        scenRow(r, "↓ lager", sc.down, subc)
+        r += 1
+        scenRow(r, "± gemengd", sc.mix, subc)
+        r += 1
+
+    // 9: BIAS-kantelpunt (afzonderlijk begrip)
+    if not na(xb) and not na(xq)
+        string kp = xb.kantelpunt != "" ? xb.kantelpunt : xq.kantelpunt
+        cellL(0, r, "BIAS-kantelpunt", subc)
+        cellL(1, r, shortTxt(kp, 62), subc, cb + ": " + xb.kantelpunt + "\n\n" + cq + ": " + xq.kantelpunt)
+        tbl.merge_cells(1, r, 2, r)
+        r += 1
+    // 10: paarinvalidatie (alleen als die bij deze periode hoort)
+    Inval iv = findInv(cb, cq)
+    if na(iv)
+        cellL(0, r, "Paarinvalidatie: geen actuele, bij deze periode passende invalidatie beschikbaar.", dim)
+        tbl.merge_cells(0, r, 2, r)
+    else
+        cellL(0, r, "Paarinvalidatie", subc)
+        cellL(1, r, shortTxt(iv.tekst, 62), subc, iv.tekst + "\n\nKatalysator: " + iv.katalysator + "\nHorizon: " + iv.horizon + "\nPeriode: " + str.format_time(iv.periode, "dd-MM-yyyy", "UTC") + " (daily, zelfde datum als BIAS_5.0)")
+        tbl.merge_cells(1, r, 2, r)
+    r += 1
+
+    if (not na(xb) and xb.conflict) or (not na(xq) and xq.conflict)
+        cellL(0, r, "⚠ max 25% risico (KCFI)", color.white, "conflict = true", warn)
+        tbl.merge_cells(0, r, 2, r)
+        r += 1
+    cellL(0, r, "onderzoeksstatus – max 25% risico, alleen met strategiebevestiging", color.new(#F5A524, 0), ONDERZOEKSSTATUS)
+    tbl.merge_cells(0, r, 2, r)
+    r += 1
+
+    // Versheid per bron (ontbreekt ≠ neutraal)
+    bool hasCons = false
+    for c in cons
+        if c.paar == cb + cq or c.paar == cq + cb
+            hasCons := true
+    string stFr  = na(p) ? "ontbreekt" : p.status == "geen_stand" ? "geen verzegelde stand" : p.status == "ontbreekt" ? "ontbreekt" : "actueel"
+    string evFr  = na(kat) ? "ontbreekt" : na(kat.sur) ? "nog niet gepubliceerd" : "actueel"
+    string fr    = "BIAS " + (biasFresh ? "actueel" : "verouderd") + " · agenda " + AGENDA_STATUS + " · strategie " + stFr + " · consensus " + (hasCons ? "actueel" : "ontbreekt") + " · invalidatie " + (na(iv) ? "ontbreekt" : "actueel") + " · uitkomst " + evFr
+    cellL(0, r, "Versheid: " + fr, dim, "Bijgewerkt " + upd + " · " + DATA_LABEL)
+    tbl.merge_cells(0, r, 2, r)
+    r += 1
+    // 11: verwijzing (Pine kan geen klikbare links tonen)
+    cellL(0, r, "Volledige analyse: BFX Macro Lab → " + cb + "/" + cq, color.new(#4C9AFF, 0), "Paaronderzoek, outlooks en eventduiding staan op de website (BFX Macro Lab, paardossier " + cb + cq + ").")
+    tbl.merge_cells(0, r, 2, r)
+    r += 1
+
+    if i_ccyRows
         for c in array.from(cb, cq)
             CcyBias x = findCcy(c)
             if not na(x) and r < MAX_ROWS
-                string info = "zekerheid " + x.zekerheid + (x.conflict ? " · ⚠ KCFI max 25%" : "")
-                string tip  = x.samenvatting + (x.kantelpunt != "" ? "\n\n" + x.kantelpunt : "") + (x.bevestiging != "" ? "\n\nStrategie: " + x.bevestiging : "")
-                bool   xn   = math.abs(x.idx) < 15
-                cellL(0, r, c, biasFresh ? color.white : dim, tip)
-                cellL(1, r, fmtIdx(x.idx) + " · " + (xn ? "Neutral" : x.lbl), not biasFresh or xn ? dim : biasColor(x.lbl), tip)
-                cellL(2, r, info, x.conflict ? c_bear : biasFresh ? color.silver : dim, tip)
+                bool xn = math.abs(x.idx) < 15
+                cellL(0, r, c, txtc, x.samenvatting)
+                cellL(1, r, fmtIdx(x.idx) + " · " + (xn ? "Neutral" : x.lbl), not biasFresh or xn ? dim : biasColor(x.lbl), x.samenvatting)
+                cellL(2, r, "zekerheid " + x.zekerheid + (x.conflict ? " · ⚠ KCFI max 25%" : ""), x.conflict ? c_bear : subc)
                 r += 1
 
-    // Komende events
+    // Extra events (standaard uit; staan ook in de tooltip van 'Volgende toets')
     int shown = 0
     for e in events
         if shown < i_rows and r < MAX_ROWS and e.t >= timenow and e.impact >= i_minImpact and isRelevant(e.ccy, ccys)
             cellL(0, r, str.format_time(e.t, "EEE dd/MM HH:mm", i_tz), color.silver)
             cellL(1, r, e.ccy + " " + e.title, impactColor(e.impact), e.detail)
-            // Kort in de cel, zodat de tabel niet buiten de chart valt; alles staat in de tooltip
-            string full = e.stats + (e.detail != "" ? "\n\n" + e.detail : "")
-            cellL(2, r, shortTxt(e.stats, 34), color.silver, full)
+            cellL(2, r, shortTxt(e.stats, 34), color.silver, e.stats + (e.detail != "" ? "\n\n" + e.detail : ""))
             shown += 1
             r += 1

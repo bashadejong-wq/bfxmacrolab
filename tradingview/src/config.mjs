@@ -51,7 +51,9 @@ export const config = {
   minImpact: num("MIN_IMPACT", 2),
 
   delivery: env("DELIVERY", "auto"), // auto | manual
-  tvChartUrl: env("TV_CHART_URL", "https://www.tradingview.com/chart/"),
+  // Uitsluitend deze layout; geen terugval op /chart/ of een andere layout
+  tvLayoutId: env("TV_LAYOUT_ID"),
+  tvLayoutName: env("TV_LAYOUT_NAME", "BFX Automatisering"),
   tvProfileDir: resolve(ROOT, env("TV_PROFILE_DIR", ".tv-profile")),
   headless: bool("HEADLESS", false),
   browserChannel: env("BROWSER_CHANNEL", ""), // bv. "chrome" om je geïnstalleerde Chrome te gebruiken
@@ -60,4 +62,5 @@ export const config = {
   telegramChatId: env("TELEGRAM_CHAT_ID"),
 
   outDir: resolve(ROOT, "out"),
+  logDir: resolve(ROOT, "logs"),
 };
