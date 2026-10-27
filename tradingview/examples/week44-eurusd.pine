@@ -36,7 +36,7 @@ type PairBias
     string basis
     string quote
     float  idx
-    string label
+    string lbl
     string tekst
     string emmer
     float  z
@@ -46,7 +46,7 @@ type PairBias
 type CcyBias
     string ccy
     float  idx
-    string label
+    string lbl
     string zekerheid
     bool   conflict
     string bevestiging
@@ -60,11 +60,11 @@ var array<CcyBias>    ccyb   = array.new<CcyBias>()
 addEv(int t, string ccy, int impact, string title, string stats, string detail) =>
     events.push(MacroEvent.new(t, ccy, impact, title, stats, detail))
 
-addPair(string basis, string quote, float idx, string label, string tekst, string emmer, float z, string bevestiging) =>
-    pairs.push(PairBias.new(basis, quote, idx, label, tekst, emmer, z, bevestiging))
+addPair(string basis, string quote, float idx, string lbl, string tekst, string emmer, float z, string bevestiging) =>
+    pairs.push(PairBias.new(basis, quote, idx, lbl, tekst, emmer, z, bevestiging))
 
-addCcy(string ccy, float idx, string label, string zekerheid, bool conflict, string bevestiging, string kantelpunt, string samenvatting) =>
-    ccyb.push(CcyBias.new(ccy, idx, label, zekerheid, conflict, bevestiging, kantelpunt, samenvatting))
+addCcy(string ccy, float idx, string lbl, string zekerheid, bool conflict, string bevestiging, string kantelpunt, string samenvatting) =>
+    ccyb.push(CcyBias.new(ccy, idx, lbl, zekerheid, conflict, bevestiging, kantelpunt, samenvatting))
 
 // ═══ DATA-START (automatisch gegenereerd) ═══
 const string VERSION    = "2026-10-27 15:00 UTC"
@@ -142,13 +142,13 @@ impactColor(int imp) =>
     imp >= 3 ? c_high : imp == 2 ? c_med : c_low
 
 // Light-labels krijgen een lichtere tint; Neutral is grijs (binnen ±15 geen richting).
-biasColor(string label) =>
-    string s = str.lower(label)
+biasColor(string lbl) =>
+    string s = str.lower(lbl)
     color base = str.contains(s, "bull") ? c_bull : str.contains(s, "bear") ? c_bear : color.gray
     str.contains(s, "light") ? color.new(base, 35) : base
 
-flipLabel(string label) =>
-    str.replace_all(str.replace_all(str.replace_all(label, "Bullish", "#TMP#"), "Bearish", "Bullish"), "#TMP#", "Bearish")
+flipLabel(string lbl) =>
+    str.replace_all(str.replace_all(str.replace_all(lbl, "Bullish", "#TMP#"), "Bearish", "Bullish"), "#TMP#", "Bearish")
 
 fmtIdx(float v) =>
     (v > 0 ? "+" : "") + str.tostring(v, "0.0")
@@ -226,8 +226,8 @@ if barstate.islast
                 evLines.push(line.new(e.t, close, e.t, close + atrv, xloc = xloc.bar_time, extend = extend.both, color = color.new(col, past ? 70 : 35), style = line.style_dotted, width = 1))
             if i_labels
                 float  y    = hiRef + atrv * (0.6 + 0.9 * (k % 3))
-                string when = str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone)
-                string tip  = e.ccy + " · " + when + "\n" + e.title + "\n" + e.stats + (e.detail != "" ? "\n\n" + e.detail : "")
+                string whenTxt = str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone)
+                string tip  = e.ccy + " · " + whenTxt + "\n" + e.title + "\n" + e.stats + (e.detail != "" ? "\n\n" + e.detail : "")
                 evLabels.push(label.new(e.t, y, e.ccy + " " + e.title, xloc = xloc.bar_time, yloc = yloc.price, color = color.new(col, past ? 75 : 15), textcolor = color.white, style = label.style_label_down, size = size.small, tooltip = tip))
             k += 1
 
@@ -270,7 +270,7 @@ if barstate.islast and i_table
         if not na(p)
             bool   inv    = p.basis != cb
             float  pIdx   = inv ? -p.idx : p.idx
-            string pLabel = inv ? flipLabel(p.label) : p.label
+            string pLabel = inv ? flipLabel(p.lbl) : p.lbl
             // BIAS 5.0-regel: binnen ±15 geen actieve richting, ongeacht het label
             bool   neutral = math.abs(pIdx) < 15 or str.contains(str.lower(pLabel), "neutral")
             cellL(0, r, "BIAS " + cb + cq, color.white, "BIAS 5.0 " + BIAS_VERSIE + " · " + bDate)
@@ -288,7 +288,7 @@ if barstate.islast and i_table
                 string info = "zekerheid " + x.zekerheid + (x.conflict ? " · ⚠ KCFI max 25%" : "")
                 string tip  = x.samenvatting + (x.kantelpunt != "" ? "\n\n" + x.kantelpunt : "") + (x.bevestiging != "" ? "\n\nStrategie: " + x.bevestiging : "")
                 cellL(0, r, c, color.white, tip)
-                cellL(1, r, fmtIdx(x.idx) + " · " + x.label, biasColor(x.label), tip)
+                cellL(1, r, fmtIdx(x.idx) + " · " + x.lbl, biasColor(x.lbl), tip)
                 cellL(2, r, info, x.conflict ? c_bear : color.silver, tip)
                 r += 1
 

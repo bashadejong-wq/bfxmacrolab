@@ -70,7 +70,16 @@ schtasks /Create /TN "BFX TradingView" /SC WEEKLY /D ZO /ST 18:15 /TR "cmd /c cd
 ```
 (Op een Engelstalige Windows: `MON,TUE,WED,THU,FRI` en `SUN`.) Vink in Taakplanner bij de taak aan: *Taak zo snel mogelijk uitvoeren na een gemiste geplande start*.
 
-### Mac (cron)
+### Mac: één commando (aanbevolen)
+
+```bash
+cd ~/pad/naar/bfxmacrolab/tradingview
+./setup/mac-install.sh            # werkdagen 06:00
+./setup/mac-install.sh --weekly   # of: zondag 18:15
+```
+Dit installeert alles en plant de taak in via launchd. Sliep de Mac om 06:00, dan draait de taak zodra hij wakker wordt. Uitzetten met `./setup/mac-uninstall.sh`. Logboek: `logs/run.log`.
+
+### Mac (handmatig met cron)
 
 `crontab -e` en voeg toe (pas pad en node-locatie aan; `which node` geeft het pad):
 ```cron
