@@ -1,11 +1,10 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "./config.mjs";
+import { EXIT, evaluateSave, preflight, stripQuery } from "./logic.mjs";
 
 const MARKER = "BFX-MACRO-OVERLAY";
 const SCRIPT_NAME = "BFX Macro Overlay";
-// Naar regel 1 in de editor: op macOS ⌘↑ (⌘Home doet daar niets), elders Ctrl+Home.
-const DOC_START = process.platform === "darwin" ? "Meta+ArrowUp" : "Control+Home";
 const EDITOR = ".monaco-editor";
 
 // TradingView verandert af en toe de interface; daarom meerdere varianten per knop.
@@ -18,11 +17,15 @@ const PINE_BUTTONS = [
 ];
 const UPDATE_BUTTONS = ['button:has-text("Update on chart")', 'button[title*="Update on chart"]', 'button:has-text("Bijwerken op grafiek")'];
 
+export const layoutUrl = (id = config.tvLayoutId) => `https://www.tradingview.com/chart/${id}/`;
+
+/** Altijd met zichtbaar venster: headless trekt de TradingView-sessie in. */
 async function launch() {
+  if (config.headless) console.warn("HEADLESS=true genegeerd: TradingView-aflevering draait altijd met zichtbaar venster.");
   const { chromium } = await import("playwright");
   mkdirSync(config.tvProfileDir, { recursive: true });
   return chromium.launchPersistentContext(config.tvProfileDir, {
-    headless: config.headless,
+    headless: false,
     channel: config.browserChannel || undefined,
     viewport: { width: 1600, height: 1000 },
     permissions: ["clipboard-read", "clipboard-write"],
@@ -39,19 +42,114 @@ async function firstVisible(page, selectors, timeout = 1500) {
   return null;
 }
 
-/** Scrolt de editor naar regel 1 (muiswiel werkt los van sneltoetsen en besturingssysteem). */
+/** Scrolt de editor tot regel 1 echt zichtbaar is (muiswiel; sneltoetsen verschillen per besturingssysteem). */
 async function scrollToTop(page) {
   const box = await page.locator(EDITOR).first().boundingBox().catch(() => null);
-  if (!box) return;
+  if (!box) return false;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  for (let i = 0; i < 15; i++) await page.mouse.wheel(0, -20000);
-  await sleep(600);
+  for (let i = 0; i < 40; i++) {
+    for (let k = 0; k < 10; k++) await page.mouse.wheel(0, -30000);
+    await sleep(300);
+    const first = await page.locator(`${EDITOR} .line-numbers`).evaluateAll((els) => Math.min(...els.map((e) => Number(e.textContent) || 1e9))).catch(() => 1e9);
+    if (first <= 1) return true;
+  }
+  return false;
+}
+
+const digits = (t) => String(t ?? "").replace(/\D/g, "");
+
+/** BFX Macro-legendarijen op de geopende layout: [{ text }] */
+async function bfxLegendItems(page) {
+  return page.locator('[data-qa-id="legend-source-item"]').filter({ hasText: "BFX Macro" });
+}
+
+/**
+ * Verwijdert BFX Macro-instanties van de geopende (BFX-)layout, behalve de instantie die keepSnapshot toont.
+ * keepSnapshot = null → alle BFX-instanties weg. Geeft het aantal verwijderde.
+ */
+async function removeBfxInstances(page, keepSnapshot = null) {
+  let removed = 0;
+  for (let guard = 0; guard < 8; guard++) {
+    const items = await bfxLegendItems(page);
+    const n = await items.count();
+    let target = null;
+    for (let i = 0; i < n; i++) {
+      const it = items.nth(i);
+      const txt = await it.innerText().catch(() => "");
+      if (!keepSnapshot || !digits(txt).includes(String(keepSnapshot))) {
+        target = it;
+        break;
+      }
+    }
+    if (!target) break;
+    // Selecteer de instantie via haar legendatitel en verwijder met Delete (de verwijderknop reageert niet betrouwbaar)
+    const before = n;
+    await target.locator('[data-qa-id*="legend-source-title"]').first().click().catch(() => {});
+    await sleep(500);
+    await page.keyboard.press("Delete");
+    await sleep(1500);
+    if ((await (await bfxLegendItems(page)).count()) >= before) break; // niets verwijderd: niet eindeloos proberen
+    removed += 1;
+  }
+  return removed;
+}
+
+/** Aantal BFX Macro-instanties op de geopende layout. */
+export async function countBfxInstances(page) {
+  return (await bfxLegendItems(page)).count();
+}
+
+/** Snapshot-id's die als tekst op de pagina staan (legenda toont ze met duizendtalscheiding). */
+export async function snapshotsOnPage(page) {
+  const body = await page.evaluate(() => document.body.innerText).catch(() => "");
+  return [...new Set((body.match(/\b20\d(?:[,.\u202f\u00a0 ]?\d{3}){3}\b/g) ?? []).map((x) => Number(x.replace(/\D/g, ""))))];
+}
+
+/** Slaat de layout expliciet op via het layoutmenu (niet op autosave vertrouwen). */
+async function saveLayout(page) {
+  const menu = page.locator('[data-name="save-load-menu"]').first();
+  if (!(await menu.isVisible().catch(() => false))) return false;
+  await menu.click();
+  await sleep(800);
+  const item = page.getByText("Save layout", { exact: true }).first();
+  const enabled = await item.isVisible().catch(() => false);
+  if (enabled) await item.click().catch(() => {});
+  else await page.keyboard.press("Escape");
+  await sleep(3000);
+  // Bevestiging van TradingView zelf
+  return page.locator('button[aria-label="All changes saved"]').first().count().then((n) => n > 0).catch(() => false);
 }
 
 async function editorText(page) {
   // De editor toont spaties als non-breaking spaces; normaliseer voor vergelijkingen.
   const txt = await page.locator(`${EDITOR} .view-lines`).first().innerText().catch(() => "");
-  return txt.replace(/\u00a0/g, " ");
+  return txt.replace(/ /g, " ");
+}
+
+/** Cookiebanner: kies de privacyvriendelijke optie, als die er staat. */
+async function declineCookies(page) {
+  const btn = await firstVisible(page, ['button:has-text("Don\'t allow")', 'button:has-text("Niet toestaan")', 'button:has-text("Reject all")'], 500);
+  if (btn) await btn.click().catch(() => {});
+}
+
+/** Sessie- en layoutstatus van de geopende pagina (geen geheimen: alleen ja/nee en namen). */
+async function pageState(ctx, page) {
+  const cookies = await ctx.cookies("https://www.tradingview.com");
+  const hasSession = cookies.some((c) => c.name === "sessionid" && c.value);
+  const info = await page
+    .evaluate(() => {
+      const el = [...document.querySelectorAll("[aria-label]")].find((e) => /Active layout:/.test(e.getAttribute("aria-label")));
+      const m = el?.getAttribute("aria-label").match(/Active layout:\s*(.+)$/m);
+      return { username: window.user?.username ?? null, layoutName: m ? m[1].trim() : null };
+    })
+    .catch(() => ({ username: null, layoutName: null }));
+  return {
+    hasSession,
+    isGuest: !info.username || info.username === "Guest",
+    title: await page.title(),
+    url: page.url(),
+    layoutName: info.layoutName,
+  };
 }
 
 /** Opent 'BFX Macro Overlay' via het Open script-venster van de Pine Editor. */
@@ -65,16 +163,7 @@ async function openScriptByName(page, editor) {
   if (await item.isVisible().catch(() => false)) await item.click();
   else await page.keyboard.press("Enter");
   await sleep(4000);
-  await editor.click().catch(() => {});
-  await page.keyboard.press(DOC_START);
-    await scrollToTop(page);
-  await sleep(500);
-}
-
-/** Cookiebanner: kies de privacyvriendelijke optie, als die er staat. */
-async function declineCookies(page) {
-  const btn = await firstVisible(page, ['button:has-text("Don\'t allow")', 'button:has-text("Niet toestaan")', 'button:has-text("Reject all")'], 500);
-  if (btn) await btn.click().catch(() => {});
+  await scrollToTop(page);
 }
 
 /** Opent een browser waarin je één keer handmatig inlogt bij TradingView. */
@@ -84,66 +173,83 @@ export async function login() {
   await page.goto("https://www.tradingview.com/#signin");
   console.log(
     "Log in bij TradingView in het geopende venster.\n" +
-      "Open daarna een chart → Pine Editor → het script 'BFX Macro Overlay' (zie README, eerste keer).\n" +
+      `Open daarna de layout '${config.tvLayoutName}' en in de Pine Editor het script '${SCRIPT_NAME}'.\n` +
       "Sluit het browservenster als je klaar bent; de sessie blijft bewaard.",
   );
   await new Promise((r) => ctx.on("close", r));
 }
 
 /**
- * Vervangt de code van het open BFX-script in de Pine Editor en slaat op.
- * Geeft { ok, message, screenshot } terug; gooit alleen bij onverwachte fouten.
+ * Alleen-lezen controle van sessie en layout (geen editoractie). Voor tests en de acceptatieronde.
+ * Geeft { ok, code, reason, state }.
+ */
+export async function check() {
+  const ctx = await launch();
+  const page = ctx.pages()[0] ?? (await ctx.newPage());
+  try {
+    await page.goto(layoutUrl(), { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await sleep(8000);
+    await declineCookies(page);
+    const state = await pageState(ctx, page);
+    const pf = preflight(state, { layoutId: config.tvLayoutId, layoutName: config.tvLayoutName });
+    const screenshot = resolve(config.outDir, "check.png");
+    await page.screenshot({ path: screenshot }).catch(() => {});
+    return { ...pf, state: { ...state, url: stripQuery(state.url) }, screenshot };
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * Vervangt de code van het BFX-script en werkt de indicator op de BFX-layout bij.
+ * Geeft { ok, code, message, screenshot, steps }; gooit alleen bij onverwachte fouten.
  */
 export async function deliver(pineFile) {
   const code = readFileSync(pineFile, "utf8");
   const version = code.match(/^\/\/ Versie: (.+)$/m)?.[1] ?? "";
   mkdirSync(config.outDir, { recursive: true });
   const screenshot = resolve(config.outDir, "last-run.png");
+  const steps = { url: "", layoutName: null, script: SCRIPT_NAME, compiled: false, saved: false, chartUpdated: false, layoutSaved: false, removed: 0, instances: null };
 
   const ctx = await launch();
   const page = ctx.pages()[0] ?? (await ctx.newPage());
-  const fail = async (message) => {
+  const stop = async (code, message) => {
     await page.screenshot({ path: screenshot }).catch(() => {});
     await ctx.close();
-    return { ok: false, message, screenshot };
+    return { ok: false, code, message, screenshot, steps };
   };
 
   try {
-    await page.goto(config.tvChartUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    // 0. Uitsluitend de BFX-layout; nooit terugvallen op /chart/ of een andere layout
+    await page.goto(layoutUrl(), { waitUntil: "domcontentloaded", timeout: 60_000 });
     await sleep(8000);
     await declineCookies(page);
-    console.log(`TradingView: ${page.url()} · ${await page.title()}`);
-
-    if (await firstVisible(page, ['button:has-text("Sign in")', 'a:has-text("Sign in")', 'button:has-text("Inloggen")'], 500)) {
-      return fail("Niet ingelogd bij TradingView. Draai `node bfx-tv.mjs login` en log opnieuw in.");
-    }
+    const state = await pageState(ctx, page);
+    steps.url = stripQuery(state.url);
+    steps.layoutName = state.layoutName;
+    const pf = preflight(state, { layoutId: config.tvLayoutId, layoutName: config.tvLayoutName });
+    if (!pf.ok) return stop(pf.code, pf.reason);
 
     // 1. Pine Editor openen (als die nog niet open staat)
     if (!(await page.locator(EDITOR).first().isVisible().catch(() => false))) {
       const btn = await firstVisible(page, PINE_BUTTONS);
-      if (!btn) return fail("Knop voor de Pine Editor niet gevonden (TradingView-interface gewijzigd?).");
+      if (!btn) return stop(EXIT.STOP_SCRIPT, "knop voor de Pine Editor niet gevonden (TradingView-interface gewijzigd?)");
       await btn.click();
       await page.locator(EDITOR).first().waitFor({ state: "visible", timeout: 20_000 }).catch(() => {});
     }
     const editor = page.locator(EDITOR).first();
-    if (!(await editor.isVisible().catch(() => false))) return fail("Pine Editor opende niet.");
+    if (!(await editor.isVisible().catch(() => false))) return stop(EXIT.STOP_SCRIPT, "Pine Editor opende niet");
 
-    // 2. Veiligheidscheck: alleen ons eigen script overschrijven.
-    //    Staat een ander script open, open dan eerst 'BFX Macro Overlay' via Open script (⌘O).
+    // 2. Veiligheidscheck: alleen ons eigen script overschrijven
     await editor.click();
-    await page.keyboard.press(DOC_START);
     await scrollToTop(page);
-    await sleep(500);
+    if (!(await editorText(page)).includes(MARKER)) await openScriptByName(page, editor);
     if (!(await editorText(page)).includes(MARKER)) {
-      await openScriptByName(page, editor);
-    }
-    if (!(await editorText(page)).includes(MARKER)) {
-      return fail(
-        "In de Pine Editor staat niet het script 'BFX Macro Overlay'. Open dat script één keer handmatig in de Pine Editor; er is niets overschreven.",
-      );
+      return stop(EXIT.STOP_SCRIPT, `in de Pine Editor staat niet het script '${SCRIPT_NAME}' (marker ontbreekt); niets overschreven`);
     }
 
     // 3. Code vervangen via het klembord (plakken voorkomt auto-aanvulling van haakjes)
+    await editor.click();
     await page.keyboard.press("ControlOrMeta+A");
     const pasted = await page
       .evaluate(async (text) => {
@@ -154,46 +260,101 @@ export async function deliver(pineFile) {
     if (pasted) await page.keyboard.press("ControlOrMeta+V");
     else await page.keyboard.insertText(code);
     await sleep(1500);
-
-    await page.keyboard.press(DOC_START);
     await scrollToTop(page);
-    await sleep(500);
-    if (version && !(await editorText(page)).includes(version)) {
-      const seen = (await editorText(page)).replace(/\s+/g, " ").slice(0, 160);
-      return fail(`Code is niet goed geplakt (versieregel niet teruggevonden). Er is niet opgeslagen. Editor toont: ${seen}`);
+    const text = await editorText(page);
+    const markerFound = text.includes(MARKER);
+    const versionFound = !version || text.includes(version);
+    if (!markerFound || !versionFound) {
+      return stop(EXIT.STOP_SCRIPT, evaluateSave({ markerFound, versionFound }).reason);
     }
 
-    // 4. Compilefouten? Dan niet opslaan.
-    await sleep(2500);
-    if ((await page.locator(`${EDITOR} .squiggly-error`).count()) > 0) {
-      return fail("De nieuwe code bevat een compilefout; niet opgeslagen. Zie het Pine-bestand in de bijlage.");
-    }
-
-    // 5. Opslaan en (indien aanwezig) bijwerken op de chart
+    // 4. Opslaan en wachten tot 'Unsaved version' weg is (compileren duurt ±10 s)
     await page.keyboard.press("ControlOrMeta+S");
-    // Groot script: compileren + opslaan duurt ±10 s. Wacht tot 'Unsaved version' weg is.
     const unsaved = page.getByText(/Unsaved version|Niet-opgeslagen versie/).first();
     await sleep(2000);
-    let saved = false;
-    for (let i = 0; i < 45; i++) {
-      if (!(await unsaved.isVisible().catch(() => false))) { saved = true; break; }
-      await sleep(1000);
+    let unsavedVisible = true;
+    for (let i = 0; i < 45 && unsavedVisible; i++) {
+      unsavedVisible = await unsaved.isVisible().catch(() => false);
+      if (unsavedVisible) await sleep(1000);
     }
-    if (!saved) return fail("Opslaan niet bevestigd binnen 45 s (TradingView toont nog 'Unsaved version').");
-    if ((await page.locator(`${EDITOR} .squiggly-error`).count()) > 0) {
-      return fail("Na opslaan meldt de Pine Editor een fout. Zie de schermafdruk.");
+    const compileErrors = await page.locator(`${EDITOR} .squiggly-error`).count();
+    steps.compiled = compileErrors === 0;
+    steps.saved = !unsavedVisible;
+
+    // 5. Indicator op de chart: TradingView werkt hem bij het opslaan vaak zelf bij; anders 'Update on chart'.
+    //    Bewijs in beide gevallen: het nieuwe snapshot-id staat in de legenda van de BFX-layout.
+    const snapshot = code.match(/^const int    SNAPSHOT_ID = (\d+)$/m)?.[1] ?? "";
+    let verdict = evaluateSave({ markerFound, versionFound, unsavedVisible, compileErrors, updateFound: true });
+    if (!verdict.ok) return stop(verdict.code, verdict.reason);
+    const waitSnapshot = async (secs) => {
+      for (let i = 0; i < secs; i++) {
+        if (snapshot && (await snapshotsOnPage(page)).includes(Number(snapshot))) return true;
+        await sleep(1000);
+      }
+      return false;
+    };
+    // a) TradingView werkt de gekoppelde instantie bij het opslaan vaak zelf bij
+    let onChart = await waitSnapshot(15);
+    // b) anders 'Update on chart'
+    if (!onChart) {
+      const update = await firstVisible(page, UPDATE_BUTTONS, 1500);
+      if (update) {
+        await update.click();
+        onChart = await waitSnapshot(20);
+      }
     }
-    // Een indicator op de chart blijft op de versie waarmee hij is toegevoegd: werk hem bij
-    // en geef TradingView tijd om de layout automatisch op te slaan.
-    const update = await firstVisible(page, UPDATE_BUTTONS, 2000);
-    if (!update) return fail("Opgeslagen, maar 'Update on chart' niet gevonden: de indicator op de chart toont nog de vorige versie.");
-    await update.click();
-    await sleep(8000);
+    // c) anders: BFX-instanties op deze layout weg en de nieuwe versie toevoegen
+    if (!onChart) {
+      steps.removed += await removeBfxInstances(page, null);
+      const add = await firstVisible(page, ['button[title="Add to chart"]', 'button[aria-label="Add to chart"]', 'button:has-text("Add to chart")'], 2000);
+      if (!add) return stop(EXIT.STOP_OPSLAAN, "'Update on chart' en 'Add to chart' niet gevonden");
+      await add.click();
+      onChart = await waitSnapshot(30);
+    }
+    // Precies één BFX-instantie: oude rijen zonder het nieuwe snapshot verwijderen
+    if (onChart) steps.removed += await removeBfxInstances(page, snapshot);
+    steps.instances = await countBfxInstances(page);
+    steps.chartUpdated = onChart;
+    verdict = evaluateSave({ markerFound, versionFound, unsavedVisible, compileErrors, updateFound: onChart });
+    if (!verdict.ok) return stop(verdict.code, `nieuwe versie (snapshot ${snapshot}) niet zichtbaar op de chart`);
+    await sleep(3000);
+    // Layout expliciet opslaan, zodat de bijgewerkte indicator na herladen blijft staan
+    steps.layoutSaved = await saveLayout(page);
+    if (!steps.layoutSaved) return stop(EXIT.STOP_OPSLAAN, "layout niet bevestigd opgeslagen ('All changes saved' ontbreekt)");
 
     await page.screenshot({ path: screenshot });
     await ctx.close();
-    return { ok: true, message: `Bijgewerkt naar versie ${version}.`, screenshot };
+    return { ok: true, code: EXIT.OK, message: `Bijgewerkt naar versie ${version}.`, screenshot, steps };
   } catch (err) {
-    return fail(`Onverwachte fout: ${err.message}`);
+    return stop(EXIT.FOUT, `onverwachte fout: ${err.message}`);
+  }
+}
+
+/**
+ * Herlaadt de BFX-layout in een nieuwe browser en leest de 'bijgewerkt'-tekst van de indicator:
+ * bewijs dat de layout de nieuwe versie bewaard heeft. Geeft { ok, reason, seen, screenshot }.
+ */
+export { saveLayout };
+
+export async function verifyOnChart(expectedStamp) {
+  const ctx = await launch();
+  const page = ctx.pages()[0] ?? (await ctx.newPage());
+  const screenshot = resolve(config.outDir, "verify.png");
+  try {
+    await page.goto(layoutUrl(), { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await sleep(12000);
+    await declineCookies(page);
+    const state = await pageState(ctx, page);
+    const pf = preflight(state, { layoutId: config.tvLayoutId, layoutName: config.tvLayoutName });
+    await page.screenshot({ path: screenshot }).catch(() => {});
+    if (!pf.ok) return { ok: false, reason: pf.reason, seen: null, screenshot };
+    // De legenda toont het snapshot-id als tekst (de tabel zelf is canvas)
+    const seen = await snapshotsOnPage(page);
+    const instances = await countBfxInstances(page);
+    const ok = seen.includes(Number(expectedStamp)) && instances === 1;
+    const reason = ok ? "" : instances !== 1 ? `${instances} BFX-instanties op de layout (verwacht 1)` : `snapshot ${expectedStamp} niet zichtbaar op de BFX-layout (gezien: ${seen.join(", ") || "geen"})`;
+    return { ok, reason, seen, instances, screenshot };
+  } finally {
+    await ctx.close();
   }
 }

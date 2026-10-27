@@ -45,20 +45,35 @@ npx playwright install chromium
 cp .env.example .env        # Windows: copy .env.example .env
 ```
 
-Vul in `.env` in:
-- `BIAS_SUPABASE_KEY`: de anon-sleutel van het BIAS 5.0-project (`BIAS_SUPABASE_URL` staat al goed).
-- `SUPABASE_URL` en `SUPABASE_KEY` (voor de events): dezelfde waarden als `VITE_SUPABASE_URL` en `VITE_SUPABASE_PUBLISHABLE_KEY` van de app. Leeg laten = alleen BIAS 5.0.
-- Optioneel `TELEGRAM_BOT_TOKEN` en `TELEGRAM_CHAT_ID` voor meldingen (bot aanmaken via @BotFather).
+Vul in `.env` in: `BIAS_SUPABASE_KEY` en `SUPABASE_KEY` (anon-sleutel), `TV_LAYOUT_ID` en `TV_LAYOUT_NAME`.
 
-### Eerste keer in TradingView
+### Aparte layout `BFX Automatisering`
 
-1. Maak de code: `node bfx-tv.mjs generate`, dit schrijft `out/bfx_macro_overlay.pine`.
-2. Start de login-browser: `node bfx-tv.mjs login`, log in bij TradingView.
-3. Open in **dat venster** een chart → **Pine Editor** → *nieuw script* → plak de inhoud van `out/bfx_macro_overlay.pine` → **opslaan als "BFX Macro Overlay"** → **Add to chart**.
-4. Laat dit script **open staan in de Pine Editor** en sluit het venster. TradingView onthoudt welk script open stond. Het afleverscript overschrijft alleen een script dat de regel `// BFX-MACRO-OVERLAY` bevat, nooit iets anders.
-5. Test: `node bfx-tv.mjs run`. Er opent kort een browser, de code wordt vervangen en je krijgt een melding.
+De automatisering raakt **uitsluitend** deze layout. Er is geen terugval op `/chart/` of een andere layout.
 
-> Tip: zet de indicator op je chart-layout(s) en sla de layout op. Gebruik je een vaste layout, zet die URL dan in `TV_CHART_URL`.
+1. `node bfx-tv.mjs login` → log in → layoutmenu → *Create new layout…* → naam **BFX Automatisering** → open in de Pine Editor `BFX Macro Overlay` → *Add to chart* → layoutmenu → *Save layout*.
+2. Zet het id uit de URL (`/chart/<id>/`) in `.env` als `TV_LAYOUT_ID`.
+3. Controle (alleen lezen): `node bfx-tv.mjs check` → `OK: ingelogd, layout 'BFX Automatisering'`.
+
+Zelf bekijken: open `https://www.tradingview.com/chart/<TV_LAYOUT_ID>/` of kies de layout in het layoutmenu. Bewerk deze layout niet rond het tijdstip van de geplande run.
+
+> **Eén sessie per account.** TradingView staat per account maar één actieve sessie toe. Inloggen in het automatiseringsvenster verbreekt je sessie in Chrome (en andersom). Na de run kun je in Chrome op *Connect* klikken; de volgende geplande run gebruikt dan weer zijn eigen sessie. Is die verbroken, dan stopt de run met "uitgelogd" (exit 3) en moet je `node bfx-tv.mjs login` opnieuw doen.
+
+### Commando's
+
+| Commando | Wat |
+|---|---|
+| `node bfx-tv.mjs generate` | data ophalen, valideren, Pine maken (geen browser) |
+| `node bfx-tv.mjs check` | sessie + layout controleren, geen editoractie |
+| `node bfx-tv.mjs run` | genereren + in TradingView zetten |
+| `node bfx-tv.mjs acceptatie` | twee volledige runs, telkens herladen en de nieuwe versie + precies één instantie controleren |
+| `npm test` | lokale testset (geen netwerk/browser) |
+
+Elke uitvoering schrijft één regel in `logs/runs.jsonl` (run-id, tijden, resultaat ok/stop/fout, exitcode, reden, BIAS-datum/versie, aantallen, agendaversheid, Pine-hash, snapshot-id, layout verwacht/gezien, compile/opslag/chart-update, screenshot). Nooit sleutels of cookies.
+
+Exitcodes: 0 ok · 1 fout · 2 data (BIAS verouderd/onvolledig) · 3 uitgelogd · 4 layout · 5 script/marker · 6 opslaan/chart niet bevestigd.
+
+Bij ongeldige of verouderde BIAS-data wordt **niets** in TradingView overschreven; er komt alleen `out/bfx_macro_overlay.diagnose.pine`.
 
 ## Automatisch laten draaien
 
