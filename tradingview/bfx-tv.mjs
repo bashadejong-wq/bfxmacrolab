@@ -118,6 +118,7 @@ async function runOnce(cmd) {
     layout_opgeslagen: res.steps.layoutSaved,
     sessie_hersteld: res.steps.reconnected,
     opslagpogingen: res.steps.saveAttempts ?? null,
+    autoschaal: res.steps.autoScale ?? null,
     instanties_verwijderd: res.steps.removed,
     instanties_na_afloop: res.steps.instances,
     screenshot: res.screenshot,

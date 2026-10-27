@@ -42,13 +42,20 @@ async function firstVisible(page, selectors, timeout = 1500) {
   return null;
 }
 
-/** Scrolt de editor tot regel 1 echt zichtbaar is (muiswiel; sneltoetsen verschillen per besturingssysteem). */
+/**
+ * Scrolt de editor tot regel 1 zichtbaar is. Het wiel-event wordt rechtstreeks op het editor-element afgevuurd
+ * (geen muisbeweging), zodat de chart er nooit door kan in- of uitzoomen.
+ */
 async function scrollToTop(page) {
-  const box = await page.locator(EDITOR).first().boundingBox().catch(() => null);
-  if (!box) return false;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const ed = page.locator(EDITOR).first();
+  if (!(await ed.count())) return false;
   for (let i = 0; i < 40; i++) {
-    for (let k = 0; k < 10; k++) await page.mouse.wheel(0, -30000);
+    await ed
+      .evaluate((el) => {
+        const target = el.querySelector(".monaco-scrollable-element") ?? el;
+        for (let k = 0; k < 10; k++) target.dispatchEvent(new WheelEvent("wheel", { deltaY: -30000, bubbles: true, cancelable: true }));
+      })
+      .catch(() => {});
     await sleep(300);
     const first = await page.locator(`${EDITOR} .line-numbers`).evaluateAll((els) => Math.min(...els.map((e) => Number(e.textContent) || 1e9))).catch(() => 1e9);
     if (first <= 1) return true;
@@ -343,6 +350,17 @@ export async function deliver(pineFile) {
     verdict = evaluateSave({ markerFound, versionFound, unsavedVisible, compileErrors, updateFound: onChart });
     if (!verdict.ok) return stop(verdict.code, `nieuwe versie (snapshot ${snapshot}) niet zichtbaar op de chart`);
     await sleep(3000);
+    // Automatische prijsschaal herstellen (een verdwaalde muiswielactie kan hem uitzetten); alleen deze BFX-layout
+    steps.autoScale = await page
+      .evaluate(() => {
+        const ps = window.TradingViewApi?.activeChart?.()?.getPanes?.()[0]?.getMainSourcePriceScale?.();
+        if (!ps) return null;
+        if (!ps.isAutoScale()) ps.setAutoScale(true);
+        // Standaard zoom/staafbreedte van de BFX-layout herstellen
+        try { window.TradingViewApi.activeChart().executeActionById("chartReset"); } catch (e) {}
+        return ps.isAutoScale();
+      })
+      .catch(() => null);
     // Layout expliciet opslaan, zodat de bijgewerkte indicator na herladen blijft staan
     steps.layoutSaved = await saveLayout(page);
     if (!steps.layoutSaved) return stop(EXIT.STOP_OPSLAAN, "layout niet bevestigd opgeslagen ('All changes saved' ontbreekt)");
