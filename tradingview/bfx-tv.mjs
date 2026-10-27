@@ -50,6 +50,7 @@ function baseEntry(cmd) {
     opslag_bevestigd: null,
     chart_bijgewerkt: null,
     layout_opgeslagen: null,
+    sessie_hersteld: null,
     screenshot: null,
   };
 }
@@ -115,6 +116,8 @@ async function runOnce(cmd) {
     opslag_bevestigd: res.steps.saved,
     chart_bijgewerkt: res.steps.chartUpdated,
     layout_opgeslagen: res.steps.layoutSaved,
+    sessie_hersteld: res.steps.reconnected,
+    opslagpogingen: res.steps.saveAttempts ?? null,
     instanties_verwijderd: res.steps.removed,
     instanties_na_afloop: res.steps.instances,
     screenshot: res.screenshot,
@@ -138,7 +141,7 @@ async function main() {
     const entry = baseEntry("check");
     const { check } = await import("./src/deliver.mjs");
     const res = await check();
-    Object.assign(entry, { chart_url: res.state.url, layout_gezien: res.state.layoutName, screenshot: res.screenshot });
+    Object.assign(entry, { chart_url: res.state.url, layout_gezien: res.state.layoutName, screenshot: res.screenshot, sessie_hersteld: res.reconnected });
     console.log(res.ok ? `OK: ingelogd, layout '${res.state.layoutName}'` : `STOP: ${res.reason}`);
     return finish(entry, res.ok ? "ok" : "stop", res.code, res.reason);
   }

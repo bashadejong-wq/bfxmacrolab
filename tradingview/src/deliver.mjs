@@ -132,6 +132,21 @@ async function declineCookies(page) {
   if (btn) await btn.click().catch(() => {});
 }
 
+/**
+ * TradingView staat één actieve sessie per account toe. Toont deze browser 'Session disconnected',
+ * klik dan op 'Connect' (een andere sessie, bv. Chrome, raakt zijn verbinding tijdelijk kwijt).
+ * Geeft true als er opnieuw verbonden is.
+ */
+export async function reconnectIfDisconnected(page) {
+  const modal = page.getByText("Session disconnected", { exact: false }).first();
+  if (!(await modal.isVisible({ timeout: 1000 }).catch(() => false))) return false;
+  const btn = page.getByRole("button", { name: "Connect", exact: true }).first();
+  if (!(await btn.isVisible().catch(() => false))) return false;
+  await btn.click();
+  await sleep(6000);
+  return !(await modal.isVisible().catch(() => false));
+}
+
 /** Sessie- en layoutstatus van de geopende pagina (geen geheimen: alleen ja/nee en namen). */
 async function pageState(ctx, page) {
   const cookies = await ctx.cookies("https://www.tradingview.com");
@@ -190,11 +205,13 @@ export async function check() {
     await page.goto(layoutUrl(), { waitUntil: "domcontentloaded", timeout: 60_000 });
     await sleep(8000);
     await declineCookies(page);
+    const reconnected = await reconnectIfDisconnected(page);
+    if (reconnected) console.log("TradingView: sessie was verbroken door een andere browser; opnieuw verbonden (Connect).");
     const state = await pageState(ctx, page);
     const pf = preflight(state, { layoutId: config.tvLayoutId, layoutName: config.tvLayoutName });
     const screenshot = resolve(config.outDir, "check.png");
     await page.screenshot({ path: screenshot }).catch(() => {});
-    return { ...pf, state: { ...state, url: stripQuery(state.url) }, screenshot };
+    return { ...pf, state: { ...state, url: stripQuery(state.url) }, screenshot, reconnected };
   } finally {
     await ctx.close();
   }
@@ -209,7 +226,7 @@ export async function deliver(pineFile) {
   const version = code.match(/^\/\/ Versie: (.+)$/m)?.[1] ?? "";
   mkdirSync(config.outDir, { recursive: true });
   const screenshot = resolve(config.outDir, "last-run.png");
-  const steps = { url: "", layoutName: null, script: SCRIPT_NAME, compiled: false, saved: false, chartUpdated: false, layoutSaved: false, removed: 0, instances: null };
+  const steps = { url: "", layoutName: null, script: SCRIPT_NAME, compiled: false, saved: false, chartUpdated: false, layoutSaved: false, removed: 0, instances: null, reconnected: false };
 
   const ctx = await launch();
   const page = ctx.pages()[0] ?? (await ctx.newPage());
@@ -224,7 +241,10 @@ export async function deliver(pineFile) {
     await page.goto(layoutUrl(), { waitUntil: "domcontentloaded", timeout: 60_000 });
     await sleep(8000);
     await declineCookies(page);
+    const reconnected = await reconnectIfDisconnected(page);
+    if (reconnected) console.log("TradingView: sessie was verbroken door een andere browser; opnieuw verbonden (Connect).");
     const state = await pageState(ctx, page);
+    steps.reconnected = reconnected;
     steps.url = stripQuery(state.url);
     steps.layoutName = state.layoutName;
     const pf = preflight(state, { layoutId: config.tvLayoutId, layoutName: config.tvLayoutName });
@@ -269,13 +289,18 @@ export async function deliver(pineFile) {
     }
 
     // 4. Opslaan en wachten tot 'Unsaved version' weg is (compileren duurt ±10 s)
-    await page.keyboard.press("ControlOrMeta+S");
+    // Focus in de editor (scrollen beweegt alleen de muis) en opslaan; tot 3 pogingen, opnieuw opslaan is onschadelijk
     const unsaved = page.getByText(/Unsaved version|Niet-opgeslagen versie/).first();
-    await sleep(2000);
     let unsavedVisible = true;
-    for (let i = 0; i < 45 && unsavedVisible; i++) {
-      unsavedVisible = await unsaved.isVisible().catch(() => false);
-      if (unsavedVisible) await sleep(1000);
+    for (let poging = 0; poging < 3 && unsavedVisible; poging++) {
+      await editor.click();
+      await page.keyboard.press("ControlOrMeta+S");
+      await sleep(2000);
+      for (let i = 0; i < 15 && unsavedVisible; i++) {
+        unsavedVisible = await unsaved.isVisible().catch(() => false);
+        if (unsavedVisible) await sleep(1000);
+      }
+      steps.saveAttempts = poging + 1;
     }
     const compileErrors = await page.locator(`${EDITOR} .squiggly-error`).count();
     steps.compiled = compileErrors === 0;
@@ -344,6 +369,8 @@ export async function verifyOnChart(expectedStamp) {
     await page.goto(layoutUrl(), { waitUntil: "domcontentloaded", timeout: 60_000 });
     await sleep(12000);
     await declineCookies(page);
+    const reconnected = await reconnectIfDisconnected(page);
+    if (reconnected) console.log("TradingView: sessie was verbroken door een andere browser; opnieuw verbonden (Connect).");
     const state = await pageState(ctx, page);
     const pf = preflight(state, { layoutId: config.tvLayoutId, layoutName: config.tvLayoutName });
     await page.screenshot({ path: screenshot }).catch(() => {});

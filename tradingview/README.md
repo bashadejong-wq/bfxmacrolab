@@ -57,7 +57,7 @@ De automatisering raakt **uitsluitend** deze layout. Er is geen terugval op `/ch
 
 Zelf bekijken: open `https://www.tradingview.com/chart/<TV_LAYOUT_ID>/` of kies de layout in het layoutmenu. Bewerk deze layout niet rond het tijdstip van de geplande run.
 
-> **Eén sessie per account.** TradingView staat per account maar één actieve sessie toe. Inloggen in het automatiseringsvenster verbreekt je sessie in Chrome (en andersom). Na de run kun je in Chrome op *Connect* klikken; de volgende geplande run gebruikt dan weer zijn eigen sessie. Is die verbroken, dan stopt de run met "uitgelogd" (exit 3) en moet je `node bfx-tv.mjs login` opnieuw doen.
+> **Eén sessie per account.** TradingView verbreekt een andere browser als je ergens **opnieuw inlogt** (melding *Session disconnected*). Het hergebruiken van een bestaande sessie gaf in tests (27-10) geen conflict met Chrome. Ziet de geplande run toch *Session disconnected*, dan klikt hij zelf op *Connect* (logveld `sessie_hersteld: true`); je Chrome-sessie raakt dan tijdelijk zijn verbinding kwijt en herstel je met *Connect*. Is de sessie helemaal weg (geen login), dan stopt de run met "uitgelogd" (exit 3) en doe je `node bfx-tv.mjs login`.
 
 ### Commando's
 

@@ -64,3 +64,9 @@ Akkoord Bas: B1 t/m B6 en I1 t/m I6 uit de audit van 27-10.
 - I3 aangescherpt: alleen de daily-invalidatie met periode = BIAS-datum; anders de letterlijke ontbreekt-tekst.
 - I6: geen URL in de kaart, alleen "Volledige analyse: BFX Macro Lab → EUR/USD"; consensuslabel "Externe bankencontext — geen BFX-signaal.".
 - Oude primaire eventlijst: standaard uit (instelbaar), events in tooltip van "Volgende toets"; regels per valuta optioneel.
+
+## Herverbinden (akkoord Bas, 27-10 avond)
+- `reconnectIfDisconnected`: ziet de run "Session disconnected", dan klikt hij op Connect; logveld `sessie_hersteld`. Werkt in run, check en herlaadcontrole.
+- Opslaan: eerst focus in de editor, ⌘S tot 3 pogingen (logveld `opslagpogingen`); een run stopte eerder veilig op 'Unsaved version'.
+- Tests: `test/reconnect.test.mjs` (nagebootste melding); totaal 22/22.
+- Waarneming: Chrome verbonden + automatische run → geen conflict (twee runs); conflict ontstaat bij een nieuwe login.
