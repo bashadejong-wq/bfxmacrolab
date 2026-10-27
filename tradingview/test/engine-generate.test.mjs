@@ -74,3 +74,17 @@ test("drempels in het template zijn als HYPOTHESE gelabeld en signalen alleen op
   assert.ok(!/\bstrategy\(|strategy\.entry/.test(tpl), "geen orders of strategy-calls");
   assert.ok(!/volume/i.test(tpl.replace(/\/\/.*$/gm, "")), "geen volume-afgeleide niveaus (CFD-volume)");
 });
+
+test("forwardbevriezing: elke HYPOTHESE-standaardwaarde staat exact in fwdFrozen", () => {
+  const tpl = readFileSync(resolve(ROOT, "template/bfx_cbo_engine.pine"), "utf8");
+  const frozen = tpl.match(/^bool fwdFrozen = (.*)$/m)?.[1];
+  assert.ok(frozen, "fwdFrozen ontbreekt");
+  const inputs = [...tpl.matchAll(/^((?:h|e)_\w+)\s*=\s*input\.(?:int|float)\(([\d.]+)/gm)];
+  assert.ok(inputs.length >= 30);
+  for (const [, name, def] of inputs) {
+    const m = frozen.match(new RegExp(`\\b${name} == ([\\d.]+)`));
+    assert.ok(m, `${name} ontbreekt in fwdFrozen`);
+    assert.equal(Number(m[1]), Number(def), `${name}: bevroren ${m[1]} ≠ standaard ${def}`);
+  }
+  assert.match(tpl, /FWD_START = timestamp\("UTC", 2026, 10, 28, 0, 0\)/);
+});

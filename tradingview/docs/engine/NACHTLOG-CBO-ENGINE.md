@@ -22,3 +22,4 @@
 - 23:18 Productiecontrole (alleen lezen): layout 6b31RP4L = Volume + BFX Macro Overlay, snapshot 202,610,272,129; git productie ea1318a schoon; LaunchAgent niet geladen.
 - 23:20 Browservrije tests: 28/28 (6 nieuw). Documenten bijgewerkt: testmatrix (resultaten + traceerbaarheid), retro-meting, beslisnotitie, risico's, implementatieplan.
 - 23:25 Commit e6d325e op research/cbo-engine-0.1, gepusht via GitHub Desktop (geverifieerd met ls-remote). Geen PR geopend, niets gemerged. LaunchAgent blijft uit.
+- 23:40 Besluit Bas: forward volgen met bevroren drempels, geen databaselogboek. Forward-meting CBO_0.1-F in de engine (start 28-10 00:00 UTC, bewaakt via fwdFrozen + test). Gecompileerd, Forward-regel en ONGELDIG-bewaking gecontroleerd, parameter teruggezet, layout opgeslagen. npm test 29/29.

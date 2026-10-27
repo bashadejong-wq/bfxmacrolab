@@ -362,6 +362,15 @@ var float[] rDD  = array.new_float(3, 0)
 var array<float> rList0 = array.new_float()
 var array<float> rList1 = array.new_float()
 var array<float> rList2 = array.new_float()
+// Forward-meting CBO_0.1-F: alleen setups waarvan box én entry ná de bevriezing liggen, en alleen met de bevroren parameters
+const string FWD_VERSIE = "CBO_0.1-F"
+int FWD_START = timestamp("UTC", 2026, 10, 28, 0, 0)
+bool fwdFrozen = i_prof == "Auto" and h_atrLen == 14 and h_volLen == 20 and h_volPct == 250 and h_lowVol == 15 and h_highVol == 85 and h_compVol == 40 and h_erLen == 20 and h_erTrend == 0.35 and h_erChaos == 0.12 and h_expMult == 2.0 and h_nMin == 8 and h_nMax == 24 and h_wMax == 1.25 and h_tol == 0.15 and h_tMin == 2 and h_nSeal == 3 and h_expiry == 2.0 and h_body == 0.5 and h_chase == 2.0 and h_retMax == 8 and h_retTol == 0.25 and h_accK == 2 and h_buf == 0.1 and h_minRoom == 1.0 and h_tMax == 32 and e_preCB == 60 and e_postCB == 120 and e_pre == 30 and e_post == 60 and e_disc == 180
+var bool[]  mFwd = array.new_bool(3, false)
+var int[]   fN   = array.new_int(3, 0)
+var int[]   fW   = array.new_int(3, 0)
+var float[] fSum = array.new_float(3, 0)
+var int[]   fOpen = array.new_int(3, 0)
 
 costPx() =>
     k_known ? (k_spread + 2 * k_slip) * syminfo.mintick * (syminfo.mintick < 0.001 ? 10 : 1) : 0.0
@@ -385,6 +394,11 @@ closeMeasure(int v, float rGross) =>
     rPk.set(v, math.max(rPk.get(v), rEq.get(v)))
     rDD.set(v, math.max(rDD.get(v), rPk.get(v) - rEq.get(v)))
     (v == 0 ? rList0 : v == 1 ? rList1 : rList2).push(rGross)
+    if mFwd.get(v)
+        fN.set(v, fN.get(v) + 1)
+        fW.set(v, fW.get(v) + (rGross > 0 ? 1 : 0))
+        fSum.set(v, fSum.get(v) + rGross)
+        fOpen.set(v, 0)
     mE.set(v, na)
 
 stepMeasure(int v) =>
@@ -397,6 +411,8 @@ stepMeasure(int v) =>
         mB.set(v, bar_index)
         mMfe.set(v, 0)
         mMae.set(v, 0)
+        mFwd.set(v, time >= FWD_START and sT >= FWD_START)
+        fOpen.set(v, mFwd.get(v) ? 1 : 0)
     if not na(mE.get(v))
         float e = mE.get(v)
         float risk = math.abs(e - mS.get(v))
@@ -556,6 +572,11 @@ if barstate.isconfirmed
 string evTxt = evBlkNow ? "BLOKKADE" : evPostNow ? "POST-EVENT" : na(evNextNow) ? (CAL_COVERAGE_PROVEN ? "geen event" : "GEEN EVENT GEVONDEN — DEKKING NIET BEWEZEN") : "vrij"
 string evNextTxt = na(evNextNow) ? "" : evNextNow.ccy + " " + evNextNow.name + " · " + str.format_time(evNextNow.t, "EEE HH:mm", i_tz) + " · over " + str.tostring(math.round((evNextNow.t - timenow) / 3600000)) + "u"
 
+fwdVar(int v) =>
+    int n = fN.get(v)
+    "V" + str.tostring(v + 1) + " " + (n == 0 ? "0" : str.tostring(n) + " · " + str.tostring(fSum.get(v) / n, "0.00") + "R")
+string fwdTxt = not fwdFrozen ? "ONGELDIG — parameters wijken af van CBO_0.1" : timenow < FWD_START ? "start " + str.format_time(FWD_START, "dd-MM HH:mm", i_tz) + " · nog geen metingen" : fwdVar(0) + " | " + fwdVar(1) + " | " + fwdVar(2) + ((fOpen.get(0) + fOpen.get(1) + fOpen.get(2)) > 0 ? " · open " + str.tostring(fOpen.get(0) + fOpen.get(1) + fOpen.get(2)) : "") + " (bruto, n te klein)"
+
 // ═══ 8. Location & Room / 10. Costs (weergave van de actieve box) ═══
 [r1, r1n] = firstRef(bDir == 0 ? 1 : bDir, close)
 float entryNow = close
@@ -692,6 +713,8 @@ if barstate.islast
         r += 1
         row2(r, "Kosten", costTxt, t2c, k_known ? t1c : cAmb)
         r += 1
+        row2(r, "Forward", fwdTxt, t2c, fwdFrozen ? t1c : cAmb, "Forwardmeting " + FWD_VERSIE + ": alleen boxen en entries ná " + str.format_time(FWD_START, "dd-MM-yyyy HH:mm", "UTC") + " UTC, bruto, prijs-only, met de bevroren parameters. Geen edgeclaim.")
+        r += 1
         string why = not macroOK ? "macro niet handelbaar" : evBlkNow ? "eventblokkade" : not regimeOK ? "regime " + regime : noRoom ? "te weinig ruimte" : st < 4 ? "wacht op verzegelde box" : st == 4 ? "wacht op breakout-close" : st == 5 or st == 6 ? "wacht op " + i_var + "-bevestiging" : "handmatige beoordeling"
         row2(r, "Reden", why + " · handmatige execution vereist", t2c, t1c)
         r += 1
@@ -735,3 +758,10 @@ plot(cKand, "Kandidaten", display = display.data_window)
 plot(cSeal, "Verzegeld", display = display.data_window)
 plot(cBrk, "Breakouts", display = display.data_window)
 plot(bar_index + 1, "Bars geladen", display = display.data_window)
+plot(fwdFrozen ? 1 : 0, "Fwd geldig (1 = bevroren parameters)", display = display.data_window)
+plot(fN.get(0), "Fwd V1 n", display = display.data_window)
+plot(fN.get(0) > 0 ? fSum.get(0) / fN.get(0) : na, "Fwd V1 gem R", display = display.data_window)
+plot(fN.get(1), "Fwd V2 n", display = display.data_window)
+plot(fN.get(1) > 0 ? fSum.get(1) / fN.get(1) : na, "Fwd V2 gem R", display = display.data_window)
+plot(fN.get(2), "Fwd V3 n", display = display.data_window)
+plot(fN.get(2) > 0 ? fSum.get(2) / fN.get(2) : na, "Fwd V3 gem R", display = display.data_window)
