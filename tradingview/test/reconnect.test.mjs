@@ -1,26 +1,41 @@
-// Herverbinden bij 'Session disconnected' op een nagebootste pagina (geen netwerk, geen TradingView).
+// Herverbinden bij 'Session disconnected' op een nagebootste pagina: geen browser, geen netwerk.
+// De nagebootste pagina heeft precies de Playwright-methodes die reconnectIfDisconnected gebruikt.
 // node --test test/reconnect.test.mjs
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
-import { chromium } from "playwright";
+import { test } from "node:test";
 import { reconnectIfDisconnected } from "../src/deliver.mjs";
 
-const MODAL = `<div id="m"><h2>Session disconnected</h2><p>Your session ended because your account was accessed from another browser or device.</p>
-<button onclick="document.getElementById('m').remove()">Connect</button></div>`;
-
-let browser;
-before(async () => (browser = await chromium.launch({ headless: true })));
-after(async () => browser?.close());
+/** Pagina met (of zonder) de TradingView-melding 'Session disconnected' en een knop 'Connect'. */
+function fakePage({ modal, connectButton = true }) {
+  const state = { modal, clicks: 0 };
+  const locator = (visible, onClick) => ({
+    first: () => locator(visible, onClick),
+    isVisible: async () => visible(),
+    click: async () => onClick?.(),
+  });
+  return {
+    state,
+    getByText: (text) => locator(() => state.modal && /Session disconnected/.test(text)),
+    getByRole: (role, { name } = {}) =>
+      locator(
+        () => role === "button" && name === "Connect" && connectButton,
+        () => {
+          state.clicks += 1;
+          state.modal = false; // TradingView sluit de melding na Connect
+        },
+      ),
+  };
+}
 
 test("melding aanwezig: klikt Connect en meldt herstel", async () => {
-  const page = await browser.newPage();
-  await page.setContent(MODAL);
+  const page = fakePage({ modal: true });
   assert.equal(await reconnectIfDisconnected(page), true);
-  assert.equal(await page.getByText("Session disconnected").count(), 0);
+  assert.equal(page.state.clicks, 1);
+  assert.equal(page.state.modal, false);
 });
 
 test("geen melding: doet niets", async () => {
-  const page = await browser.newPage();
-  await page.setContent("<p>Chart</p><button>Connect</button>");
+  const page = fakePage({ modal: false });
   assert.equal(await reconnectIfDisconnected(page), false);
+  assert.equal(page.state.clicks, 0);
 });
