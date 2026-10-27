@@ -7,8 +7,10 @@ const MONTHS_NL = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep"
 
 // ─── Bronnen ────────────────────────────────────────────────────
 
-async function restGet(url, key, path) {
-  const res = await fetch(`${url}/rest/v1/${path}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+async function restGet(url, key, path, schema = "") {
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  if (schema) headers["Accept-Profile"] = schema;
+  const res = await fetch(`${url}/rest/v1/${path}`, { headers });
   if (!res.ok) throw new Error(`Supabase ${path.split("?")[0]}: HTTP ${res.status} ${await res.text()}`);
   return res.json();
 }
@@ -43,6 +45,7 @@ async function loadEvents(now) {
     config.supabaseKey,
     `macro_events_calendar?select=event_datetime,event_currency,event_impact,importance_score,event_name,consensus,previous_value,actual_value,interpretation,market_impact_narrative` +
       `&event_datetime=gte.${from}&event_datetime=lte.${to}&event_currency=in.(${config.currencies.join(",")})&order=event_datetime.asc&limit=1000`,
+    config.supabaseSchema,
   );
   return rows
     .map((r) => ({

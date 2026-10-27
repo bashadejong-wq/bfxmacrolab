@@ -18,6 +18,7 @@ i_zoneAft   = input.int(60, "Zone: minuten na event", minval = 0, maxval = 1440,
 i_table     = input.bool(true, "Overzichtstabel", group = GV)
 i_rows      = input.int(8, "Max. events in tabel", minval = 0, maxval = 20, group = GV)
 i_tablePos  = input.string("Rechtsboven", "Positie tabel", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GV)
+i_tz        = input.string("Europe/Amsterdam", "Tijdzone voor tijden", tooltip = "IANA-naam, bijv. Europe/Amsterdam of UTC. De beurstijdzone van het symbool (OANDA = New York) wijkt vaak af van je chart.", group = GV)
 i_staleDays = input.int(3, "Waarschuw als data ouder is dan (dagen)", minval = 1, maxval = 30, group = GV)
 c_high      = input.color(#E5484D, "Hoge impact", group = GC)
 c_med       = input.color(#F5A524, "Medium impact", group = GC)
@@ -136,6 +137,11 @@ tablePos() =>
         "Linksonder"  => position.bottom_left
         => position.top_right
 
+// Eerste deel (tot " · "), afgekapt op n tekens met …
+shortTxt(string s, int n) =>
+    string first = str.length(s) > 0 ? array.get(str.split(s, " · "), 0) : ""
+    str.length(first) > n ? str.substring(first, 0, n - 1) + "…" : first
+
 // ─── Eventlijnen en labels ──────────────────────────────────────
 atrv  = ta.atr(14)
 hiRef = ta.highest(high, 50)
@@ -170,7 +176,7 @@ if barstate.islast
                 evLines.push(line.new(e.t, close, e.t, close + atrv, xloc = xloc.bar_time, extend = extend.both, color = color.new(col, past ? 70 : 35), style = line.style_dotted, width = 1))
             if i_labels
                 float  y    = hiRef + atrv * (0.6 + 0.9 * (k % 3))
-                string whenTxt = str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone)
+                string whenTxt = str.format_time(e.t, "EEE dd/MM HH:mm", i_tz)
                 string tip  = e.ccy + " · " + whenTxt + "\n" + e.title + "\n" + e.stats + (e.detail != "" ? "\n\n" + e.detail : "")
                 evLabels.push(label.new(e.t, y, e.ccy + " " + e.title, xloc = xloc.bar_time, yloc = yloc.price, color = color.new(col, past ? 75 : 15), textcolor = color.white, style = label.style_label_down, size = size.small, tooltip = tip))
             k += 1
@@ -186,7 +192,7 @@ if barstate.islast and i_table
     tbl.clear(0, 0, 2, MAX_ROWS - 1)
     [cb, cq]    = chartPair()
     string ccys = activeCcys()
-    string upd  = str.format_time(GENERATED, "dd/MM HH:mm", syminfo.timezone)
+    string upd  = str.format_time(GENERATED, "dd/MM HH:mm", i_tz)
     color  warn = color.new(c_bear, 20)
     int    r    = 0
 
@@ -240,8 +246,10 @@ if barstate.islast and i_table
     int shown = 0
     for e in events
         if shown < i_rows and r < MAX_ROWS and e.t >= timenow and e.impact >= i_minImpact and isRelevant(e.ccy, ccys)
-            cellL(0, r, str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone), color.silver)
+            cellL(0, r, str.format_time(e.t, "EEE dd/MM HH:mm", i_tz), color.silver)
             cellL(1, r, e.ccy + " " + e.title, impactColor(e.impact), e.detail)
-            cellL(2, r, e.stats, color.silver, e.detail)
+            // Kort in de cel, zodat de tabel niet buiten de chart valt; alles staat in de tooltip
+            string full = e.stats + (e.detail != "" ? "\n\n" + e.detail : "")
+            cellL(2, r, shortTxt(e.stats, 34), color.silver, full)
             shown += 1
             r += 1
