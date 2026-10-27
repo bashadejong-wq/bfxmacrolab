@@ -2,7 +2,7 @@
 // BFX-MACRO-OVERLAY
 // Dit script wordt automatisch vervangen door tradingview/bfx-tv.mjs. Handmatige wijzigingen gaan verloren.
 // Versie: {{VERSION}}
-indicator("BFX Macro Overlay", shorttitle = "BFX Macro", overlay = true, max_lines_count = 500, max_labels_count = 500)
+indicator("BFX Macro Overlay", shorttitle = "BFX Macro", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 200)
 
 // ─── Instellingen ───────────────────────────────────────────────
 const string GV = "Weergave"
@@ -12,6 +12,9 @@ i_minImpact = input.int(2, "Minimale impact events", minval = 1, maxval = 3, too
 i_pastDays  = input.int(7, "Afgelopen events tonen (dagen)", minval = 0, maxval = 30, group = GV)
 i_lines     = input.bool(true, "Verticale eventlijnen", group = GV)
 i_labels    = input.bool(true, "Eventlabels", group = GV)
+i_zones     = input.bool(true, "Risicozones rond hoge-impact events", group = GV)
+i_zoneBef   = input.int(30, "Zone: minuten vóór event", minval = 0, maxval = 720, group = GV)
+i_zoneAft   = input.int(60, "Zone: minuten na event", minval = 0, maxval = 1440, group = GV)
 i_table     = input.bool(true, "Overzichtstabel", group = GV)
 i_rows      = input.int(8, "Max. events in tabel", minval = 0, maxval = 20, group = GV)
 i_tablePos  = input.string("Rechtsboven", "Positie tabel", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GV)
@@ -136,9 +139,11 @@ tablePos() =>
 // ─── Eventlijnen en labels ──────────────────────────────────────
 atrv  = ta.atr(14)
 hiRef = ta.highest(high, 50)
+loRef = ta.lowest(low, 50)
 
 var array<line>  evLines  = array.new<line>()
 var array<label> evLabels = array.new<label>()
+var array<box>   evZones  = array.new<box>()
 
 if barstate.islast
     for l in evLines
@@ -147,6 +152,9 @@ if barstate.islast
     for lb in evLabels
         lb.delete()
     evLabels.clear()
+    for bx in evZones
+        bx.delete()
+    evZones.clear()
 
     string ccys  = activeCcys()
     int    fromT = timenow - i_pastDays * 86400000
@@ -155,6 +163,9 @@ if barstate.islast
         if e.impact >= i_minImpact and e.t >= fromT and isRelevant(e.ccy, ccys)
             color col  = impactColor(e.impact)
             bool  past = e.t < timenow
+            // Risicozone: hier geen nieuwe posities openen (spread en slippage rond hoge-impact events)
+            if i_zones and e.impact >= 3
+                evZones.push(box.new(e.t - i_zoneBef * 60000, hiRef + atrv * 3, e.t + i_zoneAft * 60000, loRef - atrv * 3, xloc = xloc.bar_time, border_width = 0, bgcolor = color.new(c_high, past ? 94 : 88)))
             if i_lines
                 evLines.push(line.new(e.t, close, e.t, close + atrv, xloc = xloc.bar_time, extend = extend.both, color = color.new(col, past ? 70 : 35), style = line.style_dotted, width = 1))
             if i_labels

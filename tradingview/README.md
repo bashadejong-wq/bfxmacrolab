@@ -26,6 +26,12 @@ Telegram: ✅ bijgewerkt (screenshot)  of  ⚠️ mislukt (+ bestand om zelf te 
 - **⚠ Verouderd / ⚠ BIAS oud** als de indicator of de BIAS-datum ouder is dan ingesteld (standaard 3 dagen).
 - Komt er een kolom `strategie_bevestiging` bij in `mirror_bias50_paar`, dan verschijnt die automatisch per paar.
 
+- **Risicozones**: gearceerde blokken rond hoge-impact events (standaard 30 min vóór tot 60 min na). Daar open je geen nieuwe posities. Instelbaar of uit te zetten.
+
+### Tweede indicator: BFX Rentespread (statisch)
+
+`template/bfx_rate_spread.pine` toont in een eigen paneel het 2- of 10-jaars renteverschil tussen basis- en noteringsvaluta (EUR = Bund). De data komt van TradingView zelf, dus dit script hoeft nooit bijgewerkt te worden: plak het één keer en voeg het toe. De tabel toont de spread, de verandering over 20 bars en de correlatie met de koers. Is die correlatie laag, dan drijven andere factoren het paar (risico, flows).
+
 Events op hetzelfde moment worden samengevoegd tot één label (bijv. *US Core PCE m/m +4*).
 
 ## Eenmalige installatie (±10 minuten)

@@ -1,0 +1,51 @@
+//@version=6
+// BFX Rentespread: staatsrente basisvaluta minus noteringsvaluta, uit TradingView's eigen data.
+// Statisch script: één keer toevoegen, ververst zichzelf (geen BFX-data nodig).
+indicator("BFX Rentespread", shorttitle = "BFX Spread", overlay = false, precision = 2)
+
+i_tenor = input.string("2Y", "Looptijd", options = ["2Y", "10Y"], tooltip = "2Y volgt het centralebankpad het best; 10Y groei en term premium.")
+i_base  = input.string("", "Basisvaluta (leeg = automatisch)", tooltip = "Bijv. EUR. Alleen nodig op niet-FX-charts.")
+i_quote = input.string("", "Noteringsvaluta (leeg = automatisch)", tooltip = "Bijv. USD")
+i_corr  = input.int(60, "Correlatievenster (bars)", minval = 10, maxval = 500)
+
+// Staatsrente per valuta (EUR = Duitse Bund).
+yieldSym(string ccy) =>
+    string t = i_tenor == "2Y" ? "02Y" : "10Y"
+    switch ccy
+        "USD" => "TVC:US" + t
+        "EUR" => "TVC:DE" + t
+        "GBP" => "TVC:GB" + t
+        "JPY" => "TVC:JP" + t
+        "CHF" => "TVC:CH" + t
+        "AUD" => "TVC:AU" + t
+        "NZD" => "TVC:NZ" + t
+        "CAD" => "TVC:CA" + t
+        => ""
+
+string cb = i_base != "" ? str.upper(i_base) : syminfo.basecurrency
+string cq = i_quote != "" ? str.upper(i_quote) : syminfo.currency
+string symB = yieldSym(cb)
+string symQ = yieldSym(cq)
+bool   valid = symB != "" and symQ != ""
+
+// Bij een niet-FX-chart een geldige placeholder opvragen en niets tonen.
+yB = request.security(valid ? symB : "TVC:US02Y", "D", close, ignore_invalid_symbol = true)
+yQ = request.security(valid ? symQ : "TVC:US02Y", "D", close, ignore_invalid_symbol = true)
+spread = valid ? yB - yQ : na
+corr   = ta.correlation(close, spread, i_corr)
+
+plot(spread, "Spread", color = spread >= 0 ? #30A46C : #E5484D, linewidth = 2)
+hline(0, "Nul", color = color.new(color.gray, 50), linestyle = hline.style_dotted)
+
+var table tb = table.new(position.top_right, 2, 3, bgcolor = color.new(#111318, 8), border_width = 1, border_color = color.new(#2A2D35, 0))
+if barstate.islast
+    if valid
+        tb.cell(0, 0, cb + " − " + cq + " " + i_tenor, text_color = color.white, text_size = size.small)
+        tb.cell(1, 0, str.tostring(spread, "0.00") + "%", text_color = spread >= 0 ? #30A46C : #E5484D, text_size = size.small)
+        tb.cell(0, 1, "Δ 20 bars", text_color = color.silver, text_size = size.small)
+        tb.cell(1, 1, str.tostring(spread - spread[20], "+0.00;-0.00") + "%", text_color = color.silver, text_size = size.small)
+        tb.cell(0, 2, "Correlatie koers", text_color = color.silver, text_size = size.small, tooltip = "Correlatie tussen koers en spread over het venster. Hoog positief = de koers volgt het renteverschil; laag of negatief = andere drivers (risico, flows).")
+        tb.cell(1, 2, str.tostring(corr, "0.00"), text_color = color.silver, text_size = size.small)
+    else
+        tb.cell(0, 0, "Geen FX-paar", text_color = color.silver, text_size = size.small)
+        tb.cell(1, 0, "vul valuta's in", text_color = color.silver, text_size = size.small)
