@@ -7,7 +7,10 @@
     "login": "node bfx-tv.mjs login",
     "generate": "node bfx-tv.mjs generate",
     "run": "node bfx-tv.mjs run",
-    "example": "node bfx-tv.mjs generate --input examples/week44-alle.json"
+    "example": "node bfx-tv.mjs generate --input examples/week44-alle.json",
+    "test": "node --test test/logic.test.mjs",
+    "check": "node bfx-tv.mjs check",
+    "acceptatie": "node bfx-tv.mjs acceptatie"
   },
   "engines": {
     "node": ">=18"
