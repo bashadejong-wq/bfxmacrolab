@@ -39,6 +39,12 @@ async function main() {
 
   if (command === "generate") return;
 
+  // BIAS_5.0 niet van vandaag: niets overschrijven, de chart houdt de laatste goede stand.
+  if (biasOld || (!input && !gen.biasDatum)) {
+    await notify(`⏸ BFX Macro niet bijgewerkt: BIAS_5.0 is niet van vandaag (${biasDay ?? "ontbreekt"}). De chart houdt de vorige stand.`);
+    process.exit(0);
+  }
+
   if (config.delivery === "manual") {
     await notify(`📈 BFX Macro klaar om te plakken\n${summary}`, { document: gen.file });
     return;

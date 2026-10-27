@@ -71,16 +71,29 @@ async function loadEvents(now) {
 async function loadBias() {
   if (!config.biasUrl || !config.biasKey) {
     console.warn("BIAS_SUPABASE_URL/BIAS_SUPABASE_KEY niet ingesteld: geen BIAS 5.0.");
-    return { pairs: [], currencies: [], biasDatum: null, biasVersie: "" };
+    return { pairs: [], currencies: [], biasDatum: null, biasVersie: "", history: [], consensus: [] };
   }
   const get = (path) => restGet(config.biasUrl, config.biasKey, path);
+  // De API geeft hooguit 1000 rijen per verzoek; haal grotere tabellen in pagina's op.
+  const getAll = async (path) => {
+    const rows = [];
+    for (let offset = 0; ; offset += 1000) {
+      const page = await get(`${path}&limit=1000&offset=${offset}`);
+      rows.push(...page);
+      if (page.length < 1000) return rows;
+    }
+  };
   // select=* zodat een later toegevoegde kolom (bv. strategie_bevestiging per paar) vanzelf meekomt
-  const [pairRows, ccyRows, sumRows] = await Promise.all([
+  const [pairRows, ccyRows, sumRows, histRows, consRows] = await Promise.all([
     get("mirror_bias50_paar?select=*&order=sorteervolgorde.asc"),
-    get("mirror_bias50?select=valuta,index,label,zekerheid,conflict,datum,versie"),
-    get("mirror_bias50_samenvatting?select=valuta,strategie_bevestiging,samenvatting_tekst,kantelpunt_tekst"),
+    get("mirror_bias50?select=valuta,index,kernscore_100,label,dekking,zekerheid,conflict,datum,versie"),
+    get("mirror_bias50_samenvatting?select=valuta,strategie_bevestiging,samenvatting_tekst,kantelpunt_tekst,onderzoeksstatus"),
+    // Alleen toonbare historie; 'teruggerekend' = ex-post, 'forward' = echte meting
+    getAll("mirror_bias50_historie?select=datum,valuta,index,bron&toonbaar=is.true&order=datum.asc,valuta.asc"),
+    // Bankconsensus alleen bij minstens 3 banken
+    get("mirror_fx_consensus?select=*&n_banken=gte.3"),
   ]);
-  return normalizeBias(pairRows, ccyRows, sumRows);
+  return { ...normalizeBias(pairRows, ccyRows, sumRows), history: histRows, consensus: consRows };
 }
 
 export function normalizeBias(pairRows, ccyRows, sumRows = []) {
@@ -97,10 +110,13 @@ export function normalizeBias(pairRows, ccyRows, sumRows = []) {
       emmer: p.gelopen_emmer ?? "",
       z: Number(p.gelopen_z ?? 0),
       bevestiging: p.strategie_bevestiging ?? "",
+      status: p.strategie_status ?? "",
     })),
     currencies: ccyRows.map((c) => ({
       ccy: c.valuta,
       idx: Number(c.index),
+      kern: c.kernscore_100 === null || c.kernscore_100 === undefined ? null : Number(c.kernscore_100),
+      dekking: c.dekking === null || c.dekking === undefined ? null : Number(c.dekking),
       label: c.label ?? "",
       zekerheid: c.zekerheid ?? "",
       conflict: Boolean(c.conflict),
@@ -108,6 +124,7 @@ export function normalizeBias(pairRows, ccyRows, sumRows = []) {
       kantelpunt: sum.get(c.valuta)?.kantelpunt_tekst ?? "",
       samenvatting: sum.get(c.valuta)?.samenvatting_tekst ?? "",
     })),
+    onderzoeksstatus: sumRows.map((s) => s.onderzoeksstatus).find(Boolean) ?? "",
     biasDatum: latest ? Date.parse(`${latest}T00:00:00Z`) : null,
     biasVersie: [...pairRows, ...ccyRows].find((r) => r.versie)?.versie ?? "",
   };
@@ -130,6 +147,9 @@ export function loadFromFile(path) {
     currencies: [],
     biasDatum: null,
     biasVersie: "",
+    onderzoeksstatus: "",
+    history: [],
+    consensus: [],
     ...bias,
   };
 }
@@ -200,7 +220,7 @@ function groupEvents(events) {
         impact: main.impact,
         title: truncate(title, 48),
         stats: truncate(stats.replace(/\n/g, " · "), 140),
-        detail: truncate(detail, 600),
+        detail: truncate(detail, 350),
       };
     })
     .sort((a, b) => a.time - b.time);
@@ -222,6 +242,32 @@ function defaultLabel(events, generatedAt) {
   return `Week ${isoWeek(generatedAt)} · ${d(first)} – ${d(last)}`;
 }
 
+const HISTORY_DAYS = 130;
+const CCYS = ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD"];
+const pineNum = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? "na" : num(v));
+const dayMs = (d) => Date.parse(`${d}T00:00:00Z`);
+
+/**
+ * Historie per valuta als vaste Pine-arrays op één gedeelde datumas.
+ * H_FWD markeert per datum of het een echte (forward) meting is; de rest is ex-post teruggerekend.
+ */
+function historyLines(rows) {
+  // Pine heeft een tokenlimiet (±100k): houd de laatste HISTORY_DAYS datums.
+  const dates = [...new Set(rows.map((r) => r.datum))].sort().slice(-HISTORY_DAYS);
+  if (!dates.length) return [`var array<int> H_T = array.new<int>()`, `var array<bool> H_FWD = array.new<bool>()`, ...CCYS.map((c) => `var array<float> H_${c} = array.new<float>()`), `const int FORWARD_START = 0`];
+  const val = new Map(rows.map((r) => [`${r.datum}|${r.valuta}`, r.index]));
+  const fwd = new Set(rows.filter((r) => r.bron === "forward").map((r) => r.datum));
+  const firstFwd = dates.find((d) => fwd.has(d));
+  return [
+    `_hT() =>\n    array.from(${dates.map(dayMs).join(", ")})`,
+    `var array<int> H_T = _hT()`,
+    `_hFwd() =>\n    array.from(${dates.map((d) => (fwd.has(d) ? "true" : "false")).join(", ")})`,
+    `var array<bool> H_FWD = _hFwd()`,
+    ...CCYS.flatMap((c) => [`_h${c}() =>\n    array.from(${dates.map((d) => pineNum(val.get(`${d}|${c}`))).join(", ")})`, `var array<float> H_${c} = _h${c}()`]),
+    `const int FORWARD_START = ${firstFwd ? dayMs(firstFwd) : 0}`,
+  ];
+}
+
 export function buildPine(data) {
   const template = readFileSync(resolve(ROOT, "template/bfx_macro_overlay.pine"), "utf8");
   const events = groupEvents(data.events);
@@ -234,6 +280,8 @@ export function buildPine(data) {
     `const string DATA_LABEL = ${pineStr(label)}`,
     `const int    BIAS_DATUM = ${data.biasDatum ?? 0}`,
     `const string BIAS_VERSIE = ${pineStr(data.biasVersie)}`,
+    `const string ONDERZOEKSSTATUS = ${pineStr(truncate(data.onderzoeksstatus || "Onderzoeksstatus: max 25% risico, alleen met strategiebevestiging.", 200))}`,
+    ...historyLines(data.history ?? []),
     `if barstate.isfirst`,
     `    int _count = ${events.length}`,
     ...events.map(
@@ -242,13 +290,29 @@ export function buildPine(data) {
     ),
     ...data.pairs.map(
       (p) =>
-        `    addPair(${pineStr(p.basis)}, ${pineStr(p.quote)}, ${num(p.idx)}, ${pineStr(p.label)}, ${pineStr(truncate(p.tekst, 160))}, ${pineStr(p.emmer)}, ${num(p.z)}, ${pineStr(truncate(p.bevestiging, 40))})`,
+        `    addPair(${pineStr(p.basis)}, ${pineStr(p.quote)}, ${num(p.idx)}, ${pineStr(p.label)}, ${pineStr(truncate(p.tekst, 160))}, ${pineStr(p.emmer)}, ${num(p.z)}, ${pineStr(truncate(p.bevestiging, 40))}, ${pineStr(p.status)})`,
     ),
     ...data.currencies.map(
       (c) =>
-        `    addCcy(${pineStr(c.ccy)}, ${num(c.idx)}, ${pineStr(c.label)}, ${pineStr(c.zekerheid)}, ${c.conflict ? "true" : "false"}, ${pineStr(truncate(c.bevestiging, 60))}, ${pineStr(truncate(c.kantelpunt, 400))}, ${pineStr(truncate(c.samenvatting, 700))})`,
+        `    addCcy(${pineStr(c.ccy)}, ${num(c.idx)}, ${pineNum(c.kern)}, ${pineNum(c.dekking)}, ${pineStr(c.label)}, ${pineStr(c.zekerheid)}, ${c.conflict ? "true" : "false"}, ${pineStr(truncate(c.bevestiging, 60))}, ${pineStr(truncate(c.kantelpunt, 400))}, ${pineStr(truncate(c.samenvatting, 400))})`,
+    ),
+    ...(data.consensus ?? []).map(
+      (k) =>
+        `    addCons(${pineStr(k.paar)}, ${num(k.mediaan)}, ${num(k.band_min)}, ${num(k.band_max)}, ${Number(k.n_banken)}, ${pineNum(k.herziening)}, ${pineStr(k.herziening_basis ?? "")}, ${k.einddatum ? dayMs(k.einddatum) : 0}, ${pineStr(k.label ?? k.consensus_type ?? "consensus")}, ${pineNum(k.afstand_spot_pct)})`,
     ),
   ];
+
+  // Pine begrenst de omvang van het hoofdscript en van één blok: de data-aanroepen gaan
+  // in functies van 30 regels, die één keer op de eerste balk worden aangeroepen.
+  const start = lines.indexOf("if barstate.isfirst");
+  const body = lines.slice(start + 1).filter((l) => !l.includes("int _count"));
+  const funcs = [];
+  const calls = ["if barstate.isfirst"];
+  for (let i = 0, n = 1; i < body.length; i += 30, n++) {
+    funcs.push(`_load${n}() =>`, ...body.slice(i, i + 30), "    true");
+    calls.push(`    _load${n}()`);
+  }
+  lines.splice(start, lines.length - start, ...funcs, ...calls);
 
   const code = template.replace("{{VERSION}}", version).replace("{{DATA}}", lines.join("\n"));
   return { code, version, label, eventCount: events.length, pairCount: data.pairs.length, biasDatum: data.biasDatum };
