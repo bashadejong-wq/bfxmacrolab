@@ -32,7 +32,10 @@ function impactLevel(impact, score) {
   return 1;
 }
 
-/** Events uit de BFX Macro Lab-database (macro_events_calendar). */
+/**
+ * Events uit de websiteagenda (mirror_agenda_events_site): dubbele feeds (ForexFactory/FMP),
+ * verouderde datums en uitschieters in de consensus zijn daar al opgeschoond.
+ */
 async function loadEvents(now) {
   if (!config.supabaseUrl || !config.supabaseKey) {
     console.warn("SUPABASE_URL/SUPABASE_KEY niet ingesteld: geen events, alleen BIAS 5.0.");
@@ -43,21 +46,24 @@ async function loadEvents(now) {
   const rows = await restGet(
     config.supabaseUrl,
     config.supabaseKey,
-    `macro_events_calendar?select=event_datetime,event_currency,event_impact,importance_score,event_name,consensus,previous_value,actual_value,interpretation,market_impact_narrative` +
+    `mirror_agenda_events_site?select=event_datetime,event_currency,impact,event_name,consensus_waarde,previous_value,actual_value,interpretation,market_impact_narrative,upside_scenario_nl,downside_scenario_nl` +
       `&event_datetime=gte.${from}&event_datetime=lte.${to}&event_currency=in.(${config.currencies.join(",")})&order=event_datetime.asc&limit=1000`,
     config.supabaseSchema,
   );
   return rows
-    .map((r) => ({
-      time: parseEventTime(r.event_datetime),
-      ccy: String(r.event_currency ?? "").toUpperCase(),
-      impact: impactLevel(r.event_impact, r.importance_score),
-      name: r.event_name ?? "",
-      consensus: r.consensus,
-      previous: r.previous_value,
-      actual: r.actual_value,
-      detail: r.market_impact_narrative || r.interpretation || "",
-    }))
+    .map((r) => {
+      const scen = [r.upside_scenario_nl && `↑ ${r.upside_scenario_nl}`, r.downside_scenario_nl && `↓ ${r.downside_scenario_nl}`].filter(Boolean).join("\n");
+      return {
+        time: parseEventTime(r.event_datetime),
+        ccy: String(r.event_currency ?? "").toUpperCase(),
+        impact: impactLevel(r.impact),
+        name: r.event_name ?? "",
+        consensus: r.consensus_waarde,
+        previous: r.previous_value,
+        actual: r.actual_value,
+        detail: r.market_impact_narrative || r.interpretation || scen,
+      };
+    })
     .filter((e) => e.time && e.ccy && e.name);
 }
 
@@ -161,6 +167,8 @@ function pineStr(s) {
     .replace(/\r?\n/g, "\\n")}"`;
 }
 
+const RATE_DECISION = /rate decision|funds rate|cash rate|refinancing rate|deposit facility|bank rate|policy rate|overnight rate/i;
+
 /** Events met dezelfde tijd en valuta worden één label (bv. PCE + BBP + claims om 14:30). */
 function groupEvents(events) {
   const groups = new Map();
@@ -172,8 +180,13 @@ function groupEvents(events) {
   }
   return [...groups.values()]
     .map((list) => {
-      // Hoofdevent = hoogste impact; bij gelijke impact het event met een scenario-uitleg.
-      list.sort((a, b) => b.impact - a.impact || Number(Boolean(b.detail)) - Number(Boolean(a.detail)));
+      // Hoofdevent = hoogste impact; daarna een rentebesluit, dan een event met consensus, dan met scenario-uitleg.
+      const rank = (e) => [e.impact, Number(RATE_DECISION.test(e.name)), Number(fmtNum(e.consensus) !== null), Number(Boolean(e.detail))];
+      list.sort((a, b) => {
+        const ra = rank(a), rb = rank(b);
+        for (let i = 0; i < ra.length; i++) if (rb[i] !== ra[i]) return rb[i] - ra[i];
+        return 0;
+      });
       const main = list[0];
       const title = list.length > 1 ? `${main.name} +${list.length - 1}` : main.name;
       const stats = list
