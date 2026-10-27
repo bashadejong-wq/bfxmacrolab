@@ -80,8 +80,9 @@ schtasks /Create /TN "BFX TradingView" /SC WEEKLY /D ZO /ST 18:15 /TR "cmd /c cd
 
 ```bash
 cd ~/pad/naar/bfxmacrolab/tradingview
-./setup/mac-install.sh            # werkdagen 06:00
-./setup/mac-install.sh --weekly   # of: zondag 18:15
+./setup/mac-install.sh               # werkdagen, 05:45 NL-tijd omgerekend naar jouw tijdzone (Thailand: 11:45)
+./setup/mac-install.sh --time 12:00  # of een eigen lokale tijd
+./setup/mac-install.sh --weekly      # of: zondag 18:15
 ```
 Dit installeert alles en plant de taak in via launchd. Sliep de Mac om 06:00, dan draait de taak zodra hij wakker wordt. Uitzetten met `./setup/mac-uninstall.sh`. Logboek: `logs/run.log`.
 

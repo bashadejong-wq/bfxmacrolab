@@ -1,7 +1,9 @@
 #!/bin/bash
 # Installeert de BFX Macro Overlay-automatisering op macOS.
-#   ./setup/mac-install.sh            werkdagen 06:00 (na de BIAS-verversing van 05:13)
-#   ./setup/mac-install.sh --weekly   zondag 18:15
+#   ./setup/mac-install.sh                    werkdagen, standaard na de BIAS-verversing (05:13 NL)
+#   ./setup/mac-install.sh --time 11:30       eigen tijd (lokale tijd van deze Mac)
+#   ./setup/mac-install.sh --weekly           zondag 18:15
+# Standaardtijd: 05:45 Nederlandse tijd omgerekend naar de tijdzone van deze Mac (bv. 11:45 in Thailand).
 # Draait het script niet omdat de Mac sliep, dan voert launchd het uit zodra de Mac wakker wordt.
 set -euo pipefail
 
@@ -27,15 +29,35 @@ if [ ! -f .env ]; then
   echo "→ .env aangemaakt. Vul BIAS_SUPABASE_KEY (en optioneel SUPABASE_URL/KEY, TELEGRAM_*) in: open -e \"$DIR/.env\""
 fi
 
-if [ "${1:-}" = "--weekly" ]; then
+WEEKLY=0; TIME=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --weekly) WEEKLY=1 ;;
+    --time) TIME="${2:-}"; shift ;;
+  esac
+  shift
+done
+
+if [ -z "$TIME" ]; then
+  # 05:45 Amsterdam-tijd (na de BIAS-verversing van 05:13) in de lokale tijd van deze Mac
+  TIME="$(python3 -c 'from datetime import datetime,timedelta;from zoneinfo import ZoneInfo as Z;n=datetime.now(Z("Europe/Amsterdam"));t=n.replace(hour=5,minute=45,second=0,microsecond=0);print(t.astimezone().strftime("%H:%M"))' 2>/dev/null || true)"
+  if [ -z "$TIME" ]; then
+    TIME="06:00"
+    echo "⚠️ Kon de tijdzone niet omrekenen (python3 ontbreekt). Ingepland op 06:00 lokale tijd; gebruik --time HH:MM als dat vóór 05:13 NL valt."
+  fi
+fi
+HOUR=$((10#${TIME%%:*})); MIN=$((10#${TIME##*:}))
+
+if [ "$WEEKLY" = 1 ]; then
   SCHEDULE='<dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>15</integer></dict>'
   WHEN="zondag 18:15"
 else
+  # ma–vr lokaal. Klopt voor tijdzones gelijk aan of oostelijk van NL (bv. Thailand): 05:45 NL valt dan op dezelfde dag.
   SCHEDULE=""
   for d in 1 2 3 4 5; do
-    SCHEDULE="$SCHEDULE<dict><key>Weekday</key><integer>$d</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>"
+    SCHEDULE="$SCHEDULE<dict><key>Weekday</key><integer>$d</integer><key>Hour</key><integer>$HOUR</integer><key>Minute</key><integer>$MIN</integer></dict>"
   done
-  WHEN="werkdagen 06:00"
+  WHEN="werkdagen $(printf '%02d:%02d' $HOUR $MIN) (lokale tijd)"
 fi
 
 mkdir -p "$DIR/logs" "$HOME/Library/LaunchAgents"
