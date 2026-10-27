@@ -3,6 +3,9 @@ import { resolve } from "node:path";
 import { config } from "./config.mjs";
 
 const MARKER = "BFX-MACRO-OVERLAY";
+const SCRIPT_NAME = "BFX Macro Overlay";
+// Naar regel 1 in de editor: op macOS ⌘↑ (⌘Home doet daar niets), elders Ctrl+Home.
+const DOC_START = process.platform === "darwin" ? "Meta+ArrowUp" : "Control+Home";
 const EDITOR = ".monaco-editor";
 
 // TradingView verandert af en toe de interface; daarom meerdere varianten per knop.
@@ -36,8 +39,42 @@ async function firstVisible(page, selectors, timeout = 1500) {
   return null;
 }
 
+/** Scrolt de editor naar regel 1 (muiswiel werkt los van sneltoetsen en besturingssysteem). */
+async function scrollToTop(page) {
+  const box = await page.locator(EDITOR).first().boundingBox().catch(() => null);
+  if (!box) return;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < 15; i++) await page.mouse.wheel(0, -20000);
+  await sleep(600);
+}
+
 async function editorText(page) {
-  return page.locator(`${EDITOR} .view-lines`).first().innerText().catch(() => "");
+  // De editor toont spaties als non-breaking spaces; normaliseer voor vergelijkingen.
+  const txt = await page.locator(`${EDITOR} .view-lines`).first().innerText().catch(() => "");
+  return txt.replace(/\u00a0/g, " ");
+}
+
+/** Opent 'BFX Macro Overlay' via het Open script-venster van de Pine Editor. */
+async function openScriptByName(page, editor) {
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+O");
+  await sleep(1500);
+  await page.keyboard.insertText(SCRIPT_NAME);
+  await sleep(2000);
+  const item = page.getByText(SCRIPT_NAME, { exact: true }).last();
+  if (await item.isVisible().catch(() => false)) await item.click();
+  else await page.keyboard.press("Enter");
+  await sleep(4000);
+  await editor.click().catch(() => {});
+  await page.keyboard.press(DOC_START);
+    await scrollToTop(page);
+  await sleep(500);
+}
+
+/** Cookiebanner: kies de privacyvriendelijke optie, als die er staat. */
+async function declineCookies(page) {
+  const btn = await firstVisible(page, ['button:has-text("Don\'t allow")', 'button:has-text("Niet toestaan")', 'button:has-text("Reject all")'], 500);
+  if (btn) await btn.click().catch(() => {});
 }
 
 /** Opent een browser waarin je één keer handmatig inlogt bij TradingView. */
@@ -74,6 +111,8 @@ export async function deliver(pineFile) {
   try {
     await page.goto(config.tvChartUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await sleep(8000);
+    await declineCookies(page);
+    console.log(`TradingView: ${page.url()} · ${await page.title()}`);
 
     if (await firstVisible(page, ['button:has-text("Sign in")', 'a:has-text("Sign in")', 'button:has-text("Inloggen")'], 500)) {
       return fail("Niet ingelogd bij TradingView. Draai `node bfx-tv.mjs login` en log opnieuw in.");
@@ -89,10 +128,15 @@ export async function deliver(pineFile) {
     const editor = page.locator(EDITOR).first();
     if (!(await editor.isVisible().catch(() => false))) return fail("Pine Editor opende niet.");
 
-    // 2. Veiligheidscheck: alleen ons eigen script overschrijven
+    // 2. Veiligheidscheck: alleen ons eigen script overschrijven.
+    //    Staat een ander script open, open dan eerst 'BFX Macro Overlay' via Open script (⌘O).
     await editor.click();
-    await page.keyboard.press("ControlOrMeta+Home");
+    await page.keyboard.press(DOC_START);
+    await scrollToTop(page);
     await sleep(500);
+    if (!(await editorText(page)).includes(MARKER)) {
+      await openScriptByName(page, editor);
+    }
     if (!(await editorText(page)).includes(MARKER)) {
       return fail(
         "In de Pine Editor staat niet het script 'BFX Macro Overlay'. Open dat script één keer handmatig in de Pine Editor; er is niets overschreven.",
@@ -111,10 +155,12 @@ export async function deliver(pineFile) {
     else await page.keyboard.insertText(code);
     await sleep(1500);
 
-    await page.keyboard.press("ControlOrMeta+Home");
+    await page.keyboard.press(DOC_START);
+    await scrollToTop(page);
     await sleep(500);
     if (version && !(await editorText(page)).includes(version)) {
-      return fail("Code is niet goed geplakt (versieregel niet teruggevonden). Er is niet opgeslagen.");
+      const seen = (await editorText(page)).replace(/\s+/g, " ").slice(0, 160);
+      return fail(`Code is niet goed geplakt (versieregel niet teruggevonden). Er is niet opgeslagen. Editor toont: ${seen}`);
     }
 
     // 4. Compilefouten? Dan niet opslaan.
@@ -125,12 +171,24 @@ export async function deliver(pineFile) {
 
     // 5. Opslaan en (indien aanwezig) bijwerken op de chart
     await page.keyboard.press("ControlOrMeta+S");
-    await sleep(3000);
-    const update = await firstVisible(page, UPDATE_BUTTONS, 800);
-    if (update) {
-      await update.click();
-      await sleep(3000);
+    // Groot script: compileren + opslaan duurt ±10 s. Wacht tot 'Unsaved version' weg is.
+    const unsaved = page.getByText(/Unsaved version|Niet-opgeslagen versie/).first();
+    await sleep(2000);
+    let saved = false;
+    for (let i = 0; i < 45; i++) {
+      if (!(await unsaved.isVisible().catch(() => false))) { saved = true; break; }
+      await sleep(1000);
     }
+    if (!saved) return fail("Opslaan niet bevestigd binnen 45 s (TradingView toont nog 'Unsaved version').");
+    if ((await page.locator(`${EDITOR} .squiggly-error`).count()) > 0) {
+      return fail("Na opslaan meldt de Pine Editor een fout. Zie de schermafdruk.");
+    }
+    // Een indicator op de chart blijft op de versie waarmee hij is toegevoegd: werk hem bij
+    // en geef TradingView tijd om de layout automatisch op te slaan.
+    const update = await firstVisible(page, UPDATE_BUTTONS, 2000);
+    if (!update) return fail("Opgeslagen, maar 'Update on chart' niet gevonden: de indicator op de chart toont nog de vorige versie.");
+    await update.click();
+    await sleep(8000);
 
     await page.screenshot({ path: screenshot });
     await ctx.close();
