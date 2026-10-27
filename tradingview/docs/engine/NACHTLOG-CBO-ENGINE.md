@@ -21,3 +21,4 @@
 - 23:17 Reload-test: EURUSD 30m, 1× engine, 1× Compass, nieuwste versie; aggregaten gelijk vóór/na.
 - 23:18 Productiecontrole (alleen lezen): layout 6b31RP4L = Volume + BFX Macro Overlay, snapshot 202,610,272,129; git productie ea1318a schoon; LaunchAgent niet geladen.
 - 23:20 Browservrije tests: 28/28 (6 nieuw). Documenten bijgewerkt: testmatrix (resultaten + traceerbaarheid), retro-meting, beslisnotitie, risico's, implementatieplan.
+- 23:25 Commit e6d325e op research/cbo-engine-0.1, gepusht via GitHub Desktop (geverifieerd met ls-remote). Geen PR geopend, niets gemerged. LaunchAgent blijft uit.
