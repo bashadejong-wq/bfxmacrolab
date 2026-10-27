@@ -7,13 +7,13 @@ indicator("BFX Macro Overlay", shorttitle = "BFX Macro", overlay = true, max_lin
 // ─── Instellingen ───────────────────────────────────────────────
 const string GV = "Weergave"
 const string GC = "Kleuren"
-i_ccys      = input.string("", "Valuta's (leeg = automatisch)", tooltip = "Bijv. EUR,USD. Leeg = basis- en noteringsvaluta van de chart.", group = GV)
-i_minImpact = input.int(2, "Minimale impact", minval = 1, maxval = 3, tooltip = "1 = laag, 2 = medium, 3 = hoog", group = GV)
+i_ccys      = input.string("", "Paar (leeg = automatisch)", tooltip = "Bijv. EUR,USD. Leeg = basis- en noteringsvaluta van de chart.", group = GV)
+i_minImpact = input.int(2, "Minimale impact events", minval = 1, maxval = 3, tooltip = "1 = laag, 2 = medium, 3 = hoog", group = GV)
 i_pastDays  = input.int(7, "Afgelopen events tonen (dagen)", minval = 0, maxval = 30, group = GV)
 i_lines     = input.bool(true, "Verticale eventlijnen", group = GV)
 i_labels    = input.bool(true, "Eventlabels", group = GV)
 i_table     = input.bool(true, "Overzichtstabel", group = GV)
-i_rows      = input.int(8, "Max. events in tabel", minval = 1, maxval = 20, group = GV)
+i_rows      = input.int(8, "Max. events in tabel", minval = 0, maxval = 20, group = GV)
 i_tablePos  = input.string("Rechtsboven", "Positie tabel", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GV)
 i_staleDays = input.int(3, "Waarschuw als data ouder is dan (dagen)", minval = 1, maxval = 30, group = GV)
 c_high      = input.color(#E5484D, "Hoge impact", group = GC)
@@ -31,26 +31,47 @@ type MacroEvent
     string stats
     string detail
 
+// BIAS 5.0 per paar (mirror_bias50_paar). idx > 0 = basisvaluta sterker.
+type PairBias
+    string basis
+    string quote
+    float  idx
+    string label
+    string tekst
+    string emmer
+    float  z
+    string bevestiging
+
+// BIAS 5.0 per valuta (mirror_bias50 + mirror_bias50_samenvatting)
 type CcyBias
     string ccy
-    string bias
-    string strength
-    string driver
-    string invalidation
+    float  idx
+    string label
+    string zekerheid
+    bool   conflict
+    string bevestiging
+    string kantelpunt
+    string samenvatting
 
 var array<MacroEvent> events = array.new<MacroEvent>()
-var array<CcyBias>    biases = array.new<CcyBias>()
+var array<PairBias>   pairs  = array.new<PairBias>()
+var array<CcyBias>    ccyb   = array.new<CcyBias>()
 
 addEv(int t, string ccy, int impact, string title, string stats, string detail) =>
     events.push(MacroEvent.new(t, ccy, impact, title, stats, detail))
 
-addBias(string ccy, string b, string strength, string driver, string invalidation) =>
-    biases.push(CcyBias.new(ccy, b, strength, driver, invalidation))
+addPair(string basis, string quote, float idx, string label, string tekst, string emmer, float z, string bevestiging) =>
+    pairs.push(PairBias.new(basis, quote, idx, label, tekst, emmer, z, bevestiging))
+
+addCcy(string ccy, float idx, string label, string zekerheid, bool conflict, string bevestiging, string kantelpunt, string samenvatting) =>
+    ccyb.push(CcyBias.new(ccy, idx, label, zekerheid, conflict, bevestiging, kantelpunt, samenvatting))
 
 // ═══ DATA-START (automatisch gegenereerd) ═══
 const string VERSION    = "2026-10-27 15:00 UTC"
 const int    GENERATED  = 1793113200000
 const string DATA_LABEL = "Week 44 · FOMC + ECB"
+const int    BIAS_DATUM = 1793059200000
+const string BIAS_VERSIE = "BIAS50_1.1"
 if barstate.isfirst
     int _count = 25
     addEv(1793104200000, "USD", 3, "Durable goods m/m +1", "Durable goods m/m: act 1.8 | cons 1.5 | vorig 0.1 · Durable goods ex transport: act 0.5 | cons 0.6 | vorig 0.3", "")
@@ -78,27 +99,99 @@ if barstate.isfirst
     addEv(1793959200000, "EUR", 2, "EZ retail sales m/m", "cons 0.3 | vorig 0.1", "")
     addEv(1793971800000, "USD", 3, "NFP +1", "NFP: vorig 29 · US werkloosheid: vorig 4.2", "Sterk banenrapport → USD↑ yields↑ EURUSD↓. Zwak (vorige: 29K) → USD↓ cut-verwachting↑.")
     addEv(1793977200000, "USD", 2, "Michigan sentiment", "cons 47 | vorig 48", "Let op inflatieverwachtingen.")
+    addPair("EUR", "GBP", -14.0594, "Neutral", "GBP relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)", ">2", 2.8537, "")
+    addPair("EUR", "AUD", -1.5205, "Neutral", "AUD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)", "1-2", 1.2464, "")
+    addPair("EUR", "NZD", -1.51, "Neutral", "NZD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)", "1-2", 1.238, "")
+    addPair("EUR", "USD", -12.9611, "Neutral", "USD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)", "1-2", 1.0958, "")
+    addPair("EUR", "CAD", -3.4596, "Neutral", "CAD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)", ">2", 2.7214, "")
+    addPair("EUR", "CHF", 0.0684, "Neutral", "EUR relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "tegen", -2.2037, "")
+    addPair("EUR", "JPY", -3.1134, "Neutral", "JPY relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)", "1-2", 1.0902, "")
+    addPair("GBP", "AUD", 12.539, "Neutral", "GBP relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.4432, "")
+    addPair("GBP", "NZD", 12.5494, "Neutral", "GBP relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.2689, "")
+    addPair("GBP", "USD", 1.0984, "Neutral", "GBP relatief sterker dan USD (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.4356, "")
+    addPair("GBP", "CAD", 10.5998, "Neutral", "GBP relatief sterker dan CAD (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.4245, "")
+    addPair("GBP", "CHF", 14.1278, "Neutral", "GBP relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.1081, "")
+    addPair("GBP", "JPY", 10.946, "Neutral", "GBP relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.4439, "")
+    addPair("AUD", "NZD", 0.0105, "Neutral", "AUD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.1932, "")
+    addPair("AUD", "USD", -11.4406, "Neutral", "USD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.0143, "")
+    addPair("AUD", "CAD", -1.9392, "Neutral", "CAD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.9277, "")
+    addPair("AUD", "CHF", 1.5889, "Neutral", "AUD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.5187, "")
+    addPair("AUD", "JPY", -1.593, "Neutral", "JPY relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.0243, "")
+    addPair("NZD", "USD", -11.4511, "Neutral", "USD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.0934, "")
+    addPair("NZD", "CAD", -1.9496, "Neutral", "CAD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.5428, "")
+    addPair("NZD", "CHF", 1.5784, "Neutral", "NZD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.2039, "")
+    addPair("NZD", "JPY", -1.6034, "Neutral", "JPY relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.1398, "")
+    addPair("USD", "CAD", 9.5015, "Neutral", "USD relatief sterker dan CAD (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.7412, "")
+    addPair("USD", "CHF", 13.0295, "Neutral", "USD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.3212, "")
+    addPair("USD", "JPY", 9.8477, "Neutral", "USD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.0448, "")
+    addPair("CAD", "CHF", 3.528, "Neutral", "CAD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.5423, "")
+    addPair("CAD", "JPY", 0.3462, "Neutral", "CAD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)", "0-1", 0.7153, "")
+    addPair("CHF", "JPY", -3.1818, "Neutral", "JPY relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)", "tegen", -0.3766, "")
+    addCcy("AUD", -6.4541, "Neutral", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 8,55 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A5 2-jaarsrente minus actuele inflatie (+3,72), als alle andere onderdelen gelijk blijven; geen voorspelling.", "AUD: index −6,45 (Neutral); cijferdeel (A) draagt −2,72 indexpunten bij; genormaliseerde kernscore −4,5/100; dekking 84,0%; zekerheid laag. Meeste steun: A5 2-jaarsrente minus actuele inflatie (+3,72), A4t Toon centrale bank (+2,88), B3 Paaroordelen (V1) (+2,58). Meeste druk: A3w Werkloosheidstrend (−8,00), B1 Banken (−6,26), A1s Inflatiesnelheid (−2,62).")
+    addCcy("CAD", -2.5758, "Neutral", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 12,42 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A3w Werkloosheidstrend (+2,99), als alle andere onderdelen gelijk blijven; geen voorspelling.", "CAD: index −2,58 (Neutral); cijferdeel (A) draagt −3,15 indexpunten bij; genormaliseerde kernscore −5,3/100; dekking 84,0%; zekerheid laag. Meeste steun: A3w Werkloosheidstrend (+2,99), B4 Positionering (COT) (+1,26), B7 Grondstoffen en ruilvoet (+1,16). Meeste druk: A4t Toon centrale bank (−2,88), B6 Recente koersbeweging (mean-reversion-proxy) (−1,96), A2b Groei t.o.v. potentieel (−1,70).")
+    addCcy("CHF", -9.6318, "Neutral", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 5,37 punten lager. Zonder B1 Banken (+8,01) zou de index −17,64 zijn (Light Bearish), als alle andere onderdelen gelijk blijven; geen voorspelling.", "CHF: index −9,63 (Neutral); cijferdeel (A) draagt −19,13 indexpunten bij; genormaliseerde kernscore −31,9/100; dekking 84,0%; zekerheid laag. Meeste steun: B1 Banken (+8,01), A2b Groei t.o.v. potentieel (+1,94), B4 Positionering (COT) (+1,29). Meeste druk: A1n Inflatie t.o.v. doel (−10,08), A3l Loongroei (−6,00), A5 2-jaarsrente minus actuele inflatie (−5,27).")
+    addCcy("EUR", -9.495, "Neutral", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 5,51 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A1n Inflatie t.o.v. doel (+4,73), als alle andere onderdelen gelijk blijven; geen voorspelling.", "EUR: index −9,50 (Neutral); cijferdeel (A) draagt +1,45 indexpunten bij; genormaliseerde kernscore +2,4/100; dekking 83,5%; zekerheid laag. Meeste steun: A1n Inflatie t.o.v. doel (+4,73), B6 Recente koersbeweging (mean-reversion-proxy) (+3,00), B4 Positionering (COT) (+2,40). Meeste druk: B1 Banken (−12,80), A5 2-jaarsrente minus actuele inflatie (−4,78), B3 Paaroordelen (V1) (−2,58).")
+    addCcy("GBP", 18.6238, "Light Bullish", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: +15 (Light Bullish naar Neutral), 3,62 punten lager. Zonder B1 Banken (+3,70) zou de index +14,92 zijn (Neutral), als alle andere onderdelen gelijk blijven; geen voorspelling.", "GBP: index +18,62 (Light Bullish); cijferdeel (A) draagt +15,00 indexpunten bij; genormaliseerde kernscore +25,0/100; dekking 83,5%; zekerheid laag. Meeste steun: A5 2-jaarsrente minus actuele inflatie (+6,23), A3w Werkloosheidstrend (+4,83), B1 Banken (+3,70). Meeste druk: B6 Recente koersbeweging (mean-reversion-proxy) (−1,11), A2v Ondernemersvertrouwen (−1,00), A4t Toon centrale bank (−0,80).")
+    addCcy("JPY", -3.2682, "Neutral", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 11,73 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A1s Inflatiesnelheid (+6,00), als alle andere onderdelen gelijk blijven; geen voorspelling.", "JPY: index −3,27 (Neutral); cijferdeel (A) draagt +0,67 indexpunten bij; genormaliseerde kernscore +1,1/100; dekking 84,0%; zekerheid laag. Meeste steun: A1s Inflatiesnelheid (+6,00), A3w Werkloosheidstrend (+2,99), A3l Loongroei (+2,28). Meeste druk: A1n Inflatie t.o.v. doel (−9,26), B3 Paaroordelen (V1) (−3,10), A5 2-jaarsrente minus actuele inflatie (−2,20).")
+    addCcy("NZD", -6.475, "Neutral", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 8,53 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A1n Inflatie t.o.v. doel (+7,20), als alle andere onderdelen gelijk blijven; geen voorspelling.", "NZD: index −6,48 (Neutral); cijferdeel (A) draagt −7,20 indexpunten bij; genormaliseerde kernscore −12,0/100; dekking 80,0%; zekerheid laag. Meeste steun: A1n Inflatie t.o.v. doel (+7,20), B1 Banken (+3,05), A2b Groei t.o.v. potentieel (+0,24). Meeste druk: A3w Werkloosheidstrend (−4,37), A2p PMI-trend (−3,15), A1s Inflatiesnelheid (−2,62).")
+    addCcy("USD", 16.4271, "Light Bullish", "laag", false, "geen verzegelde strategiestand", "Dichtstbijzijnde labelgrens: +15 (Light Bullish naar Neutral), 1,43 punten lager. Zonder B3 Paaroordelen (V1) (+2,07) zou de index +14,36 zijn (Neutral), als alle andere onderdelen gelijk blijven; geen voorspelling.", "USD: index +16,43 (Light Bullish); cijferdeel (A) draagt +14,90 indexpunten bij; genormaliseerde kernscore +24,8/100; dekking 84,0%; zekerheid laag. Meeste steun: A2p PMI-trend (+4,25), A5 2-jaarsrente minus actuele inflatie (+3,96), A1n Inflatie t.o.v. doel (+3,91). Meeste druk: A1s Inflatiesnelheid (−2,62), B1 Banken (−0,80), A2v Ondernemersvertrouwen (−0,24).")
 // ═══ DATA-EINDE ═══
 
 // ─── Helpers ────────────────────────────────────────────────────
 impactColor(int imp) =>
     imp >= 3 ? c_high : imp == 2 ? c_med : c_low
 
-biasColor(string b) =>
-    string s = str.lower(b)
-    str.contains(s, "bull") or str.contains(s, "long") ? c_bull : str.contains(s, "bear") or str.contains(s, "short") ? c_bear : color.gray
+// Light-labels krijgen een lichtere tint; Neutral is grijs (binnen ±15 geen richting).
+biasColor(string label) =>
+    string s = str.lower(label)
+    color base = str.contains(s, "bull") ? c_bull : str.contains(s, "bear") ? c_bear : color.gray
+    str.contains(s, "light") ? color.new(base, 35) : base
+
+flipLabel(string label) =>
+    str.replace_all(str.replace_all(str.replace_all(label, "Bullish", "#TMP#"), "Bearish", "Bullish"), "#TMP#", "Bearish")
+
+fmtIdx(float v) =>
+    (v > 0 ? "+" : "") + str.tostring(v, "0.0")
+
+chartPair() =>
+    string s = str.upper(str.replace_all(i_ccys, " ", ""))
+    string b = syminfo.basecurrency
+    string q = syminfo.currency
+    if s != ""
+        array<string> parts = str.split(s, ",")
+        b := parts.size() > 1 ? parts.get(0) : ""
+        q := parts.size() > 1 ? parts.get(1) : parts.get(0)
+    [b, q]
 
 // Geeft ",EUR,USD," terug zodat we op ",CCY," kunnen zoeken.
 activeCcys() =>
-    string s = str.upper(str.replace_all(i_ccys, " ", ""))
-    if s == ""
-        string b = syminfo.basecurrency
-        string q = syminfo.currency
-        s := b == "" or b == q ? q : b + "," + q
-    "," + s + ","
+    [b, q] = chartPair()
+    "," + (b == "" or b == q ? q : b + "," + q) + ","
 
 isRelevant(string ccy, string ccys) =>
     ccy == "ALL" or str.contains(ccys, "," + ccy + ",")
+
+// Zoekt het paar; staat het andersom in de data (bv. USDEUR), dan ook gevonden (aanroeper keert om).
+findPair(string b, string q) =>
+    PairBias found = na
+    for p in pairs
+        if p.basis == b and p.quote == q
+            found := p
+            break
+    if na(found)
+        for p in pairs
+            if p.basis == q and p.quote == b
+                found := p
+                break
+    found
+
+findCcy(string c) =>
+    CcyBias found = na
+    for x in ccyb
+        if x.ccy == c
+            found := x
+            break
+    found
 
 tablePos() =>
     switch i_tablePos
@@ -142,41 +235,69 @@ if barstate.islast
 const int MAX_ROWS = 40
 var table tbl = table.new(tablePos(), 3, MAX_ROWS, bgcolor = color.new(#111318, 8), border_color = color.new(#2A2D35, 0), border_width = 1, frame_color = color.new(#2A2D35, 0), frame_width = 1)
 
+cellL(int col, int row, string txt, color tc, string tip = "", color bg = na) =>
+    tbl.cell(col, row, txt, text_color = tc, text_size = size.small, text_halign = text.align_left, tooltip = tip, bgcolor = bg)
+
 if barstate.islast and i_table
     tbl.clear(0, 0, 2, MAX_ROWS - 1)
+    [cb, cq]    = chartPair()
     string ccys = activeCcys()
     string upd  = str.format_time(GENERATED, "dd/MM HH:mm", syminfo.timezone)
+    color  warn = color.new(c_bear, 20)
     int    r    = 0
 
-    tbl.cell(0, r, "BFX Macro", text_color = color.white, text_size = size.small, text_halign = text.align_left)
-    tbl.cell(1, r, DATA_LABEL, text_color = color.white, text_size = size.small, text_halign = text.align_left)
-    tbl.cell(2, r, "bijgewerkt " + upd, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+    cellL(0, r, "BFX Macro", color.white)
+    cellL(1, r, DATA_LABEL, color.white)
+    cellL(2, r, "bijgewerkt " + upd, color.silver)
     r += 1
 
     if timenow - GENERATED > i_staleDays * 86400000
-        tbl.cell(0, r, "⚠", text_color = color.white, bgcolor = color.new(c_bear, 20), text_size = size.small)
-        tbl.cell(1, r, "Data verouderd", text_color = color.white, bgcolor = color.new(c_bear, 20), text_size = size.small, text_halign = text.align_left)
-        tbl.cell(2, r, "laatste update " + upd, text_color = color.white, bgcolor = color.new(c_bear, 20), text_size = size.small, text_halign = text.align_left)
+        cellL(0, r, "⚠ Verouderd", color.white, "", warn)
+        cellL(1, r, "Indicator niet bijgewerkt", color.white, "", warn)
+        cellL(2, r, "laatste update " + upd, color.white, "", warn)
         r += 1
 
-    for b in biases
-        if r < MAX_ROWS and isRelevant(b.ccy, ccys)
-            string bTxt = b.bias + (b.strength != "" ? " (" + b.strength + ")" : "")
-            tbl.cell(0, r, b.ccy, text_color = color.white, text_size = size.small)
-            tbl.cell(1, r, bTxt, text_color = biasColor(b.bias), text_size = size.small, text_halign = text.align_left)
-            tbl.cell(2, r, b.driver, text_color = color.silver, text_size = size.small, text_halign = text.align_left, tooltip = b.invalidation != "" ? "Invalidatie: " + b.invalidation : "")
+    // BIAS 5.0 voor dit paar
+    if BIAS_DATUM > 0
+        string bDate = str.format_time(BIAS_DATUM, "dd/MM", "UTC")
+        if timenow - BIAS_DATUM > i_staleDays * 86400000
+            cellL(0, r, "⚠ BIAS oud", color.white, "", warn)
+            cellL(1, r, "BIAS 5.0-data van " + bDate, color.white, "", warn)
+            cellL(2, r, BIAS_VERSIE, color.white, "", warn)
             r += 1
 
+        PairBias p = findPair(cb, cq)
+        if not na(p)
+            bool   inv    = p.basis != cb
+            float  pIdx   = inv ? -p.idx : p.idx
+            string pLabel = inv ? flipLabel(p.label) : p.label
+            // BIAS 5.0-regel: binnen ±15 geen actieve richting, ongeacht het label
+            bool   neutral = math.abs(pIdx) < 15 or str.contains(str.lower(pLabel), "neutral")
+            cellL(0, r, "BIAS " + cb + cq, color.white, "BIAS 5.0 " + BIAS_VERSIE + " · " + bDate)
+            cellL(1, r, fmtIdx(pIdx) + " · " + pLabel, neutral ? color.gray : biasColor(pLabel), p.tekst)
+            cellL(2, r, "gelopen " + p.emmer + " (z " + str.tostring(p.z, "0.00") + ")", color.silver, "Hoe ver de koers al in de richting van de bias is gelopen, in standaardafwijkingen. 'tegen' = koers liep tegen de bias in.")
+            r += 1
+            cellL(0, r, neutral ? "geen richting" : "richting", neutral ? color.gray : color.white)
+            cellL(1, r, neutral ? "binnen ±15: geen kant kiezen" : p.tekst, neutral ? color.gray : color.silver, p.tekst)
+            cellL(2, r, p.bevestiging != "" ? p.bevestiging : "", color.silver, "Strategiebevestiging")
+            r += 1
+
+        for c in array.from(cb, cq)
+            CcyBias x = findCcy(c)
+            if not na(x) and r < MAX_ROWS
+                string info = "zekerheid " + x.zekerheid + (x.conflict ? " · ⚠ KCFI max 25%" : "")
+                string tip  = x.samenvatting + (x.kantelpunt != "" ? "\n\n" + x.kantelpunt : "") + (x.bevestiging != "" ? "\n\nStrategie: " + x.bevestiging : "")
+                cellL(0, r, c, color.white, tip)
+                cellL(1, r, fmtIdx(x.idx) + " · " + x.label, biasColor(x.label), tip)
+                cellL(2, r, info, x.conflict ? c_bear : color.silver, tip)
+                r += 1
+
+    // Komende events
     int shown = 0
     for e in events
         if shown < i_rows and r < MAX_ROWS and e.t >= timenow and e.impact >= i_minImpact and isRelevant(e.ccy, ccys)
-            tbl.cell(0, r, str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone), text_color = color.silver, text_size = size.small, text_halign = text.align_left)
-            tbl.cell(1, r, e.ccy + " " + e.title, text_color = impactColor(e.impact), text_size = size.small, text_halign = text.align_left, tooltip = e.detail)
-            tbl.cell(2, r, e.stats, text_color = color.silver, text_size = size.small, text_halign = text.align_left, tooltip = e.detail)
+            cellL(0, r, str.format_time(e.t, "EEE dd/MM HH:mm", syminfo.timezone), color.silver)
+            cellL(1, r, e.ccy + " " + e.title, impactColor(e.impact), e.detail)
+            cellL(2, r, e.stats, color.silver, e.detail)
             shown += 1
             r += 1
-
-    if shown == 0 and r < MAX_ROWS
-        tbl.cell(0, r, "—", text_color = color.silver, text_size = size.small)
-        tbl.cell(1, r, "Geen komende events", text_color = color.silver, text_size = size.small, text_halign = text.align_left)
-        tbl.cell(2, r, str.replace_all(str.substring(ccys, 1, str.length(ccys) - 1), ",", " / "), text_color = color.silver, text_size = size.small, text_halign = text.align_left)

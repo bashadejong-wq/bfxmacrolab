@@ -7,13 +7,8 @@ const MONTHS_NL = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep"
 
 // ─── Bronnen ────────────────────────────────────────────────────
 
-async function supabaseGet(path) {
-  if (!config.supabaseUrl || !config.supabaseKey) {
-    throw new Error("SUPABASE_URL en SUPABASE_KEY ontbreken in tradingview/.env");
-  }
-  const res = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
-    headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` },
-  });
+async function restGet(url, key, path) {
+  const res = await fetch(`${url}/rest/v1/${path}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
   if (!res.ok) throw new Error(`Supabase ${path.split("?")[0]}: HTTP ${res.status} ${await res.text()}`);
   return res.json();
 }
@@ -35,18 +30,21 @@ function impactLevel(impact, score) {
   return 1;
 }
 
-/** Haalt events en bias uit Supabase en zet ze om naar het neutrale invoerformaat. */
-export async function loadFromSupabase(now = Date.now()) {
+/** Events uit de BFX Macro Lab-database (macro_events_calendar). */
+async function loadEvents(now) {
+  if (!config.supabaseUrl || !config.supabaseKey) {
+    console.warn("SUPABASE_URL/SUPABASE_KEY niet ingesteld: geen events, alleen BIAS 5.0.");
+    return [];
+  }
   const from = new Date(now - config.daysBack * DAY).toISOString();
   const to = new Date(now + config.daysAhead * DAY).toISOString();
-  const ccyList = config.currencies.join(",");
-
-  const rows = await supabaseGet(
+  const rows = await restGet(
+    config.supabaseUrl,
+    config.supabaseKey,
     `macro_events_calendar?select=event_datetime,event_currency,event_impact,importance_score,event_name,consensus,previous_value,actual_value,interpretation,market_impact_narrative` +
-      `&event_datetime=gte.${from}&event_datetime=lte.${to}&event_currency=in.(${ccyList})&order=event_datetime.asc&limit=1000`,
+      `&event_datetime=gte.${from}&event_datetime=lte.${to}&event_currency=in.(${config.currencies.join(",")})&order=event_datetime.asc&limit=1000`,
   );
-
-  const events = rows
+  return rows
     .map((r) => ({
       time: parseEventTime(r.event_datetime),
       ccy: String(r.event_currency ?? "").toUpperCase(),
@@ -58,37 +56,80 @@ export async function loadFromSupabase(now = Date.now()) {
       detail: r.market_impact_narrative || r.interpretation || "",
     }))
     .filter((e) => e.time && e.ccy && e.name);
-
-  const biasRows = await supabaseGet(
-    `entity_bias?select=entity_code,bias,bias_strength,main_driver,invalidation,snap_date&order=snap_date.desc&limit=500`,
-  );
-  const seen = new Set();
-  const biases = [];
-  for (const b of biasRows) {
-    const ccy = String(b.entity_code ?? "").toUpperCase();
-    if (!config.currencies.includes(ccy) || seen.has(ccy)) continue;
-    seen.add(ccy);
-    biases.push({
-      ccy,
-      bias: b.bias ?? "",
-      strength: b.bias_strength ?? "",
-      driver: b.main_driver ?? "",
-      invalidation: b.invalidation ?? "",
-    });
-  }
-
-  return { generatedAt: now, events, biases };
 }
 
-/** Leest een JSON-bestand in hetzelfde formaat (zie examples/). */
+/** BIAS 5.0 uit mirror_bias50_paar, mirror_bias50 en mirror_bias50_samenvatting. */
+async function loadBias() {
+  if (!config.biasUrl || !config.biasKey) {
+    console.warn("BIAS_SUPABASE_URL/BIAS_SUPABASE_KEY niet ingesteld: geen BIAS 5.0.");
+    return { pairs: [], currencies: [], biasDatum: null, biasVersie: "" };
+  }
+  const get = (path) => restGet(config.biasUrl, config.biasKey, path);
+  // select=* zodat een later toegevoegde kolom (bv. strategie_bevestiging per paar) vanzelf meekomt
+  const [pairRows, ccyRows, sumRows] = await Promise.all([
+    get("mirror_bias50_paar?select=*&order=sorteervolgorde.asc"),
+    get("mirror_bias50?select=valuta,index,label,zekerheid,conflict,datum,versie"),
+    get("mirror_bias50_samenvatting?select=valuta,strategie_bevestiging,samenvatting_tekst,kantelpunt_tekst"),
+  ]);
+  return normalizeBias(pairRows, ccyRows, sumRows);
+}
+
+export function normalizeBias(pairRows, ccyRows, sumRows = []) {
+  const sum = new Map(sumRows.map((s) => [s.valuta, s]));
+  const dates = [...pairRows, ...ccyRows].map((r) => r.datum).filter(Boolean).sort();
+  const latest = dates.at(-1) ?? null;
+  return {
+    pairs: pairRows.map((p) => ({
+      basis: p.basis,
+      quote: p.quote,
+      idx: Number(p.paar_index),
+      label: p.paar_label ?? "",
+      tekst: p.paar_richting_tekst ?? "",
+      emmer: p.gelopen_emmer ?? "",
+      z: Number(p.gelopen_z ?? 0),
+      bevestiging: p.strategie_bevestiging ?? "",
+    })),
+    currencies: ccyRows.map((c) => ({
+      ccy: c.valuta,
+      idx: Number(c.index),
+      label: c.label ?? "",
+      zekerheid: c.zekerheid ?? "",
+      conflict: Boolean(c.conflict),
+      bevestiging: sum.get(c.valuta)?.strategie_bevestiging ?? "",
+      kantelpunt: sum.get(c.valuta)?.kantelpunt_tekst ?? "",
+      samenvatting: sum.get(c.valuta)?.samenvatting_tekst ?? "",
+    })),
+    biasDatum: latest ? Date.parse(`${latest}T00:00:00Z`) : null,
+    biasVersie: [...pairRows, ...ccyRows].find((r) => r.versie)?.versie ?? "",
+  };
+}
+
+export async function loadFromSupabase(now = Date.now()) {
+  const [events, bias] = await Promise.all([loadEvents(now), loadBias()]);
+  return { generatedAt: now, events, ...bias };
+}
+
+/** Leest een JSON-bestand (zie examples/): events + optioneel ruwe BIAS-rijen. */
 export function loadFromFile(path) {
   const data = JSON.parse(readFileSync(path, "utf8"));
+  const bias = data.bias ? normalizeBias(data.bias.paar ?? [], data.bias.valuta ?? [], data.bias.samenvatting ?? []) : {};
   return {
     generatedAt: data.generatedAt ? Date.parse(data.generatedAt) : Date.now(),
     label: data.label,
-    events: data.events.map((e) => ({ ...e, time: Date.parse(e.time), ccy: e.ccy.toUpperCase() })),
-    biases: data.biases ?? [],
+    events: (data.events ?? []).map((e) => ({ ...e, time: Date.parse(e.time), ccy: e.ccy.toUpperCase() })),
+    pairs: [],
+    currencies: [],
+    biasDatum: null,
+    biasVersie: "",
+    ...bias,
   };
+}
+
+/** Laatste werkdag (UTC-datum) waarop BIAS 5.0 ververst had moeten zijn (05:13 NL ≈ 04:13 UTC). */
+export function expectedBiasDate(now = Date.now()) {
+  const d = new Date(now - 4.5 * 3_600_000);
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 // ─── Omzetten naar Pine ─────────────────────────────────────────
@@ -102,6 +143,8 @@ function statsLine(e) {
   if (fmtNum(e.previous)) parts.push(`vorig ${fmtNum(e.previous)}`);
   return parts.join(" | ");
 }
+
+const num = (v) => (Number.isFinite(Number(v)) ? String(Math.round(Number(v) * 10000) / 10000) : "0.0");
 
 function truncate(s, max) {
   const t = String(s ?? "").replace(/\s+/g, " ").trim();
@@ -173,20 +216,26 @@ export function buildPine(data) {
     `const string VERSION    = ${pineStr(version)}`,
     `const int    GENERATED  = ${Math.round(data.generatedAt)}`,
     `const string DATA_LABEL = ${pineStr(label)}`,
+    `const int    BIAS_DATUM = ${data.biasDatum ?? 0}`,
+    `const string BIAS_VERSIE = ${pineStr(data.biasVersie)}`,
     `if barstate.isfirst`,
     `    int _count = ${events.length}`,
     ...events.map(
       (e) =>
         `    addEv(${e.time}, ${pineStr(e.ccy)}, ${e.impact}, ${pineStr(e.title)}, ${pineStr(e.stats)}, ${pineStr(e.detail)})`,
     ),
-    ...data.biases.map(
-      (b) =>
-        `    addBias(${pineStr(b.ccy)}, ${pineStr(truncate(b.bias, 20))}, ${pineStr(truncate(b.strength, 16))}, ${pineStr(truncate(b.driver, 60))}, ${pineStr(truncate(b.invalidation, 200))})`,
+    ...data.pairs.map(
+      (p) =>
+        `    addPair(${pineStr(p.basis)}, ${pineStr(p.quote)}, ${num(p.idx)}, ${pineStr(p.label)}, ${pineStr(truncate(p.tekst, 160))}, ${pineStr(p.emmer)}, ${num(p.z)}, ${pineStr(truncate(p.bevestiging, 40))})`,
+    ),
+    ...data.currencies.map(
+      (c) =>
+        `    addCcy(${pineStr(c.ccy)}, ${num(c.idx)}, ${pineStr(c.label)}, ${pineStr(c.zekerheid)}, ${c.conflict ? "true" : "false"}, ${pineStr(truncate(c.bevestiging, 60))}, ${pineStr(truncate(c.kantelpunt, 400))}, ${pineStr(truncate(c.samenvatting, 700))})`,
     ),
   ];
 
   const code = template.replace("{{VERSION}}", version).replace("{{DATA}}", lines.join("\n"));
-  return { code, version, label, eventCount: events.length, biasCount: data.biases.length };
+  return { code, version, label, eventCount: events.length, pairCount: data.pairs.length, biasDatum: data.biasDatum };
 }
 
 export async function generate({ input } = {}) {

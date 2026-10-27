@@ -32,8 +32,12 @@ const num = (key, fallback) => {
 };
 
 export const config = {
+  // Events: database achter het BFX Macro Lab-dashboard (macro_events_calendar)
   supabaseUrl: env("SUPABASE_URL"),
   supabaseKey: env("SUPABASE_KEY"),
+  // BIAS 5.0: mirror_bias50, mirror_bias50_paar, mirror_bias50_samenvatting
+  biasUrl: env("BIAS_SUPABASE_URL"),
+  biasKey: env("BIAS_SUPABASE_KEY"),
   // Tijden in macro_events_calendar zonder tijdzone worden als UTC gelezen.
   eventTimesAreUtc: bool("EVENT_TIMES_ARE_UTC", true),
   daysBack: num("DAYS_BACK", 7),

@@ -4,7 +4,7 @@
 //   node bfx-tv.mjs generate [--input x]    alleen Pine-code maken (out/bfx_macro_overlay.pine)
 //   node bfx-tv.mjs run [--input x]         maken + in TradingView zetten + melding
 import { config } from "./src/config.mjs";
-import { generate } from "./src/generate.mjs";
+import { expectedBiasDate, generate } from "./src/generate.mjs";
 import { notify } from "./src/notify.mjs";
 
 const [command = "run", ...rest] = process.argv.slice(2);
@@ -30,7 +30,11 @@ async function main() {
     await notify(`⚠️ BFX Macro: data ophalen mislukt.\n${err.message}`);
     process.exit(1);
   }
-  const summary = `${gen.label} · ${gen.eventCount} events · ${gen.biasCount} bias-regels`;
+  const biasDay = gen.biasDatum ? new Date(gen.biasDatum).toISOString().slice(0, 10) : null;
+  const biasOld = !input && gen.biasDatum && gen.biasDatum < expectedBiasDate();
+  const summary =
+    `${gen.label} · ${gen.eventCount} events · BIAS 5.0 ${biasDay ? `van ${biasDay} (${gen.pairCount} paren)` : "ontbreekt"}` +
+    (biasOld ? `\n⚠️ BIAS 5.0 is niet van vandaag; de indicator toont de waarden van ${biasDay}.` : "");
   console.log(`Pine-code gemaakt: ${gen.file}\n${summary}`);
 
   if (command === "generate") return;
