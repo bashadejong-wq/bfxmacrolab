@@ -107,4 +107,4 @@ Zet `DELIVERY=manual` in `.env`. Dan maakt het script alleen de code en stuurt h
 - **Tijden:** `EVENT_TIMES_ARE_UTC=true` gaat ervan uit dat `event_datetime` in UTC staat. Controleer bij de eerste run of bijvoorbeeld het FOMC-besluit op het juiste tijdstip staat.
 - **Gebruiksvoorwaarden:** TradingView staat geautomatiseerde toegang formeel niet toe. Eén update per dag of week op je eigen account is beperkt, maar het risico is niet nul. Met `DELIVERY=manual` vermijd je dit volledig.
 - **BIAS-datum:** de run meldt het als BIAS 5.0 niet van de laatste werkdag is; de indicator toont dan de oude stand met waarschuwing.
-- **Testdata:** `examples/week44-eurusd.json` (+ `.pine`) bevat de events van week 44 (FMP-kalender) en de echte BIAS 5.0-stand van 27-10-2026. Probeer met `npm run example`.
+- **Testdata:** `examples/week44-alle.json` (+ `.pine`) bevat de events van week 44 voor alle 8 valuta's (FMP-kalender) en de echte BIAS 5.0-stand van 27-10-2026 (alle 28 paren). Werkt op elk paar: EURUSD, GBPJPY, AUDNZD, enz. Probeer met `npm run example`.

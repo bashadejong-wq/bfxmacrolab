@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-10-27T15:00:00Z",
-  "label": "Week 44 · FOMC + ECB",
-  "source": "Events: FMP economische kalender (testdata). BIAS 5.0: mirror_bias50* van 2026-10-27.",
+  "label": "Week 44 · FOMC, ECB, BoJ, BoC, RBNZ",
+  "source": "Events: FMP economische kalender (testdata, alle 8 valuta's). BIAS 5.0: mirror_bias50* van 2026-10-27.",
   "events": [
     {
       "time": "2026-10-27T12:30:00Z",
@@ -34,12 +34,62 @@
       "detail": ""
     },
     {
+      "time": "2026-10-28T00:30:00Z",
+      "ccy": "AUD",
+      "impact": 3,
+      "name": "AU CPI Q3 (trimmed mean q/q)",
+      "consensus": 1.0,
+      "previous": 0.8,
+      "actual": null,
+      "detail": "Boven verwachting → RBA-hike-kans↑ → AUD↑. Onder → AUD↓ (risk-gevoelig)."
+    },
+    {
+      "time": "2026-10-28T01:00:00Z",
+      "ccy": "NZD",
+      "impact": 3,
+      "name": "RBNZ rentebesluit",
+      "consensus": 3.0,
+      "previous": 2.75,
+      "actual": null,
+      "detail": "Hawkish/hike → NZD↑ (rente-differentieel). Dovish/hold met cut-signaal → NZD↓. Consensus = hike: hold zou NZD flink raken."
+    },
+    {
       "time": "2026-10-28T07:00:00Z",
       "ccy": "EUR",
       "impact": 2,
       "name": "DE consumentenvertrouwen",
       "consensus": -30.9,
       "previous": -30.6,
+      "actual": null,
+      "detail": ""
+    },
+    {
+      "time": "2026-10-28T12:30:00Z",
+      "ccy": "GBP",
+      "impact": 3,
+      "name": "UK begroting",
+      "consensus": null,
+      "previous": null,
+      "actual": null,
+      "detail": "Fiscale ruimte en gilt-uitgifte bepalen de term premium. Ruime begroting + hogere gilt-yields kan GBP juist drukken (fiscaal risico); geloofwaardige consolidatie → GBP↑."
+    },
+    {
+      "time": "2026-10-28T13:45:00Z",
+      "ccy": "CAD",
+      "impact": 3,
+      "name": "BoC rentebesluit",
+      "consensus": 2.5,
+      "previous": 2.25,
+      "actual": null,
+      "detail": "Hawkish/hike → CAD↑ (rente-differentieel). Dovish/hold met cut-signaal → CAD↓. Consensus = hike."
+    },
+    {
+      "time": "2026-10-28T14:30:00Z",
+      "ccy": "CAD",
+      "impact": 2,
+      "name": "BoC persconferentie",
+      "consensus": null,
+      "previous": null,
       "actual": null,
       "detail": ""
     },
@@ -134,12 +184,52 @@
       "detail": "Focus op inflatie (3.8% headline) versus zwakke groei: bepaalt EURUSD-richting richting december."
     },
     {
+      "time": "2026-10-29T23:30:00Z",
+      "ccy": "JPY",
+      "impact": 2,
+      "name": "JP werkloosheid",
+      "consensus": 2.5,
+      "previous": 2.5,
+      "actual": null,
+      "detail": ""
+    },
+    {
+      "time": "2026-10-30T03:00:00Z",
+      "ccy": "JPY",
+      "impact": 3,
+      "name": "BoJ rentebesluit",
+      "consensus": 1.25,
+      "previous": 1.25,
+      "actual": null,
+      "detail": "Hawkish signaal (volgende hike) → JPY↑, carry-trades onder druk (risk-off). Dovish → JPY↓."
+    },
+    {
       "time": "2026-10-30T06:30:00Z",
       "ccy": "EUR",
       "impact": 2,
       "name": "FR BBP Q3",
       "consensus": 0.1,
       "previous": 0,
+      "actual": null,
+      "detail": ""
+    },
+    {
+      "time": "2026-10-30T06:30:00Z",
+      "ccy": "JPY",
+      "impact": 3,
+      "name": "Ueda persconferentie",
+      "consensus": null,
+      "previous": null,
+      "actual": null,
+      "detail": "Timing volgende hike en JGB-aankopen bepalen USDJPY."
+    },
+    {
+      "time": "2026-10-30T07:30:00Z",
+      "ccy": "CHF",
+      "impact": 2,
+      "name": "CH retail sales m/m",
+      "consensus": 0.2,
+      "previous": 0.4,
       "actual": null,
       "detail": ""
     },
@@ -214,6 +304,16 @@
       "detail": "Zwakke groei (cons 0.2% na 0.6%) → EUR↓ en dovish ECB-verwachting. Verrassing omhoog → EUR↑."
     },
     {
+      "time": "2026-10-30T12:30:00Z",
+      "ccy": "CAD",
+      "impact": 2,
+      "name": "CA BBP m/m",
+      "consensus": 0.1,
+      "previous": null,
+      "actual": null,
+      "detail": ""
+    },
+    {
       "time": "2026-10-30T13:00:00Z",
       "ccy": "EUR",
       "impact": 3,
@@ -230,6 +330,16 @@
       "name": "DE retail sales m/m",
       "consensus": 0.1,
       "previous": 1.3,
+      "actual": null,
+      "detail": ""
+    },
+    {
+      "time": "2026-11-02T08:30:00Z",
+      "ccy": "CHF",
+      "impact": 2,
+      "name": "CH PMI industrie",
+      "consensus": null,
+      "previous": 55.3,
       "actual": null,
       "detail": ""
     },
@@ -254,6 +364,26 @@
       "detail": "Machtsverdeling Congres → fiscale verwachtingen, term premium en volatiliteit in USD/yields."
     },
     {
+      "time": "2026-11-03T03:30:00Z",
+      "ccy": "AUD",
+      "impact": 3,
+      "name": "RBA rentebesluit",
+      "consensus": null,
+      "previous": 4.6,
+      "actual": null,
+      "detail": "Hawkish/hike → AUD↑ (rente-differentieel). Dovish/hold met cut-signaal → AUD↓."
+    },
+    {
+      "time": "2026-11-03T07:30:00Z",
+      "ccy": "CHF",
+      "impact": 3,
+      "name": "CH inflatie j/j",
+      "consensus": null,
+      "previous": 1.0,
+      "actual": null,
+      "detail": "Lage inflatie houdt SNB-verruiming (negatieve rente/interventie) op tafel → CHF↓. Hoger → CHF↑."
+    },
+    {
       "time": "2026-11-03T15:00:00Z",
       "ccy": "USD",
       "impact": 2,
@@ -262,6 +392,16 @@
       "previous": 7.079,
       "actual": null,
       "detail": ""
+    },
+    {
+      "time": "2026-11-03T21:45:00Z",
+      "ccy": "NZD",
+      "impact": 3,
+      "name": "NZ werkloosheid Q3",
+      "consensus": 5.5,
+      "previous": 5.6,
+      "actual": null,
+      "detail": "Daling werkloosheid steunt RBNZ-hike-pad → NZD↑."
     },
     {
       "time": "2026-11-04T10:00:00Z",
@@ -304,6 +444,26 @@
       "detail": "Prijzencomponent extra belangrijk voor inflatieverwachting."
     },
     {
+      "time": "2026-11-05T08:00:00Z",
+      "ccy": "CHF",
+      "impact": 2,
+      "name": "CH werkloosheid",
+      "consensus": null,
+      "previous": 3.0,
+      "actual": null,
+      "detail": ""
+    },
+    {
+      "time": "2026-11-05T12:00:00Z",
+      "ccy": "GBP",
+      "impact": 3,
+      "name": "BoE rentebesluit",
+      "consensus": 4.0,
+      "previous": 3.75,
+      "actual": null,
+      "detail": "Hawkish/hike → GBP↑ (rente-differentieel). Dovish/hold met cut-signaal → GBP↓. Consensus = hike; let op stemverhouding MPC."
+    },
+    {
       "time": "2026-11-05T13:30:00Z",
       "ccy": "USD",
       "impact": 2,
@@ -344,6 +504,16 @@
       "detail": ""
     },
     {
+      "time": "2026-11-06T13:30:00Z",
+      "ccy": "CAD",
+      "impact": 3,
+      "name": "CA banen + werkloosheid",
+      "consensus": null,
+      "previous": 6.5,
+      "actual": null,
+      "detail": "Vorige maand −68K banen: herstel → CAD↑, nieuwe zwakte → CAD↓."
+    },
+    {
       "time": "2026-11-06T15:00:00Z",
       "ccy": "USD",
       "impact": 2,
@@ -352,6 +522,16 @@
       "previous": 48,
       "actual": null,
       "detail": "Let op inflatieverwachtingen."
+    },
+    {
+      "time": "2026-11-06T15:00:00Z",
+      "ccy": "CAD",
+      "impact": 2,
+      "name": "Ivey PMI",
+      "consensus": null,
+      "previous": 58.2,
+      "actual": null,
+      "detail": ""
     }
   ],
   "biases": [],

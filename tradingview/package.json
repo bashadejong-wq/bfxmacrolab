@@ -7,7 +7,7 @@
     "login": "node bfx-tv.mjs login",
     "generate": "node bfx-tv.mjs generate",
     "run": "node bfx-tv.mjs run",
-    "example": "node bfx-tv.mjs generate --input examples/week44-eurusd.json"
+    "example": "node bfx-tv.mjs generate --input examples/week44-alle.json"
   },
   "engines": {
     "node": ">=18"
