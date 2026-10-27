@@ -16,3 +16,7 @@
 | Dataverschuiving na herladen | box-ID + vergelijking alert-log vs. historische herberekening |
 | Productiedruk | geen statuslabel "bevestigd" in productie-Compass vóór forward-resultaat en expliciet besluit |
 | Pine-limieten (tokens, objecten, requests) | Engine als aparte indicator; max. ±10 security-calls |
+
+## Gebeurd in de nachtronde 27/28-10
+- De retrospectieve meting draaide op alle geladen historie en raakte daarmee de validatieperiode (2026-01 t/m 08). Er is niets afgesteld, dus dit telt als één vooraf vastgelegde toets. Elke volgende drempelwijziging = nieuwe versie (CBO_0.2) en alleen forward te valideren.
+- Bar Magnifier is niet beschikbaar in een indicator; vervangen door *stop eerst* als stop en target in dezelfde bar vallen (conservatief).

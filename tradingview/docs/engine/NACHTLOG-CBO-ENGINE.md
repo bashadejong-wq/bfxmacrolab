@@ -1,0 +1,23 @@
+# Nachtlog CBO Research Engine 0.1
+
+- 22:43 Start. Branch was claude/tradingview-macro-overlay @ ea1318a met 3 gewijzigde bestanden + docs/engine (niet gecommit).
+- 22:43 Snapshot: /Users/bashajong/Claude/bfx-tv-snapshot-* (diff, tgz, sha256).
+- 22:43 LaunchAgent nl.bfx.tradingview-overlay UITGELADEN (geverifieerd: niet geladen). nl.bfx.login-wachter niet aangeraakt. Blijft uit tot besluit Bas.
+- 22:43 Werkmap vastgelegd op branch wip/compass-fase1-2026-10-27 (commit). Productiewerkmap terug op ea1318a, schoon.
+- 22:43 Onderzoeksworktree ../bfx-cbo-research op branch research/cbo-engine-0.1.
+- Classificatie WIP-wijzigingen: template = presentatie (Compass Fase 1); deliver.mjs scroll-via-JS-wheel = automatisering, RISICOVOL (exit 5); deliver.mjs autoscale/chartReset = automatisering, niet nodig voor onderzoek; bfx-tv.mjs logveld autoschaal = automatisering, onschadelijk. Geen van deze wordt in de Engine gebruikt.
+- 22:47 Engine-template + engine-generate.mjs geschreven; eerste generatie.
+- 22:50 Pine Editor in onderzoekslayout DcotUC2P bleef 17 px breed. Oorzaak: verborgen sleepgreep (4 px, x=1538). Verbreed door slepen. Ook op productielayout alleen de editor-knop geprobeerd; niets gewijzigd of opgeslagen.
+- 22:54 Nieuw script "BFX CBO Research Engine 0.1" aangemaakt (Create new → Indicator) en opgeslagen. Productiescript "BFX Macro Overlay" niet gewijzigd.
+- 22:55 Compilefout 1: lokale functie refLine in lokaal bereik → naar globaal. Waarschuwing: ta.lowest in lokaal bereik → globaal low50. Daarna schoon.
+- 22:56 Op chart gezet (EURUSD 30m). Compass toegevoegd in dezelfde onderzoekslayout (script niet opgeslagen of gewijzigd). Layout opgeslagen.
+- 22:59 Testmatrix runtime: 7 majors × 30m, EURUSD × 5m/15m/1H/4H/D: geen runtimefouten.
+- 23:00 Bevinding 1: op D gaf regime "post-event" (event valt binnen één bar). Fix: post-event-regime alleen op bars ≤ 1 uur.
+- 23:01 Bevinding 2: variantregel toonde oude uitkomsten zonder actieve box. Fix: label "vorige box:".
+- 23:02 Incident: plakken gebeurde één keer op de chart (editor was geminimaliseerd) → één tekstobject in de ONDERZOEKSlayout. Direct verwijderd (1 object, geverifieerd 0 over). Compile-hulpscript daarna beveiligd: plakt alleen als de editor zichtbaar is én het onderzoeksscript toont.
+- 23:04 Donker thema (alleen achtergrond van deze chart), Heikin Ashi (engine uit), Minimal, profiel-mismatch, 1H Swing: zoals verwacht. Chart teruggezet.
+- 23:06 Datavenster-plots toegevoegd (V1/V2/V3 n, hit, gem R, tellingen) om meting tekstueel af te lezen.
+- 23:08–23:15 Meting 7 majors × 15m/30m/1H/4H: V1 n 65 (−0,03R), V2 n 34 (−0,34R), V3 n 49 (−0,02R), bruto. Geen edge aangetoond of uitgesloten. Validatieperiode meegenomen (gedocumenteerd).
+- 23:17 Reload-test: EURUSD 30m, 1× engine, 1× Compass, nieuwste versie; aggregaten gelijk vóór/na.
+- 23:18 Productiecontrole (alleen lezen): layout 6b31RP4L = Volume + BFX Macro Overlay, snapshot 202,610,272,129; git productie ea1318a schoon; LaunchAgent niet geladen.
+- 23:20 Browservrije tests: 28/28 (6 nieuw). Documenten bijgewerkt: testmatrix (resultaten + traceerbaarheid), retro-meting, beslisnotitie, risico's, implementatieplan.

@@ -12,3 +12,14 @@
 | 7 | Na ≥ 8 weken: besluit of CBO-status zichtbaar wordt in de productie-Compass, met versie/horizon/sample/onderzoeksstatus | template | ja, expliciet besluit |
 
 Kleinste veilige volgende stap: **stap 0a** (LaunchAgent uitladen of werkmap terugzetten) — voorkomt dat morgen 05:45 niet-goedgekeurde code draait.
+
+## Stand 28-10-2026 (na nachtronde)
+| Stap | Stand |
+|---|---|
+| 0a | ✔ LaunchAgent uitgeladen; productiewerkmap op `ea1318a` |
+| 0b–d | open |
+| 1 | open (Compass Fase 1 op branch `wip/compass-fase1-2026-10-27`) |
+| 2 | ✔ als onderzoeksversie: script *BFX CBO Research Engine 0.1*, layout *BFX CBO Onderzoek* |
+| 3 | deels: browservrije generatortests (6), reload-identiek op aggregaat; synthetische Pine-reeksen niet gebouwd |
+| 4 | deels: retrospectief, indicator-meting (geen strategy-script, geen baselines, geen periodesplitsing) |
+| 5–7 | open; 5 kan niet meer op 2026-01 t/m 08 (zie CBO-RETRO-METING-0.1) |

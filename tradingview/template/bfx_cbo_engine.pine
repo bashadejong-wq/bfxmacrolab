@@ -1,0 +1,737 @@
+//@version=6
+// BFX-CBO-ENGINE
+// ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE. Geen handelsadvies; geen automatische uitvoering.
+// Datablok: {{VERSION}}
+indicator("BFX CBO Research Engine 0.1", shorttitle = "BFX CBO 0.1", overlay = true, max_lines_count = 300, max_labels_count = 100, max_boxes_count = 60)
+
+// ═══ 0. Instellingen ═══════════════════════════════════════════
+const string GW = "Weergave"
+const string GP = "Timeframeprofiel"
+const string GH = "HYPOTHESE-parameters (niet bewezen)"
+const string GE = "Event (HYPOTHESE-vensters)"
+const string GK = "Kosten"
+i_mode    = input.string("Compact", "Weergave", options = ["Minimal", "Compact", "Expanded"], group = GW)
+i_pos     = input.string("Rechtsboven", "Positie kaart", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GW)
+i_spacer  = input.int(1, "Lege regels boven kaart", minval = 0, maxval = 8, group = GW)
+i_var     = input.string("V2", "Primaire variant (weergave)", options = ["V1", "V2", "V3"], tooltip = "V1 breakout-close · V2 + eerste retest · V3 + acceptatie-kandidaat. Alle drie worden apart gemeten.", group = GW)
+i_hist    = input.int(5, "Expanded: historische boxen", minval = 0, maxval = 20, group = GW)
+i_refs    = input.bool(true, "Expanded: feitelijke referentielijnen", group = GW)
+i_tz      = input.string("Europe/Amsterdam", "Tijdzone weergave", group = GW)
+i_prof    = input.string("Auto", "Profiel", options = ["Auto", "Intraday", "Swing", "Manual"], group = GP)
+i_mCtx    = input.timeframe("240", "Manual: context-TF", group = GP)
+i_mStr    = input.timeframe("60", "Manual: structuur-TF", group = GP)
+i_mTrg    = input.timeframe("30", "Manual: trigger-TF", group = GP)
+i_mExe    = input.timeframe("5", "Manual: uitvoering-TF", group = GP)
+// Regime
+h_atrLen  = input.int(14, "ATR-lengte", minval = 2, group = GH)
+h_volLen  = input.int(20, "Gerealiseerde vol: lengte", minval = 5, group = GH)
+h_volPct  = input.int(250, "Vol-percentiel: venster (bars)", minval = 50, group = GH)
+h_lowVol  = input.float(15, "Lage vol < percentiel", group = GH)
+h_highVol = input.float(85, "Hoge vol > percentiel", group = GH)
+h_compVol = input.float(40, "Compressie: vol < percentiel", group = GH)
+h_erLen   = input.int(20, "Efficiency ratio: lengte", minval = 5, group = GH)
+h_erTrend = input.float(0.35, "Trend: ER ≥", group = GH)
+h_erChaos = input.float(0.12, "Chaotisch: ER <", group = GH)
+h_expMult = input.float(2.0, "Expansie: bar-range ≥ × ATR", group = GH)
+// Consolidatie / box
+h_nMin    = input.int(8, "Box: min. bars", minval = 3, group = GH)
+h_nMax    = input.int(24, "Box: max. bars", minval = 5, group = GH)
+h_wMax    = input.float(1.25, "Box: max. breedte × ATR", group = GH)
+h_tol     = input.float(0.15, "Test-tolerantie × boxbreedte", group = GH)
+h_tMin    = input.int(2, "Min. tests boven én onder", minval = 1, group = GH)
+h_nSeal   = input.int(3, "Verzegelen na n bars zonder nieuw extreem", minval = 1, group = GH)
+h_expiry  = input.float(2.0, "Verval: geen breakout binnen × boxduur", group = GH)
+// Breakout / varianten
+h_body    = input.float(0.5, "Breakout: min. body-aandeel buiten box", group = GH)
+h_chase   = input.float(2.0, "Chase: bar-range > × boxbreedte", group = GH)
+h_retMax  = input.int(8, "V2: max. bars tot retest", minval = 1, group = GH)
+h_retTol  = input.float(0.25, "V2: retest-tolerantie × ATR", group = GH)
+h_accK    = input.int(2, "V3: closes buiten box", minval = 1, group = GH)
+h_buf     = input.float(0.1, "Stopbuffer × ATR", group = GH)
+h_minRoom = input.float(1.0, "Min. ruimte (R) tot eerste referentie", group = GH)
+h_tMax    = input.int(32, "Meting: tijdexit na bars", minval = 4, group = GH)
+// Event
+e_preCB   = input.int(60, "Centrale bank: blok vóór (min)", group = GE)
+e_postCB  = input.int(120, "Centrale bank: cooldown na (min)", group = GE)
+e_pre     = input.int(30, "High impact: blok vóór (min)", group = GE)
+e_post    = input.int(60, "High impact: cooldown na (min)", group = GE)
+e_disc    = input.int(180, "Post-event regime (min na event)", group = GE)
+// Kosten
+k_known   = input.bool(false, "Kosten bekend (anders: KOSTEN ONBEKEND)", group = GK)
+k_spread  = input.float(0.0, "Spread (pips) — aanname", group = GK)
+k_slip    = input.float(0.0, "Slippage per kant (pips) — aanname", group = GK)
+
+// ═══ 1. Data (gegenereerd) ══════════════════════════════════════
+type PairBias
+    string basis
+    string quote
+    float  idx
+    string lbl
+    string status
+    string tekst
+type CcyK
+    string ccy
+    float  idx
+    string kp
+type Inv
+    string paar
+    string tekst
+    string horizon
+type Ev
+    int    t
+    string ccy
+    bool   cb
+    string name
+var array<PairBias> pairs = array.new<PairBias>()
+var array<CcyK>     ccyk  = array.new<CcyK>()
+var array<Inv>      invs  = array.new<Inv>()
+var array<Ev>       evs   = array.new<Ev>()
+addPair(string b, string q, float i, string l, string s, string t) =>
+    pairs.push(PairBias.new(b, q, i, l, s, t))
+addCcy(string c, float i, string k) =>
+    ccyk.push(CcyK.new(c, i, k))
+addInv(string p, string t, string h) =>
+    invs.push(Inv.new(p, t, h))
+addEv(int t, string c, bool cb, string n) =>
+    evs.push(Ev.new(t, c, cb, n))
+
+// ═══ DATA-START ═══
+{{DATA}}
+// ═══ DATA-EINDE ═══
+
+// ═══ 2. Macro Context (BIAS_5.0, ongewijzigd) ═══════════════════
+string cb = syminfo.basecurrency
+string cq = syminfo.currency
+findPair() =>
+    PairBias f = na
+    for p in pairs
+        if (p.basis == cb and p.quote == cq) or (p.basis == cq and p.quote == cb)
+            f := p
+            break
+    f
+findInv() =>
+    Inv f = na
+    for v in invs
+        if v.paar == cb + cq or v.paar == cq + cb
+            f := v
+            break
+    f
+expectedBiasDay() =>
+    string tz = "Europe/Amsterdam"
+    int t = timenow
+    if hour(t, tz) * 60 + minute(t, tz) < 330
+        t := t - 86400000
+    int dow = dayofweek(t, tz)
+    int back = dow == dayofweek.sunday ? 2 : dow == dayofweek.saturday ? 1 : 0
+    timestamp("UTC", year(t, tz), month(t, tz), dayofmonth(t, tz)) - back * 86400000
+PairBias pb = findPair()
+float pIdx = na(pb) ? na : (pb.basis != cb ? -pb.idx : pb.idx)
+bool  biasFresh = BIAS_DATUM > 0 and BIAS_DATUM >= expectedBiasDay()
+int   macroDir = na(pIdx) or not biasFresh ? 0 : pIdx >= 15 ? 1 : pIdx <= -15 ? -1 : 0
+string macroTxt = na(pb) ? "onbekend" : not biasFresh ? "verouderd" : macroDir == 0 ? "neutraal" : (macroDir > 0 ? "bullish " : "bearish ") + cb + "/" + cq
+
+// ═══ 3. Timeframe Profile ═══════════════════════════════════════
+int tfSec = timeframe.in_seconds()
+string prof = i_prof
+string ctxTF = "240"
+string strTF = "60"
+string trgTF = timeframe.period
+string role = "trigger"
+if prof == "Auto"
+    prof := tfSec <= 300 ? "Intraday" : tfSec <= 1800 ? "Intraday" : tfSec <= 14400 ? "Swing" : "Context"
+if prof == "Intraday"
+    ctxTF := "240"
+    strTF := "60"
+    trgTF := tfSec <= 300 ? "30" : timeframe.period
+    role := tfSec <= 300 ? "execution" : (tfSec == 900 or tfSec == 1800) ? "trigger" : "mismatch"
+else if prof == "Swing"
+    ctxTF := "D"
+    strTF := "240"
+    trgTF := timeframe.period
+    role := (tfSec == 3600 or tfSec == 14400) ? "trigger" : "mismatch"
+else if prof == "Manual"
+    ctxTF := i_mCtx
+    strTF := i_mStr
+    trgTF := i_mTrg
+    role := timeframe.period == i_mTrg ? "trigger" : timeframe.period == i_mExe ? "execution" : "mismatch"
+else
+    role := "context"
+bool synth = chart.is_heikinashi or chart.is_renko or chart.is_kagi or chart.is_pnf or chart.is_linebreak or chart.is_range
+bool engineOn = role == "trigger" and not synth
+
+// Bevestigde hogere-TF-waarden: expr[1] + lookahead_on = laatste gesloten bar, geen future leak
+htf(string tf, float x) =>
+    request.security(syminfo.tickerid, tf, x[1], lookahead = barmerge.lookahead_on)
+float ctxEma   = htf(ctxTF, ta.ema(close, 50))
+float ctxClose = htf(ctxTF, close)
+float ctxSlope = htf(ctxTF, ta.ema(close, 50) - ta.ema(close, 50)[5])
+float strSwH   = htf(strTF, ta.valuewhen(not na(ta.pivothigh(high, 3, 3)), high[3], 0))
+float strSwL   = htf(strTF, ta.valuewhen(not na(ta.pivotlow(low, 3, 3)), low[3], 0))
+float pdh      = htf("D", high)
+float pdl      = htf("D", low)
+float pwh      = htf("W", high)
+float pwl      = htf("W", low)
+float dOpen    = request.security(syminfo.tickerid, "D", open, lookahead = barmerge.lookahead_on)
+float wOpen    = request.security(syminfo.tickerid, "W", open, lookahead = barmerge.lookahead_on)
+int   dStart   = time("D")
+int   wStart   = time("W")
+
+// Sessies (IANA; DST automatisch) — volledige sessies, geen Initial Balance
+sessHL(string sess, string tz) =>
+    bool inS = not na(time(timeframe.period, sess, tz))
+    var float h = na
+    var float l = na
+    var int st = na
+    var float lh = na
+    var float ll = na
+    var int lst = na
+    if inS and not inS[1]
+        h := high
+        l := low
+        st := time
+    else if inS
+        h := math.max(h, high)
+        l := math.min(l, low)
+    if not inS and inS[1]
+        lh := h
+        ll := l
+        lst := st
+    [inS ? h : lh, inS ? l : ll, inS ? st : lst, inS]
+[asH, asL, asT, asV] = sessHL("0900-1500", "Asia/Tokyo")
+[lnH, lnL, lnT, lnV] = sessHL("0800-1700", "Europe/London")
+[nyH, nyL, nyT, nyV] = sessHL("0800-1700", "America/New_York")
+
+// ═══ 4. Market Regime (verklaarbaar; alle grenzen HYPOTHESE) ════
+float atr = ta.atr(h_atrLen)
+float rv  = ta.stdev(math.log(close / close[1]), h_volLen)
+float rvP = ta.percentrank(rv, h_volPct)
+float er  = math.abs(close - close[h_erLen]) / math.max(math.sum(math.abs(close - close[1]), h_erLen), syminfo.mintick)
+float rng = high - low
+
+// Events (alleen basis/quote, high impact) — status op een tijdstip
+evAt(int t) =>
+    bool blk = false
+    bool post = false
+    Ev nxt = na
+    Ev lst = na
+    for e in evs
+        if e.ccy == cb or e.ccy == cq
+            int pre = (e.cb ? e_preCB : e_pre) * 60000
+            int aft = (e.cb ? e_postCB : e_post) * 60000
+            if t >= e.t - pre and t <= e.t + aft
+                blk := true
+            if t > e.t and t <= e.t + e_disc * 60000
+                post := true
+            if e.t >= t and na(nxt)
+                nxt := e
+            if e.t <= t
+                lst := e
+    [blk, post, nxt, lst]
+[evBlk, evPost, evNext, evLast] = evAt(time_close)
+
+string regime = "balans"
+string regWhy = ""
+bool ctxUp = not na(ctxSlope) and ctxSlope > 0 and ctxClose > ctxEma
+bool ctxDn = not na(ctxSlope) and ctxSlope < 0 and ctxClose < ctxEma
+// Post-event-regime alleen op bars ≤ 1 uur: op 4H/D valt een event binnen één bar en zegt het venster niets (testmatrix 27-10)
+bool evRegimeTF = timeframe.in_seconds() <= 3600
+if evPost and evRegimeTF
+    regime := "post-event"
+    regWhy := "binnen " + str.tostring(e_disc) + " min na high-impact event"
+else if rng >= h_expMult * atr
+    regime := "expansie"
+    regWhy := "bar-range " + str.tostring(rng / atr, "0.0") + "×ATR ≥ " + str.tostring(h_expMult)
+else if rvP > h_highVol
+    regime := "hoge volatiliteit"
+    regWhy := "vol-percentiel " + str.tostring(rvP, "0") + " > " + str.tostring(h_highVol)
+else if er < h_erChaos and rvP > 50
+    regime := "chaotisch"
+    regWhy := "ER " + str.tostring(er, "0.00") + " < " + str.tostring(h_erChaos) + " bij vol-pct " + str.tostring(rvP, "0")
+else if rvP < h_lowVol
+    regime := "lage volatiliteit"
+    regWhy := "vol-percentiel " + str.tostring(rvP, "0") + " < " + str.tostring(h_lowVol)
+else if rvP < h_compVol and er < h_erTrend
+    regime := "compressie"
+    regWhy := "vol-pct " + str.tostring(rvP, "0") + " < " + str.tostring(h_compVol) + ", ER " + str.tostring(er, "0.00")
+else if er >= h_erTrend and (ctxUp or ctxDn)
+    regime := "trend"
+    regWhy := "ER " + str.tostring(er, "0.00") + " ≥ " + str.tostring(h_erTrend) + ", context " + (ctxUp ? "op" : "neer")
+else
+    regWhy := "geen andere regel van toepassing"
+bool regimeOK = regime == "compressie" or regime == "balans" or regime == "trend" or regime == "lage volatiliteit"
+
+// ═══ 5. Consolidation Detection + 6. Box State Machine ══════════
+// 0 GEEN CONTEXT · 1 CONTEXT GELDIG · 2 VORMT · 3 KANDIDAAT · 4 VERZEGELD · 5 BREAKOUT · 6 RETEST/ACCEPTATIE · 7 BEVESTIGD · 8 ACTIEF · 9 MISLUKT · 10 VERLOPEN · 11 EVENT BLOCK
+stName(int s) =>
+    switch s
+        0 => "GEEN CONTEXT"
+        1 => "CONTEXT GELDIG"
+        2 => "CONSOLIDATIE VORMT"
+        3 => "BOX KANDIDAAT"
+        4 => "BOX VERZEGELD"
+        5 => "BREAKOUT"
+        6 => "RETEST/ACCEPTATIE"
+        7 => "BEVESTIGD"
+        8 => "ACTIEF"
+        9 => "MISLUKT"
+        10 => "VERLOPEN"
+        11 => "EVENT BLOCK"
+        => "?"
+vName(int s) =>
+    switch s
+        0 => "–"
+        1 => "wacht"
+        2 => "bevestigd"
+        3 => "mislukt"
+        4 => "verlopen"
+        => "?"
+
+float hhN = ta.highest(high, h_nMin)
+float llN = ta.lowest(low, h_nMin)
+float low50 = ta.lowest(low, 50)
+
+var int   st = 0
+var float bHi = na
+var float bLo = na
+var int   bStartT = na
+var int   bStartB = na
+var int   bN = 0
+var int   tTop = 0
+var int   tBot = 0
+var int   quiet = 0
+var float sHi = na
+var float sLo = na
+var int   sT = na
+var int   sB = na
+var int   sN = 0
+var string boxId = ""
+var int   bDir = 0
+var int   bB = na
+var int   bT = na
+var int   outCnt = 0
+var float retExt = na
+var int   v1 = 0
+var int   v2 = 0
+var int   v3 = 0
+var string brkTxt = ""
+var bool  chase = false
+var int   prevSt = 0
+// Telling (retrospectief, prijs-only)
+var int cKand = 0
+var int cSeal = 0
+var int cBrk = 0
+var int cWick = 0
+var int cFail = 0
+var int cBlock = 0
+
+// Ruimte: eerste tegengestelde feitelijke referentie in richting d vanaf prijs p
+firstRef(int d, float p) =>
+    float best = na
+    string nm = ""
+    float[] ys = array.from(pdh, pdl, pwh, pwl, dOpen, wOpen, asH, asL, lnH, lnL, nyH, nyL, strSwH, strSwL)
+    string[] ns = array.from("PDH", "PDL", "PWH", "PWL", "D Open", "W Open", "Asia H", "Asia L", "London H", "London L", "NY H", "NY L", "swing H (" + strTF + ")", "swing L (" + strTF + ")")
+    for i = 0 to ys.size() - 1
+        float y = ys.get(i)
+        if not na(y) and ((d == 1 and y > p) or (d == -1 and y < p))
+            if na(best) or math.abs(y - p) < math.abs(best - p)
+                best := y
+                nm := ns.get(i)
+    [best, nm]
+
+// ═══ 12. Research Logging — retrospectieve meting per variant (prijs-only) ═══
+// Slot per variant: open meting met entry op open van de volgende bar; stop-eerst bij gelijktijdige raak.
+var float[] mE   = array.new_float(3, na)
+var float[] mS   = array.new_float(3, na)
+var float[] mT   = array.new_float(3, na)
+var int[]   mD   = array.new_int(3, 0)
+var int[]   mB   = array.new_int(3, na)
+var bool[]  mPend = array.new_bool(3, false)
+var float[] mPS  = array.new_float(3, na)
+var float[] mPT  = array.new_float(3, na)
+var float[] mMfe = array.new_float(3, 0)
+var float[] mMae = array.new_float(3, 0)
+var int[]   rN   = array.new_int(3, 0)
+var int[]   rW   = array.new_int(3, 0)
+var float[] rSum = array.new_float(3, 0)
+var float[] rSumN = array.new_float(3, 0)
+var float[] rMfe = array.new_float(3, 0)
+var float[] rMae = array.new_float(3, 0)
+var float[] rEq  = array.new_float(3, 0)
+var float[] rPk  = array.new_float(3, 0)
+var float[] rDD  = array.new_float(3, 0)
+var array<float> rList0 = array.new_float()
+var array<float> rList1 = array.new_float()
+var array<float> rList2 = array.new_float()
+
+costPx() =>
+    k_known ? (k_spread + 2 * k_slip) * syminfo.mintick * (syminfo.mintick < 0.001 ? 10 : 1) : 0.0
+
+armMeasure(int v, int d, float stopP, float tgtP) =>
+    mPend.set(v, true)
+    mD.set(v, d)
+    mPS.set(v, stopP)
+    mPT.set(v, tgtP)
+
+closeMeasure(int v, float rGross) =>
+    float risk = math.abs(mE.get(v) - mS.get(v))
+    float rNet = risk > 0 ? rGross - costPx() / risk : rGross
+    rN.set(v, rN.get(v) + 1)
+    rW.set(v, rW.get(v) + (rGross > 0 ? 1 : 0))
+    rSum.set(v, rSum.get(v) + rGross)
+    rSumN.set(v, rSumN.get(v) + rNet)
+    rMfe.set(v, rMfe.get(v) + mMfe.get(v))
+    rMae.set(v, rMae.get(v) + mMae.get(v))
+    rEq.set(v, rEq.get(v) + rNet)
+    rPk.set(v, math.max(rPk.get(v), rEq.get(v)))
+    rDD.set(v, math.max(rDD.get(v), rPk.get(v) - rEq.get(v)))
+    (v == 0 ? rList0 : v == 1 ? rList1 : rList2).push(rGross)
+    mE.set(v, na)
+
+stepMeasure(int v) =>
+    // Gearmd op de vorige bar → entry op open van deze bar
+    if mPend.get(v)
+        mPend.set(v, false)
+        mE.set(v, open)
+        mS.set(v, mPS.get(v))
+        mT.set(v, mPT.get(v))
+        mB.set(v, bar_index)
+        mMfe.set(v, 0)
+        mMae.set(v, 0)
+    if not na(mE.get(v))
+        float e = mE.get(v)
+        float risk = math.abs(e - mS.get(v))
+        int d = mD.get(v)
+        if risk > 0
+            mMfe.set(v, math.max(mMfe.get(v), ((d == 1 ? high : e) - (d == 1 ? e : low)) / risk))
+            mMae.set(v, math.max(mMae.get(v), ((d == 1 ? e : high) - (d == 1 ? low : e)) / risk))
+            bool hitS = d == 1 ? low <= mS.get(v) : high >= mS.get(v)
+            bool hitT = d == 1 ? high >= mT.get(v) : low <= mT.get(v)
+            if hitS
+                closeMeasure(v, -1.0)
+            else if hitT
+                closeMeasure(v, math.abs(mT.get(v) - e) / risk)
+            else if bar_index - mB.get(v) >= h_tMax
+                closeMeasure(v, (d == 1 ? close - e : e - close) / risk)
+        else
+            mE.set(v, na)
+
+if barstate.isconfirmed and engineOn
+    for v = 0 to 2
+        stepMeasure(v)
+    float w = bHi - bLo
+    // Start of herstart
+    if st == 0 or st == 1 or st >= 9
+        if regimeOK and not evBlk and (hhN - llN) <= h_wMax * atr
+            st := 2
+            bHi := hhN
+            bLo := llN
+            bN := h_nMin
+            bStartT := time[h_nMin - 1]
+            bStartB := bar_index - h_nMin + 1
+            tTop := 0
+            tBot := 0
+            quiet := 0
+            float ww = hhN - llN
+            for i = 0 to h_nMin - 1
+                tTop += high[i] >= hhN - h_tol * ww ? 1 : 0
+                tBot += low[i] <= llN + h_tol * ww ? 1 : 0
+        else
+            st := evBlk ? 11 : regimeOK ? 1 : 0
+    else if st == 2 or st == 3
+        float nh = math.max(bHi, high)
+        float nl = math.min(bLo, low)
+        if evBlk
+            st := 11
+            cBlock += 1
+        else if (nh - nl) <= h_wMax * atr and bN < h_nMax
+            quiet := (high <= bHi and low >= bLo) ? quiet + 1 : 0
+            bHi := nh
+            bLo := nl
+            bN += 1
+            float w2 = bHi - bLo
+            tTop += high >= bHi - h_tol * w2 ? 1 : 0
+            tBot += low <= bLo + h_tol * w2 ? 1 : 0
+            if st == 2 and tTop >= h_tMin and tBot >= h_tMin
+                st := 3
+                cKand += 1
+            if st == 3 and quiet >= h_nSeal
+                // Verzegeling: vanaf hier liggen de grenzen vast
+                st := 4
+                sHi := bHi
+                sLo := bLo
+                sT := time_close
+                sB := bar_index
+                sN := bN
+                boxId := syminfo.ticker + ":" + timeframe.period + ":" + str.tostring(bStartT) + ":" + str.tostring(sT)
+                cSeal += 1
+                v1 := 0
+                v2 := 0
+                v3 := 0
+                outCnt := 0
+        else
+            // Kandidaat vervalt (te breed of te lang zonder verzegeling)
+            st := 1
+    else if st == 4
+        float sw = sHi - sLo
+        if evBlk
+            st := 11
+            cBlock += 1
+        else
+            bool up = close > sHi
+            bool dn = close < sLo
+            float body = math.abs(close - open)
+            float outB = up ? close - math.max(open, sHi) : dn ? math.min(open, sLo) - close : 0
+            bool bodyOk = body > 0 and outB / body >= h_body
+            if (up or dn) and bodyOk
+                st := 5
+                bDir := up ? 1 : -1
+                bB := bar_index
+                bT := time_close
+                cBrk += 1
+                chase := rng > h_chase * sw
+                float upW = high - math.max(open, close)
+                float loW = math.min(open, close) - low
+                float clLoc = rng > 0 ? (close - low) / rng : 0.5
+                brkTxt := "body buiten " + str.tostring(outB / body * 100, "0") + "% · wick tegen " + str.tostring((bDir == 1 ? upW : loW) / math.max(rng, syminfo.mintick) * 100, "0") + "% · close-locatie " + str.tostring(bDir == 1 ? clLoc : 1 - clLoc, "0.00") + " · afstand " + str.tostring((bDir == 1 ? close - sHi : sLo - close) / atr, "0.00") + " ATR · expansie " + str.tostring(rng / math.max(sw / sN, syminfo.mintick), "0.0") + "× gem. boxbar" + (chase ? " · CHASE" : "")
+                // V1: direct; meting met stop aan de overkant
+                [t1, t1n] = firstRef(bDir, close)
+                float stop1 = bDir == 1 ? sLo - h_buf * atr : sHi + h_buf * atr
+                float tgt1 = na(t1) ? close + bDir * 2 * math.abs(close - stop1) : t1
+                v1 := 2
+                armMeasure(0, bDir, stop1, tgt1)
+                v2 := 1
+                v3 := 1
+                outCnt := 1
+            else
+                if (high > sHi and close <= sHi) or (low < sLo and close >= sLo)
+                    cWick += 1
+                if bar_index - sB > h_expiry * sN
+                    st := 10
+    else if st == 5 or st == 6
+        bool back = bDir == 1 ? close < sHi : close > sLo
+        if back
+            if v2 == 1
+                v2 := 3
+            if v3 == 1
+                v3 := 3
+            st := 9
+            cFail += 1
+        else
+            outCnt += 1
+            st := 6
+            // V2: eerste retest van de gebroken grens en close weer in richting
+            if v2 == 1
+                bool ret = bDir == 1 ? low <= sHi + h_retTol * atr : high >= sLo - h_retTol * atr
+                if ret
+                    retExt := bDir == 1 ? low : high
+                    float stop2 = bDir == 1 ? retExt - h_buf * atr : retExt + h_buf * atr
+                    [t2, t2n] = firstRef(bDir, close)
+                    v2 := 2
+                    armMeasure(1, bDir, stop2, na(t2) ? close + bDir * 2 * math.abs(close - stop2) : t2)
+                else if bar_index - bB >= h_retMax
+                    v2 := 4
+            // V3: acceptatie-kandidaat = k closes buiten de box
+            if v3 == 1 and outCnt >= h_accK
+                float stop3 = bDir == 1 ? sLo - h_buf * atr : sHi + h_buf * atr
+                [t3, t3n] = firstRef(bDir, close)
+                v3 := 2
+                armMeasure(2, bDir, stop3, na(t3) ? close + bDir * 2 * math.abs(close - stop3) : t3)
+            int vp = i_var == "V1" ? v1 : i_var == "V2" ? v2 : v3
+            if vp == 2
+                st := 7
+            if v2 != 1 and v3 != 1
+                st := vp == 2 ? 8 : 9
+    else if st == 7 or st == 8
+        int vi = i_var == "V1" ? 0 : i_var == "V2" ? 1 : 2
+        st := not na(mE.get(vi)) or mPend.get(vi) ? 8 : 1
+
+// Alerts uitsluitend op bar close bij een toestandswissel
+if barstate.isconfirmed and engineOn and st != prevSt
+    alert("{\"bron\":\"BFX CBO 0.1\",\"paar\":\"" + cb + cq + "\",\"tf\":\"" + timeframe.period + "\",\"box\":\"" + boxId + "\",\"state\":\"" + stName(st) + "\",\"bias\":\"" + (na(pIdx) ? "onbekend" : str.tostring(pIdx, "0.0")) + "\",\"biasdatum\":\"" + (BIAS_DATUM > 0 ? str.format_time(BIAS_DATUM, "yyyy-MM-dd", "UTC") : "") + "\",\"let_op\":\"decision support — geen entrysignaal\"}", alert.freq_once_per_bar_close)
+if barstate.isconfirmed
+    prevSt := st
+
+// ═══ 9. Event Risk (weergave) ════════════════════════════════════
+[evBlkNow, evPostNow, evNextNow, evLastNow] = evAt(timenow)
+string evTxt = evBlkNow ? "BLOKKADE" : evPostNow ? "POST-EVENT" : na(evNextNow) ? (CAL_COVERAGE_PROVEN ? "geen event" : "GEEN EVENT GEVONDEN — DEKKING NIET BEWEZEN") : "vrij"
+string evNextTxt = na(evNextNow) ? "" : evNextNow.ccy + " " + evNextNow.name + " · " + str.format_time(evNextNow.t, "EEE HH:mm", i_tz) + " · over " + str.tostring(math.round((evNextNow.t - timenow) / 3600000)) + "u"
+
+// ═══ 8. Location & Room / 10. Costs (weergave van de actieve box) ═══
+[r1, r1n] = firstRef(bDir == 0 ? 1 : bDir, close)
+float entryNow = close
+float stopNow = bDir == 1 ? (i_var == "V2" and not na(retExt) ? retExt - h_buf * atr : sLo - h_buf * atr) : bDir == -1 ? (i_var == "V2" and not na(retExt) ? retExt + h_buf * atr : sHi + h_buf * atr) : na
+float riskNow = na(stopNow) ? na : math.abs(entryNow - stopNow)
+float rGrossNow = na(r1) or na(riskNow) or riskNow == 0 ? na : math.abs(r1 - entryNow) / riskNow
+string roomTxt = st >= 5 and st <= 8 ? (na(rGrossNow) ? "onbekend (geen referentie)" : str.tostring(rGrossNow, "0.0") + "R bruto tot " + r1n) : "–"
+string costTxt = k_known ? "aanname " + str.tostring(k_spread, "0.0") + " pip spread + " + str.tostring(k_slip, "0.0") + " slippage" : "KOSTEN ONBEKEND"
+bool noRoom = st >= 5 and st <= 8 and not na(rGrossNow) and rGrossNow < h_minRoom
+
+// ═══ 11. Setup Presentation ═════════════════════════════════════
+bool dark = (color.r(chart.bg_color) * 299 + color.g(chart.bg_color) * 587 + color.b(chart.bg_color) * 114) / 1000 < 128
+color t1c = dark ? #E6E8EE : #1A1D24
+color t2c = dark ? #9AA1B2 : #555C6B
+color t3c = dark ? #6E7586 : #8A909E
+color bgc = dark ? color.new(#131722, 6) : color.new(#FFFFFF, 6)
+color cBull = #26A65B
+color cBear = #E5484D
+color cAmb  = #F0A020
+color cInf  = #4C9AFF
+
+var box   bxCur = na
+var line  lnInv = na
+var line  lnT1 = na
+var line  lnT2 = na
+var box   bxEntry = na
+var label lbBox = na
+var line  lnEv = na
+var label lbEv = na
+var array<box> hist = array.new<box>()
+var array<line> refL = array.new<line>()
+var array<label> refLb = array.new<label>()
+refLine(int x0, float y, string nm) =>
+    if not na(y) and not na(x0)
+        refL.push(line.new(x0, y, time_close, y, xloc = xloc.bar_time, color = color.new(t3c, 40), width = 1))
+        refLb.push(label.new(bar_index + 2, y, nm, style = label.style_label_left, color = color.new(t3c, 100), textcolor = t3c, size = size.tiny))
+
+if barstate.isconfirmed and engineOn and st == 4 and prevSt != 4 and i_mode == "Expanded" and i_hist > 0
+    hist.push(box.new(bStartT, sHi, sT, sLo, xloc = xloc.bar_time, border_color = color.new(t3c, 60), border_width = 1, bgcolor = color.new(t3c, 96)))
+    if hist.size() > i_hist
+        hist.shift().delete()
+
+if barstate.islast
+    box.delete(bxCur)
+    line.delete(lnInv)
+    line.delete(lnT1)
+    line.delete(lnT2)
+    box.delete(bxEntry)
+    label.delete(lbBox)
+    line.delete(lnEv)
+    label.delete(lbEv)
+    for l in refL
+        l.delete()
+    refL.clear()
+    for l in refLb
+        l.delete()
+    refLb.clear()
+    if engineOn and st >= 2 and st <= 8
+        bool sealed = st >= 4
+        float hi = sealed ? sHi : bHi
+        float lo = sealed ? sLo : bLo
+        color bc = st >= 5 ? (bDir == 1 ? cBull : cBear) : cInf
+        bxCur := box.new(bStartT, hi, time_close, lo, xloc = xloc.bar_time, border_color = color.new(bc, 30), border_width = 1, bgcolor = color.new(bc, 94))
+        lbBox := label.new(bar_index + 2, hi, "CBO · " + str.lower(stName(st)) + (sealed ? " " + str.format_time(sT, "HH:mm", i_tz) : ""), style = label.style_label_left, color = color.new(bc, 100), textcolor = bc, size = size.tiny, tooltip = "Box-ID " + boxId)
+        if st >= 5 and i_mode != "Minimal"
+            if not na(stopNow)
+                lnInv := line.new(bar_index - 3, stopNow, bar_index + 10, stopNow, color = color.new(cBear, 20), style = line.style_dashed)
+            if not na(r1)
+                lnT1 := line.new(bar_index - 3, r1, bar_index + 10, r1, color = color.new(t2c, 30), style = line.style_dotted)
+            if not na(riskNow)
+                lnT2 := line.new(bar_index - 3, entryNow + bDir * 2 * riskNow, bar_index + 10, entryNow + bDir * 2 * riskNow, color = color.new(t3c, 40), style = line.style_dotted)
+            if i_var == "V2" and v2 == 1
+                float ez1 = bDir == 1 ? sHi : sLo
+                float ez2 = bDir == 1 ? sHi + h_retTol * atr : sLo - h_retTol * atr
+                bxEntry := box.new(bar_index, math.max(ez1, ez2), bar_index + 10, math.min(ez1, ez2), border_width = 0, bgcolor = color.new(cAmb, 88), text = "retestzone (hypothese)", text_size = size.tiny, text_color = color.new(cAmb, 20))
+    if not na(evNextNow) and i_mode != "Minimal"
+        color ec = evNextNow.cb ? #8E7CFF : cAmb
+        lnEv := line.new(evNextNow.t, low, evNextNow.t, high, xloc = xloc.bar_time, extend = extend.both, color = color.new(ec, 80), style = line.style_dotted)
+        lbEv := label.new(evNextNow.t, low50 - atr * 0.6, evNextNow.ccy + " · " + evNextNow.name, xloc = xloc.bar_time, style = label.style_label_up, color = color.new(ec, 85), textcolor = ec, size = size.tiny)
+    if i_mode == "Expanded" and i_refs and not synth
+        refLine(dStart, pdh, "PDH")
+        refLine(dStart, pdl, "PDL")
+        refLine(wStart, pwh, "PWH")
+        refLine(wStart, pwl, "PWL")
+        refLine(dStart, dOpen, "D Open")
+        refLine(wStart, wOpen, "W Open")
+
+// Kaart
+var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 40, border_width = 0, frame_width = 0)
+row2(int r, string a, string b, color ca, color cbb, string tip = "", string sz = size.small) =>
+    tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+    tb.cell(1, r, b, text_color = cbb, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+row1(int r, string a, color ca, string tip = "", string sz = size.small) =>
+    tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+    tb.merge_cells(0, r, 1, r)
+fmt(float v, string f) =>
+    na(v) ? "–" : str.tostring(v, f)
+median(array<float> a) =>
+    a.size() == 0 ? na : a.median()
+
+if barstate.islast
+    tb.clear(0, 0, 1, 39)
+    int r = 0
+    if i_spacer > 0 and (i_pos == "Rechtsboven" or i_pos == "Linksboven")
+        for k = 0 to i_spacer - 1
+            tb.cell(0, r, " ", text_size = size.small)
+            r += 1
+    string dirW = macroDir == 1 ? "BULLISH" : macroDir == -1 ? "BEARISH" : "GEEN RICHTING"
+    row2(r, cb + "/" + cq + " · onderzoeksrichting: " + dirW, na(pIdx) ? "" : fmt(pIdx, "+0.0;-0.0"), macroDir == 1 ? cBull : macroDir == -1 ? cBear : t2c, t2c, "", size.normal)
+    r += 1
+    row1(r, "ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE", cAmb, "Alle drempels zijn hypothesen; metingen zijn retrospectief en prijs-only.", size.tiny)
+    r += 1
+    bool macroOK = macroDir != 0
+    string mtx = macroOK ? "akkoord: " + macroTxt : "MACRO NIET HANDELBAAR (" + macroTxt + ")"
+    row2(r, "Macro", mtx, t2c, macroOK ? t1c : cAmb)
+    r += 1
+    string stTxt = synth ? "UIT — synthetische chart" : role == "execution" ? timeframe.period + " = executionlaag; primaire bevestiging komt van " + trgTF : role == "context" ? "contextlaag — CBO op 15m/30m (Intraday) of 1H/4H (Swing)" : role == "mismatch" ? "chart-TF past niet bij profiel " + prof : stName(st) + (noRoom ? " — GOEDE BREAKOUT, GEEN HANDELBARE RUIMTE" : "")
+    row2(r, "CBO", stTxt, t2c, st >= 5 and st <= 8 and engineOn ? (bDir == macroDir and macroOK ? (bDir == 1 ? cBull : cBear) : cAmb) : t1c, "Box-ID: " + boxId)
+    r += 1
+    if i_mode != "Minimal"
+        row2(r, "Regime", regime, t2c, t1c, regWhy)
+        r += 1
+        row2(r, "Context", prof + " · ctx " + ctxTF + " · structuur " + strTF + " · trigger " + trgTF, t2c, t1c)
+        r += 1
+        row2(r, "Variant", i_var + (st >= 4 and st <= 10 ? " · " : " · vorige box: ") + "V1 " + vName(v1) + " · V2 " + vName(v2) + " · V3 " + vName(v3), t2c, t1c, "Afzonderlijk gemeten; niet gecombineerd. Zonder verzegelde box tonen de varianten de uitkomst van de vorige box.")
+        r += 1
+        if engineOn and st >= 2 and st <= 8
+            row2(r, "Box", fmt(st >= 4 ? sLo : bLo, format.mintick) + "–" + fmt(st >= 4 ? sHi : bHi, format.mintick) + " · " + str.tostring(st >= 4 ? sN : bN) + " bars", t2c, t1c)
+            r += 1
+    row2(r, "Event", evTxt + (evNextTxt != "" and i_mode != "Minimal" ? " · " + evNextTxt : ""), t2c, evBlkNow ? cAmb : t1c)
+    r += 1
+    if i_mode != "Minimal"
+        row2(r, "Ruimte", roomTxt, t2c, noRoom ? cAmb : t1c)
+        r += 1
+        row2(r, "Kosten", costTxt, t2c, k_known ? t1c : cAmb)
+        r += 1
+        string why = not macroOK ? "macro niet handelbaar" : evBlkNow ? "eventblokkade" : not regimeOK ? "regime " + regime : noRoom ? "te weinig ruimte" : st < 4 ? "wacht op verzegelde box" : st == 4 ? "wacht op breakout-close" : st == 5 or st == 6 ? "wacht op " + i_var + "-bevestiging" : "handmatige beoordeling"
+        row2(r, "Reden", why + " · handmatige execution vereist", t2c, t1c)
+        r += 1
+        Inv iv = findInv()
+        if not na(iv)
+            row2(r, "Macro-invalidatie", str.substring(iv.tekst, 0, math.min(60, str.length(iv.tekst))), t2c, t1c, iv.tekst)
+            r += 1
+    if i_mode == "Expanded"
+        row1(r, "— Onderzoek —", t3c, "", size.tiny)
+        r += 1
+        row2(r, "Regimebewijs", regWhy, t3c, t2c, "", size.tiny)
+        r += 1
+        if st >= 5 and st <= 8
+            row2(r, "Breakout", brkTxt, t3c, t2c, "", size.tiny)
+            r += 1
+        row2(r, "Tellingen", "kandidaat " + str.tostring(cKand) + " · verzegeld " + str.tostring(cSeal) + " · breakout " + str.tostring(cBrk) + " · wick-false " + str.tostring(cWick) + " · terug in box " + str.tostring(cFail) + " · eventblok " + str.tostring(cBlock), t3c, t2c, "", size.tiny)
+        r += 1
+        for v = 0 to 2
+            int n = rN.get(v)
+            array<float> lst = v == 0 ? rList0 : v == 1 ? rList1 : rList2
+            row2(r, "V" + str.tostring(v + 1) + " (retro, prijs-only)", n == 0 ? "geen afgeronde metingen" : "n " + str.tostring(n) + " · hit " + str.tostring(rW.get(v) * 100.0 / n, "0") + "% · gem " + str.tostring(rSum.get(v) / n, "0.00") + "R · med " + str.tostring(median(lst), "0.00") + "R · netto " + (k_known ? str.tostring(rSumN.get(v) / n, "0.00") + "R" : "kosten onbekend") + " · MFE " + str.tostring(rMfe.get(v) / n, "0.0") + " · MAE " + str.tostring(rMae.get(v) / n, "0.0") + " · maxDD " + str.tostring(rDD.get(v), "0.0") + "R", t3c, t2c, "Retrospectief op geladen historie, beide richtingen, zonder biasfilter (BIAS_5.0 heeft 1 forwarddag). Geen edgeclaim.", size.tiny)
+            r += 1
+        row2(r, "Hypothesen", "box " + str.tostring(h_nMin) + "–" + str.tostring(h_nMax) + " bars ≤ " + str.tostring(h_wMax) + " ATR · seal " + str.tostring(h_nSeal) + " · body ≥ " + str.tostring(h_body * 100, "0") + "% · V2 ≤ " + str.tostring(h_retMax) + " bars · V3 " + str.tostring(h_accK) + " closes · ruimte ≥ " + str.tostring(h_minRoom) + "R", t3c, t2c, "", size.tiny)
+        r += 1
+        row1(r, "Referenties: " + syminfo.prefix + "-feed, providerdag; sessies Asia 09–15 Asia/Tokyo, London 08–17 Europe/London, NY 08–17 America/New_York", t3c, "", size.tiny)
+        r += 1
+    row1(r, "BIAS " + BIAS_VERSIE + " · " + (BIAS_DATUM > 0 ? str.format_time(BIAS_DATUM, "dd/MM", "UTC") : "–") + (biasFresh ? " actueel" : " verouderd") + " · update " + str.format_time(ENG_GENERATED, "dd/MM HH:mm", i_tz), t3c, "", size.tiny)
+
+// ═══ 12b. Meetwaarden in het datavenster (alleen lezen; geen lijnen op de chart) ═══
+// Retrospectief, prijs-only, zonder kosten en zonder biasfilter. Bedoeld om de meting te kunnen aflezen, geen edgeclaim.
+plot(rN.get(0), "V1 n", display = display.data_window)
+plot(rN.get(0) > 0 ? rW.get(0) * 100.0 / rN.get(0) : na, "V1 hit %", display = display.data_window)
+plot(rN.get(0) > 0 ? rSum.get(0) / rN.get(0) : na, "V1 gem R", display = display.data_window)
+plot(rN.get(1), "V2 n", display = display.data_window)
+plot(rN.get(1) > 0 ? rW.get(1) * 100.0 / rN.get(1) : na, "V2 hit %", display = display.data_window)
+plot(rN.get(1) > 0 ? rSum.get(1) / rN.get(1) : na, "V2 gem R", display = display.data_window)
+plot(rN.get(2), "V3 n", display = display.data_window)
+plot(rN.get(2) > 0 ? rW.get(2) * 100.0 / rN.get(2) : na, "V3 hit %", display = display.data_window)
+plot(rN.get(2) > 0 ? rSum.get(2) / rN.get(2) : na, "V3 gem R", display = display.data_window)
+plot(cKand, "Kandidaten", display = display.data_window)
+plot(cSeal, "Verzegeld", display = display.data_window)
+plot(cBrk, "Breakouts", display = display.data_window)
+plot(bar_index + 1, "Bars geladen", display = display.data_window)
