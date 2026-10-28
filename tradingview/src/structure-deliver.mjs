@@ -194,6 +194,12 @@ async function deliverToTradingView(entry, out) {
     }
     const n = (await studies()).filter(([, nm]) => nm === SCRIPT).length;
     if (n !== 1) throw fail(EXIT.VERIFY, `${n} instanties van ${SCRIPT} op de chart`);
+    // Een nieuwe scriptversie komt achter de candles te staan → kaart naar voren (blijft bewaard na "Save layout"; getest 28-10)
+    await page.evaluate((nm) => {
+      const c = TradingViewApi.activeChart();
+      const st = c.getAllStudies().find((x) => x.name === nm);
+      c.getStudyById(st.id).bringToFront();
+    }, SCRIPT);
 
     // Layout expliciet opslaan (anders laadt de layout na openen de vorige scriptversie)
     await page.locator('[data-name="save-load-menu"]').first().click();

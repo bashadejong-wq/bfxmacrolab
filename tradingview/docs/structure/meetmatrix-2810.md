@@ -1,0 +1,30 @@
+| Paar | TF | fout | status nu | bias (bar) | Fwd geldig | STR fwd n | CBO kand/verz/brk | swingbreaks | CBO-acceptaties | bars |
+|---|---|---|---|---|---|---|---|---|---|---|
+| EURUSD | 15 | false | WATCH | -16.1 | 1 | 0 | 43/4/4 | 538 | 2 | 20464 |
+| GBPUSD | 15 | false | BLOCKED | +1.9 | 1 | 0 | 47/2/2 | 528 | 1 | 20459 |
+| USDJPY | 15 | false | BLOCKED | +12.2 | 1 | 0 | 40/7/7 | 526 | 6 | 20444 |
+| AUDUSD | 15 | false | BLOCKED | -13.8 | 1 | 0 | 42/2/2 | 571 | 2 | 20459 |
+| NZDUSD | 15 | false | BLOCKED | -12.1 | 1 | 0 | 25/3/2 | 556 | 2 | 20453 |
+| USDCAD | 15 | false | BLOCKED | +10.8 | 1 | 0 | 30/2/2 | 554 | 2 | 20427 |
+| USDCHF | 15 | false | BLOCKED | +15.3 | 1 | 0 | 44/3/3 | 547 | 3 | 20373 |
+| EURUSD | 30 | false | WATCH | -16.1 | 1 | 0 | 64/5/5 | 608 | 2 | 22623 |
+| GBPUSD | 30 | false | BLOCKED | +1.9 | 1 | 0 | 41/9/9 | 577 | 8 | 22617 |
+| USDJPY | 30 | false | BLOCKED | +12.2 | 1 | 0 | 31/6/6 | 587 | 4 | 22606 |
+| AUDUSD | 30 | false | BLOCKED | -13.8 | 1 | 0 | 30/3/3 | 610 | 2 | 22619 |
+| NZDUSD | 30 | false | BLOCKED | -12.1 | 1 | 0 | 11/0/0 | 581 | 0 | 22611 |
+| USDCAD | 30 | false | BLOCKED | +10.8 | 1 | 0 | 30/5/5 | 590 | 3 | 22601 |
+| USDCHF | 30 | false | BLOCKED | +15.3 | 1 | 0 | 33/2/2 | 601 | 1 | 22560 |
+| EURUSD | 60 | false | WATCH | -16.1 | 1 | 0 | 59/2/2 | 629 | 2 | 23741 |
+| GBPUSD | 60 | false | BLOCKED | +1.9 | 1 | 0 | 60/2/2 | 652 | 2 | 23739 |
+| USDJPY | 60 | false | BLOCKED | +12.2 | 1 | 0 | 22/6/6 | 610 | 4 | 23739 |
+| AUDUSD | 60 | false | BLOCKED | -13.8 | 1 | 0 | 9/0/0 | 628 | 0 | 23737 |
+| NZDUSD | 60 | false | BLOCKED | -12.1 | 1 | 0 | 7/0/0 | 617 | 0 | 23733 |
+| USDCAD | 60 | false | BLOCKED | +10.8 | 1 | 0 | 35/1/1 | 633 | 1 | 23735 |
+| USDCHF | 60 | false | WATCH | +15.3 | 1 | 0 | 16/1/1 | 606 | 1 | 23721 |
+| EURUSD | 240 | false | WATCH | -16.1 | 1 | 0 | 7/0/0 | 596 | 0 | 21474 |
+| GBPUSD | 240 | false | BLOCKED | +1.9 | 1 | 0 | 3/0/0 | 584 | 0 | 21473 |
+| USDJPY | 240 | false | BLOCKED | +12.2 | 1 | 0 | 9/0/0 | 540 | 0 | 21474 |
+| AUDUSD | 240 | false | BLOCKED | -13.8 | 1 | 0 | 2/0/0 | 583 | 0 | 21473 |
+| NZDUSD | 240 | false | BLOCKED | -12.1 | 1 | 0 | 6/1/1 | 586 | 1 | 21468 |
+| USDCAD | 240 | false | BLOCKED | +10.8 | 1 | 0 | 3/0/0 | 572 | 0 | 21473 |
+| USDCHF | 240 | false | WATCH | +15.3 | 1 | 0 | 2/0/0 | 573 | 0 | 21473 |

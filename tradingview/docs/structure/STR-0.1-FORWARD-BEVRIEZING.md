@@ -6,7 +6,7 @@
 |---|---|
 | Versie | `STR_0.1-F` |
 | Start | **2026-10-29 00:00 UTC** (01:00 Amsterdam) |
-| Template | `template/bfx_structure_engine.pine` · sha256 `981fbbe36b781f7dc0720f4242f0416e6b2901d90572aedcc2a3432fee037374` (eerst `490257b2…`; zie wijziging hieronder) |
+| Template | `template/bfx_structure_engine.pine` · sha256 `e1f5d32f1a6b4fdbbe823b2fe19cf5511d5cc3da14297dd212503f15cb09e277` (definitief vóór de start; eerder `490257b2…`, `981fbbe3…`) |
 | Branch | `research/structure-engine-0.1` (niet gemerged) |
 | Layout | onderzoekslayout "BFX CBO Onderzoek" (DcotUC2P), niet productie |
 | CBO_0.1-template | ongewijzigd, sha256 `6d9259d6…` |
@@ -59,3 +59,21 @@
 - **Startwaarden "eerst gezien"**: de werkelijke schrijftijden uit `bfx_lab.bias50_snapshot.vastgelegd_op` (27-10 12:09:33 UTC, 28-10 04:13:00 UTC).
 - Daarnaast is er een plot "Datablok-id (min)" toegevoegd, zodat te controleren is welke versie op de chart draait. Dit is alleen weergave.
 - Er zijn geen drempels gewijzigd. De meting is nog niet gestart, dus er wordt niets gemengd.
+
+## Wijzigingen vóór de start (28-10, controleronde 11:15–12:00)
+
+Geen enkele drempel is gewijzigd. De meting is nog niet gestart, dus er wordt niets gemengd. De wijzigingen:
+
+1. **Logboekvelden** in het alertbericht (setup-ID, templatehash, zone-, sweep- en structuur-ID, bias available_at, expiry, uitkomst met MFE/MAE).
+   Daarnaast een kandidaatbericht `BFX_KAND_0.1`.
+2. **Vooraf vastgelegde varianten V1–V6** met een gestandaardiseerde exit, alleen forward geteld (zie `VARIANTEN-EN-EVALUATIE-VOORAF.md`).
+3. **Presentatie:**
+   - Minimal 3 regels, Compact 6 regels;
+   - bewijs en research alleen in Expanded;
+   - geen candle-tekst;
+   - 1 box en 2 zones in totaal;
+   - labelrail;
+   - een ondoorzichtige kaart.
+4. **Stop en ruimte** gelden alleen bij een actuele box. Een oude box (bv. die van 1 september) mag geen plan meer leveren.
+
+Definitieve hash bij de start: `e1f5d32f…`. Elke latere wijziging = `STR_0.2-F`.
