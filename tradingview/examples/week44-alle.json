@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-27T15:00:00Z",
+  "generatedAt": "2026-10-28T05:30:00Z",
   "label": "Week 44 · FOMC, ECB, BoJ, BoC, RBNZ",
-  "source": "Events: FMP economische kalender (testdata, alle 8 valuta's). BIAS 5.0: mirror_bias50* van 2026-10-27.",
+  "source": "Events: FMP economische kalender (testdata, alle 8 valuta's). BIAS 5.0: mirror_bias50* van 2026-10-28 (BIAS50_1.2).",
   "events": [
     {
       "time": "2026-10-27T12:30:00Z",
@@ -538,492 +538,520 @@
   "bias": {
     "paar": [
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURGBP",
         "basis": "EUR",
         "quote": "GBP",
-        "paar_index": -14.0594,
-        "gelopen_z": 2.8537,
+        "paar_index": -18.0227,
+        "gelopen_z": 2.9975,
         "gelopen_emmer": ">2",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 0,
-        "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)"
+        "paar_label": "Light Bearish",
+        "paar_richting_tekst": "GBP relatief sterker dan EUR",
+        "strategie_bevestiging": "bevestigd"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURAUD",
         "basis": "EUR",
         "quote": "AUD",
-        "paar_index": -1.5205,
-        "gelopen_z": 1.2464,
+        "paar_index": -2.2952,
+        "gelopen_z": 1.8331,
         "gelopen_emmer": "1-2",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 1,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "AUD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "AUD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURNZD",
         "basis": "EUR",
         "quote": "NZD",
-        "paar_index": -1.51,
-        "gelopen_z": 1.238,
+        "paar_index": -4.0334,
+        "gelopen_z": 1.6502,
         "gelopen_emmer": "1-2",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 2,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "NZD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "NZD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURUSD",
         "basis": "EUR",
         "quote": "USD",
-        "paar_index": -12.9611,
-        "gelopen_z": 1.0958,
+        "paar_index": -16.1328,
+        "gelopen_z": 1.1823,
         "gelopen_emmer": "1-2",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 3,
-        "paar_label": "Neutral",
-        "paar_richting_tekst": "USD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)"
+        "paar_label": "Light Bearish",
+        "paar_richting_tekst": "USD relatief sterker dan EUR",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURCAD",
         "basis": "EUR",
         "quote": "CAD",
-        "paar_index": -3.4596,
-        "gelopen_z": 2.7214,
+        "paar_index": -5.3425,
+        "gelopen_z": 2.6436,
         "gelopen_emmer": ">2",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 4,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "CAD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "CAD relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURCHF",
         "basis": "EUR",
         "quote": "CHF",
-        "paar_index": 0.0684,
-        "gelopen_z": -2.2037,
-        "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "paar_index": -0.8029,
+        "gelopen_z": 2.3918,
+        "gelopen_emmer": ">2",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 5,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "EUR relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "CHF relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "bevestigd"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "EURJPY",
         "basis": "EUR",
         "quote": "JPY",
-        "paar_index": -3.1134,
-        "gelopen_z": 1.0902,
-        "gelopen_emmer": "1-2",
-        "versie": "BIAS50_1.1",
+        "paar_index": -3.8982,
+        "gelopen_z": 0.9265,
+        "gelopen_emmer": "0-1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 6,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "JPY relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "JPY relatief sterker dan EUR (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "GBPAUD",
         "basis": "GBP",
         "quote": "AUD",
-        "paar_index": 12.539,
-        "gelopen_z": 0.4432,
+        "paar_index": 15.7275,
+        "gelopen_z": 0.0268,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 7,
-        "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_label": "Light Bullish",
+        "paar_richting_tekst": "GBP relatief sterker dan AUD",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "GBPNZD",
         "basis": "GBP",
         "quote": "NZD",
-        "paar_index": 12.5494,
-        "gelopen_z": 0.2689,
-        "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "paar_index": 13.9893,
+        "gelopen_z": -0.0562,
+        "gelopen_emmer": "tegen",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 8,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "GBP relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "geen trade"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "GBPUSD",
         "basis": "GBP",
         "quote": "USD",
-        "paar_index": 1.0984,
-        "gelopen_z": 0.4356,
+        "paar_index": 1.8899,
+        "gelopen_z": 0.4424,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 9,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan USD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "GBP relatief sterker dan USD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "GBPCAD",
         "basis": "GBP",
         "quote": "CAD",
-        "paar_index": 10.5998,
-        "gelopen_z": -0.4245,
+        "paar_index": 12.6802,
+        "gelopen_z": -0.2425,
         "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 10,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan CAD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "GBP relatief sterker dan CAD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "GBPCHF",
         "basis": "GBP",
         "quote": "CHF",
-        "paar_index": 14.1278,
-        "gelopen_z": 0.1081,
+        "paar_index": 17.2198,
+        "gelopen_z": 0.0433,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 11,
-        "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_label": "Light Bullish",
+        "paar_richting_tekst": "GBP relatief sterker dan CHF",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "GBPJPY",
         "basis": "GBP",
         "quote": "JPY",
-        "paar_index": 10.946,
-        "gelopen_z": 0.4439,
+        "paar_index": 14.1245,
+        "gelopen_z": 0.6772,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 12,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "GBP relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "GBP relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "bevestigd"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "AUDNZD",
         "basis": "AUD",
         "quote": "NZD",
-        "paar_index": 0.0105,
-        "gelopen_z": -0.1932,
-        "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "paar_index": -1.7383,
+        "gelopen_z": 0.0938,
+        "gelopen_emmer": "0-1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 13,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "AUD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "NZD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "AUDUSD",
         "basis": "AUD",
         "quote": "USD",
-        "paar_index": -11.4406,
-        "gelopen_z": 0.0143,
-        "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "paar_index": -13.8376,
+        "gelopen_z": -0.2815,
+        "gelopen_emmer": "tegen",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 14,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "USD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "USD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "geen trade"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "AUDCAD",
         "basis": "AUD",
         "quote": "CAD",
-        "paar_index": -1.9392,
-        "gelopen_z": 0.9277,
+        "paar_index": -3.0474,
+        "gelopen_z": 0.2395,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 15,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "CAD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "CAD relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "AUDCHF",
         "basis": "AUD",
         "quote": "CHF",
-        "paar_index": 1.5889,
-        "gelopen_z": -0.5187,
-        "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "paar_index": 1.4923,
+        "gelopen_z": 0.0057,
+        "gelopen_emmer": "0-1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 16,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "AUD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "AUD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "geen trade"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "AUDJPY",
         "basis": "AUD",
         "quote": "JPY",
-        "paar_index": -1.593,
-        "gelopen_z": -0.0243,
+        "paar_index": -1.603,
+        "gelopen_z": -0.5618,
         "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 17,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "JPY relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "JPY relatief sterker dan AUD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "NZDUSD",
         "basis": "NZD",
         "quote": "USD",
-        "paar_index": -11.4511,
-        "gelopen_z": -0.0934,
+        "paar_index": -12.0994,
+        "gelopen_z": -0.2989,
         "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 18,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "USD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "USD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "bevestigd"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "NZDCAD",
         "basis": "NZD",
         "quote": "CAD",
-        "paar_index": -1.9496,
-        "gelopen_z": 0.5428,
+        "paar_index": -1.3091,
+        "gelopen_z": 0.1025,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 19,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "CAD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "CAD relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "NZDCHF",
         "basis": "NZD",
         "quote": "CHF",
-        "paar_index": 1.5784,
-        "gelopen_z": -0.2039,
-        "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "paar_index": 3.2305,
+        "gelopen_z": 0.092,
+        "gelopen_emmer": "0-1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 20,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "NZD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "NZD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "NZDJPY",
         "basis": "NZD",
         "quote": "JPY",
-        "paar_index": -1.6034,
-        "gelopen_z": -0.1398,
-        "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "paar_index": 0.1353,
+        "gelopen_z": 0.5391,
+        "gelopen_emmer": "0-1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 21,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "JPY relatief sterker dan NZD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "NZD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "geen trade"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "USDCAD",
         "basis": "USD",
         "quote": "CAD",
-        "paar_index": 9.5015,
-        "gelopen_z": -0.7412,
+        "paar_index": 10.7903,
+        "gelopen_z": -0.6171,
         "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 22,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "USD relatief sterker dan CAD (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "USD relatief sterker dan CAD (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "USDCHF",
         "basis": "USD",
         "quote": "CHF",
-        "paar_index": 13.0295,
-        "gelopen_z": -0.3212,
+        "paar_index": 15.3299,
+        "gelopen_z": -0.3689,
         "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 23,
-        "paar_label": "Neutral",
-        "paar_richting_tekst": "USD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_label": "Light Bullish",
+        "paar_richting_tekst": "USD relatief sterker dan CHF",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "USDJPY",
         "basis": "USD",
         "quote": "JPY",
-        "paar_index": 9.8477,
-        "gelopen_z": 0.0448,
+        "paar_index": 12.2346,
+        "gelopen_z": 0.2624,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 24,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "USD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "USD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "CADCHF",
         "basis": "CAD",
         "quote": "CHF",
-        "paar_index": 3.528,
-        "gelopen_z": 0.5423,
+        "paar_index": 4.5396,
+        "gelopen_z": 0.2888,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 25,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "CAD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "CAD relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "CADJPY",
         "basis": "CAD",
         "quote": "JPY",
-        "paar_index": 0.3462,
-        "gelopen_z": 0.7153,
+        "paar_index": 1.4444,
+        "gelopen_z": 0.8364,
         "gelopen_emmer": "0-1",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 26,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "CAD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "CAD relatief sterker dan JPY (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "in opbouw"
       },
       {
-        "datum": "2026-10-27",
+        "datum": "2026-10-28",
         "paar": "CHFJPY",
         "basis": "CHF",
         "quote": "JPY",
-        "paar_index": -3.1818,
-        "gelopen_z": -0.3766,
+        "paar_index": -3.0953,
+        "gelopen_z": -0.6582,
         "gelopen_emmer": "tegen",
-        "versie": "BIAS50_1.1",
+        "versie": "BIAS50_1.2",
         "sorteervolgorde": 27,
         "paar_label": "Neutral",
-        "paar_richting_tekst": "JPY relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)"
+        "paar_richting_tekst": "JPY relatief sterker dan CHF (geen actieve BIAS_5.0-paarrichting)",
+        "strategie_bevestiging": "tegengesteld"
       }
     ],
     "valuta": [
       {
         "valuta": "AUD",
-        "index": -6.4541,
+        "index": -8.4323,
         "label": "Neutral",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "CAD",
-        "index": -2.5758,
+        "index": -2.3376,
         "label": "Neutral",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "CHF",
-        "index": -9.6318,
+        "index": -11.4168,
         "label": "Neutral",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "EUR",
-        "index": -9.495,
+        "index": -13.0226,
         "label": "Neutral",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "GBP",
-        "index": 18.6238,
+        "index": 23.0227,
         "label": "Light Bullish",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "JPY",
-        "index": -3.2682,
+        "index": -5.2263,
         "label": "Neutral",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "NZD",
-        "index": -6.475,
+        "index": -4.9558,
         "label": "Neutral",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       },
       {
         "valuta": "USD",
-        "index": 16.4271,
+        "index": 19.2429,
         "label": "Light Bullish",
         "zekerheid": "laag",
         "conflict": false,
-        "datum": "2026-10-27",
-        "versie": "BIAS50_1.1"
+        "datum": "2026-10-28",
+        "versie": "BIAS50_1.2"
       }
     ],
     "samenvatting": [
       {
-        "valuta": "EUR",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "EUR: index −9,50 (Neutral); cijferdeel (A) draagt +1,45 indexpunten bij; genormaliseerde kernscore +2,4/100; dekking 83,5%; zekerheid laag. Meeste steun: A1n Inflatie t.o.v. doel (+4,73), B6 Recente koersbeweging (mean-reversion-proxy) (+3,00), B4 Positionering (COT) (+2,40). Meeste druk: B1 Banken (−12,80), A5 2-jaarsrente minus actuele inflatie (−4,78), B3 Paaroordelen (V1) (−2,58).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 5,51 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A1n Inflatie t.o.v. doel (+4,73), als alle andere onderdelen gelijk blijven; geen voorspelling."
-      },
-      {
-        "valuta": "USD",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "USD: index +16,43 (Light Bullish); cijferdeel (A) draagt +14,90 indexpunten bij; genormaliseerde kernscore +24,8/100; dekking 84,0%; zekerheid laag. Meeste steun: A2p PMI-trend (+4,25), A5 2-jaarsrente minus actuele inflatie (+3,96), A1n Inflatie t.o.v. doel (+3,91). Meeste druk: A1s Inflatiesnelheid (−2,62), B1 Banken (−0,80), A2v Ondernemersvertrouwen (−0,24).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: +15 (Light Bullish naar Neutral), 1,43 punten lager. Zonder B3 Paaroordelen (V1) (+2,07) zou de index +14,36 zijn (Neutral), als alle andere onderdelen gelijk blijven; geen voorspelling."
-      },
-      {
-        "valuta": "GBP",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "GBP: index +18,62 (Light Bullish); cijferdeel (A) draagt +15,00 indexpunten bij; genormaliseerde kernscore +25,0/100; dekking 83,5%; zekerheid laag. Meeste steun: A5 2-jaarsrente minus actuele inflatie (+6,23), A3w Werkloosheidstrend (+4,83), B1 Banken (+3,70). Meeste druk: B6 Recente koersbeweging (mean-reversion-proxy) (−1,11), A2v Ondernemersvertrouwen (−1,00), A4t Toon centrale bank (−0,80).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: +15 (Light Bullish naar Neutral), 3,62 punten lager. Zonder B1 Banken (+3,70) zou de index +14,92 zijn (Neutral), als alle andere onderdelen gelijk blijven; geen voorspelling."
-      },
-      {
-        "valuta": "JPY",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "JPY: index −3,27 (Neutral); cijferdeel (A) draagt +0,67 indexpunten bij; genormaliseerde kernscore +1,1/100; dekking 84,0%; zekerheid laag. Meeste steun: A1s Inflatiesnelheid (+6,00), A3w Werkloosheidstrend (+2,99), A3l Loongroei (+2,28). Meeste druk: A1n Inflatie t.o.v. doel (−9,26), B3 Paaroordelen (V1) (−3,10), A5 2-jaarsrente minus actuele inflatie (−2,20).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 11,73 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A1s Inflatiesnelheid (+6,00), als alle andere onderdelen gelijk blijven; geen voorspelling."
-      },
-      {
-        "valuta": "CHF",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "CHF: index −9,63 (Neutral); cijferdeel (A) draagt −19,13 indexpunten bij; genormaliseerde kernscore −31,9/100; dekking 84,0%; zekerheid laag. Meeste steun: B1 Banken (+8,01), A2b Groei t.o.v. potentieel (+1,94), B4 Positionering (COT) (+1,29). Meeste druk: A1n Inflatie t.o.v. doel (−10,08), A3l Loongroei (−6,00), A5 2-jaarsrente minus actuele inflatie (−5,27).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 5,37 punten lager. Zonder B1 Banken (+8,01) zou de index −17,64 zijn (Light Bearish), als alle andere onderdelen gelijk blijven; geen voorspelling."
-      },
-      {
         "valuta": "AUD",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "AUD: index −6,45 (Neutral); cijferdeel (A) draagt −2,72 indexpunten bij; genormaliseerde kernscore −4,5/100; dekking 84,0%; zekerheid laag. Meeste steun: A5 2-jaarsrente minus actuele inflatie (+3,72), A4t Toon centrale bank (+2,88), B3 Paaroordelen (V1) (+2,58). Meeste druk: A3w Werkloosheidstrend (−8,00), B1 Banken (−6,26), A1s Inflatiesnelheid (−2,62).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 8,55 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A5 2-jaarsrente minus actuele inflatie (+3,72), als alle andere onderdelen gelijk blijven; geen voorspelling."
-      },
-      {
-        "valuta": "NZD",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "NZD: index −6,48 (Neutral); cijferdeel (A) draagt −7,20 indexpunten bij; genormaliseerde kernscore −12,0/100; dekking 80,0%; zekerheid laag. Meeste steun: A1n Inflatie t.o.v. doel (+7,20), B1 Banken (+3,05), A2b Groei t.o.v. potentieel (+0,24). Meeste druk: A3w Werkloosheidstrend (−4,37), A2p PMI-trend (−3,15), A1s Inflatiesnelheid (−2,62).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 8,53 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A1n Inflatie t.o.v. doel (+7,20), als alle andere onderdelen gelijk blijven; geen voorspelling."
+        "strategie_bevestiging": "tegengesteld",
+        "samenvatting_tekst": "AUD: index −8,43 (Neutral); zekerheid laag. Meeste steun: A5 2-jaarsrente minus actuele inflatie (+3,68), A4t Toon centrale bank (+2,88), B3 Paaroordelen (V1) (+2,58). Meeste druk: A3w Werkloosheidstrend (−8,00), B1 Banken (−4,15), B2 Cijferverrassingen (−3,24).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 6,57 punten lager."
       },
       {
         "valuta": "CAD",
-        "strategie_bevestiging": "geen verzegelde strategiestand",
-        "samenvatting_tekst": "CAD: index −2,58 (Neutral); cijferdeel (A) draagt −3,15 indexpunten bij; genormaliseerde kernscore −5,3/100; dekking 84,0%; zekerheid laag. Meeste steun: A3w Werkloosheidstrend (+2,99), B4 Positionering (COT) (+1,26), B7 Grondstoffen en ruilvoet (+1,16). Meeste druk: A4t Toon centrale bank (−2,88), B6 Recente koersbeweging (mean-reversion-proxy) (−1,96), A2b Groei t.o.v. potentieel (−1,70).",
-        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 12,42 punten lager. Geen enkel onderdeel brengt de index in zijn eentje over die grens; het meeste effect bij weglaten heeft A3w Werkloosheidstrend (+2,99), als alle andere onderdelen gelijk blijven; geen voorspelling."
+        "strategie_bevestiging": "in opbouw",
+        "samenvatting_tekst": "CAD: index −2,34 (Neutral); zekerheid laag. Meeste steun: A3w Werkloosheidstrend (+2,99), B4 Positionering (COT) (+1,26), B7 Grondstoffen en ruilvoet (+1,19). Meeste druk: A4t Toon centrale bank (−2,88), A2b Groei t.o.v. potentieel (−1,70), B6 Recente koersbeweging (−1,30).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 12,66 punten lager."
+      },
+      {
+        "valuta": "CHF",
+        "strategie_bevestiging": "in opbouw",
+        "samenvatting_tekst": "CHF: index −11,42 (Neutral); zekerheid laag. Meeste steun: B1 Banken (+6,72), A2b Groei t.o.v. potentieel (+1,94), B4 Positionering (COT) (+1,29). Meeste druk: A1n Inflatie t.o.v. doel (−10,08), A3l Loongroei (−6,00), A5 2-jaarsrente minus actuele inflatie (−5,26).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 3,58 punten lager. Zonder B1 Banken (+6,72) zou de index −18,13 zijn (Light Bearish); geen voorspelling."
+      },
+      {
+        "valuta": "EUR",
+        "strategie_bevestiging": "bevestigd",
+        "samenvatting_tekst": "EUR: index −13,02 (Neutral); zekerheid laag. Meeste steun: A1n Inflatie t.o.v. doel (+4,73), B6 Recente koersbeweging (+3,00), B4 Positionering (COT) (+2,40). Meeste druk: B1 Banken (−14,31), A5 2-jaarsrente minus actuele inflatie (−4,88), B3 Paaroordelen (V1) (−2,58).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 1,98 punten lager. Zonder A2p PMI-trend (+2,15) zou de index −15,18 zijn (Light Bearish); geen voorspelling."
+      },
+      {
+        "valuta": "GBP",
+        "strategie_bevestiging": "bevestigd",
+        "samenvatting_tekst": "GBP: index +23,02 (Light Bullish); zekerheid laag. Meeste steun: A5 2-jaarsrente minus actuele inflatie (+6,23), A3w Werkloosheidstrend (+4,83), B2 Cijferverrassingen (+4,42). Meeste druk: A2v Ondernemersvertrouwen (−1,00), B6 Recente koersbeweging (−0,84), A4t Toon centrale bank (−0,80).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: +15 (Light Bullish naar Neutral), 8,02 punten lager."
+      },
+      {
+        "valuta": "JPY",
+        "strategie_bevestiging": "bevestigd",
+        "samenvatting_tekst": "JPY: index −5,23 (Neutral); zekerheid laag. Meeste steun: A1s Inflatiesnelheid (+6,00), A3w Werkloosheidstrend (+2,99), A3l Loongroei (+2,28). Meeste druk: A1n Inflatie t.o.v. doel (−9,26), B3 Paaroordelen (V1) (−3,10), B2 Cijferverrassingen (−2,52).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 9,77 punten lager."
+      },
+      {
+        "valuta": "NZD",
+        "strategie_bevestiging": "geen trade",
+        "samenvatting_tekst": "NZD: index −4,96 (Neutral); zekerheid laag. Meeste steun: A1n Inflatie t.o.v. doel (+7,20), B1 Banken (+3,82), B2 Cijferverrassingen (+1,12). Meeste druk: A3w Werkloosheidstrend (−4,37), A2p PMI-trend (−3,15), A1s Inflatiesnelheid (−2,62).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: −15 (Neutral naar Light Bearish), 10,04 punten lager."
+      },
+      {
+        "valuta": "USD",
+        "strategie_bevestiging": "in opbouw",
+        "samenvatting_tekst": "USD: index +19,24 (Light Bullish); zekerheid laag. Meeste steun: A2p PMI-trend (+4,25), A5 2-jaarsrente minus actuele inflatie (+4,00), A1n Inflatie t.o.v. doel (+3,91). Meeste druk: A1s Inflatiesnelheid (−2,62), B1 Banken (−0,93), A2v Ondernemersvertrouwen (−0,24).",
+        "kantelpunt_tekst": "Dichtstbijzijnde labelgrens: +15 (Light Bullish naar Neutral), 4,24 punten lager. Zonder A2p PMI-trend (+4,25) zou de index +15,00 zijn (Neutral); geen voorspelling."
       }
     ]
   }
