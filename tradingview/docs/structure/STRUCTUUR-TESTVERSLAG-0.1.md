@@ -79,8 +79,8 @@ De productielayout is niet geopend, het productie-worktree staat op `ea1318a` en
 - ~~CBO-integratie~~ (fase 2 gedaan, zonder eventblokkade)
 - ~~Bias 5.0- en eventkoppeling~~ (fase 3 gedaan)
 - ~~execution gates en de statussen WATCH/ARMED/CONFIRMED~~ (fase 3 gedaan)
-- de modi Minimal/Compact/Expanded volgens het nieuwe kaartontwerp
-- JSON-alerts en het bewijslogboek
+- ~~de modi Minimal/Compact/Expanded~~ (fase 4 gedaan)
+- ~~JSON-alerts~~ (fase 4 gedaan) en het bewijslogboek
 - bevriezen en de forwardmeting
 
 ---
@@ -211,3 +211,63 @@ CONFIRMED kan dus pas vanaf vandaag forward ontstaan.
 | NZDUSD | 240 | false | 6/1/1 | 6/1/1 | ja | 0 | BLOCKED | 0 | 0/0/0 |
 
 Screenshots: `screenshots/05-eurusd-30m-watch.png` (Compact, WATCH) en `screenshots/06-gbpusd-30m-expanded-blocked.png` (Expanded, BLOCKED met reden per poort).
+
+---
+
+# Fase 4 (28-10-2026, 09:25–09:50): kaartmodi en JSON-alerts
+
+| Test | Uitkomst |
+|---|---|
+| Compileren | geslaagd, geen fouten |
+| Runtime: 7 majors × 15m/30m/1H/4H | 28/28 zonder fout |
+| CBO-module tegen CBO_0.1 | 28/28 gelijk |
+| Herladen (EURUSD 30m, alle tellingen + status) | identiek |
+| `npm test` | 43/43, met een test die het alertbericht echt opbouwt en met `JSON.parse` controleert (aanhalingstekens in teksten, `null` voor onbekend) |
+| Minimal | 4 regels: "EURUSD · 30 \| SHORT · 4H bearish" → "WATCH \| geen box" → "wacht op een verzegelde CBO-box" |
+| Compact | 9 regels: BIAS · STRUCTUUR · LOCATIE · TRIGGER · EVENT · SETUP · POORTEN |
+| Expanded | Compact + 8 regels; past nu op een scherm van 1000 px (vóór fase 4 ±35 regels) |
+
+**Tijdens het testen gerepareerd**
+
+1. "Plan" en "Ruimte" gebruikten de laatst verzegelde box, ook als die oud was. Op EURUSD was dat de box van 1 september.
+   Stop en ruimte gelden nu alleen bij een verzegelde box, een breakout of een recente acceptatie. Daar is een test voor toegevoegd.
+2. Na de eerste save stond er "Add to chart" in plaats van een automatische update van de chart.
+   Ik heb de nieuwe versie toegevoegd en de oude instantie (alleen deze eigen onderzoeksindicator) verwijderd. Bij de volgende save werkte de update weer vanzelf.
+3. Supabase gaf één keer kort HTTP 503 ("schema cache"). Het compileerscript stopte netjes vóór het plakken; een herhaling slaagde.
+
+**Alerts gebruiken**: in TradingView een alert maken op "BFX Structure Engine 0.1" met "Any alert() function call". Ik heb zelf geen alert aangemaakt.
+Standaard komt er alleen een bericht bij een wissel van of naar ARMED en hoger. Dat is instelbaar via "Alerts bij statuswissel".
+
+## Matrix fase 4
+
+| Paar | TF | fout | CBO STR | CBO 0.1 | gelijk | status |
+|---|---|---|---|---|---|---|
+| EURUSD | 15 | false | 43/4/4 | 43/4/4 | ja | WATCH |
+| GBPUSD | 15 | false | 47/2/2 | 47/2/2 | ja | BLOCKED |
+| USDJPY | 15 | false | 40/7/7 | 40/7/7 | ja | BLOCKED |
+| AUDUSD | 15 | false | 42/2/2 | 42/2/2 | ja | BLOCKED |
+| USDCHF | 15 | false | 44/3/3 | 44/3/3 | ja | BLOCKED |
+| USDCAD | 15 | false | 30/2/2 | 30/2/2 | ja | BLOCKED |
+| NZDUSD | 15 | false | 25/3/2 | 25/3/2 | ja | BLOCKED |
+| EURUSD | 30 | false | 64/5/5 | 64/5/5 | ja | WATCH |
+| GBPUSD | 30 | false | 41/9/9 | 41/9/9 | ja | BLOCKED |
+| USDJPY | 30 | false | 31/6/6 | 31/6/6 | ja | BLOCKED |
+| AUDUSD | 30 | false | 30/3/3 | 30/3/3 | ja | BLOCKED |
+| USDCHF | 30 | false | 33/2/2 | 33/2/2 | ja | BLOCKED |
+| USDCAD | 30 | false | 30/5/5 | 30/5/5 | ja | BLOCKED |
+| NZDUSD | 30 | false | 11/0/0 | 11/0/0 | ja | BLOCKED |
+| EURUSD | 60 | false | 59/2/2 | 59/2/2 | ja | WATCH |
+| GBPUSD | 60 | false | 60/2/2 | 60/2/2 | ja | BLOCKED |
+| USDJPY | 60 | false | 22/6/6 | 22/6/6 | ja | BLOCKED |
+| AUDUSD | 60 | false | 9/0/0 | 9/0/0 | ja | BLOCKED |
+| USDCHF | 60 | false | 16/1/1 | 16/1/1 | ja | WATCH |
+| USDCAD | 60 | false | 35/1/1 | 35/1/1 | ja | BLOCKED |
+| NZDUSD | 60 | false | 7/0/0 | 7/0/0 | ja | BLOCKED |
+| EURUSD | 240 | false | 7/0/0 | 7/0/0 | ja | WATCH |
+| GBPUSD | 240 | false | 3/0/0 | 3/0/0 | ja | BLOCKED |
+| USDJPY | 240 | false | 9/0/0 | 9/0/0 | ja | BLOCKED |
+| AUDUSD | 240 | false | 2/0/0 | 2/0/0 | ja | BLOCKED |
+| USDCHF | 240 | false | 2/0/0 | 2/0/0 | ja | WATCH |
+| USDCAD | 240 | false | 3/0/0 | 3/0/0 | ja | BLOCKED |
+| NZDUSD | 240 | false | 6/1/1 | 6/1/1 | ja | BLOCKED |
+Screenshots: `screenshots/07-modus-Minimal.png`, `07-modus-Compact.png`, `07-modus-Expanded.png`.

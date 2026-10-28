@@ -234,3 +234,39 @@ Retrospectieve tellingen zijn **geen bewijs**: de bias bestaat alleen vanaf de b
 ## 19. Parameters fase 3 (HYPOTHESE)
 
 `e_preCB 60 · e_postCB 120 · e_pre 30 · e_post 60 · e_disc 180 · g_trigAge 3 · g_minRoom 1.0 · g_stopBuf 0.1 · g_swAge 24 · g_needSweep false · g_tMax 32 · k_known false · k_spread 0.0 · k_slip 0.0`
+
+---
+
+# Fase 4 (28-10-2026): kaartmodi en JSON-alerts
+
+## 20. Kaartmodi
+
+| Modus | Regels |
+|---|---|
+| **Minimal** | 1. paar · TF \| macrozijde + context-TF-richting · 2. **status** \| belangrijkste reden · 3. → volgende stap · 4. onderzoekslabel |
+| **Compact** (standaard) | kop · onderzoekslabel · BIAS · STRUCTUUR · LOCATIE · TRIGGER · EVENT · **SETUP** (+ volgende stap) · POORTEN |
+| **Expanded** | Compact + bewijs ✓ · bewijs ✕/? · macro-invalidatie · zones (max 2) · CBO-box en laatste afloop · plan (instap/stop/doel/R) · structuurdetail (D, 4H, swing, internal, fractal) · bron (snapshot, biasdatum, feed) |
+
+- Kleur: groen/rood alleen voor richting; amber voor wachten of risico (ARMED, BLOCKED, FAILED); grijs voor onbekend of inactief.
+- Onderzoekstellingen staan in de Data Window en niet op de kaart.
+
+## 21. JSON-alerts (schema `BFX_EXEC_0.1`)
+
+- Eén `alert()` per **statuswissel**, alleen op `barstate.isconfirmed` en met `alert.freq_once_per_bar_close`.
+- De filter `i_alert` heeft vier standen:
+  - **Uit**;
+  - **Alle wissels**;
+  - **ARMED en hoger** (standaard): de oude of de nieuwe status is ≥ ARMED;
+  - **CONFIRMED en hoger**.
+- **Velden**:
+  - `schema`, `engine`, `datablok`, `snapshot_id`;
+  - `symbol`, `feed`, `timeframe`, `bar_close` (UTC);
+  - `status`, `vorige_status`;
+  - `macro` {versie, datum, richting, index, actueel};
+  - `structuur` {context_tf, context, swing, internal, pd_pct};
+  - `cbo` {state, box_id}, `zone_id`;
+  - `poorten` {data, macro, htf, locatie, sweep, trigger, event, ruimte, kosten} = ok / faalt / laat_door / onbekend;
+  - `invalidatie`, `doel` {naam, prijs}, `ruimte_r`, `event`;
+  - `onbekend` [poortnamen], `let_op`.
+- Onbekende getallen worden `null`. Strings worden ge-escaped.
+- De indicator maakt **zelf geen alert in TradingView aan**. Bas kiest zelf "Any alert() function call".

@@ -17,10 +17,10 @@ test("onderzoeksmarker, v6 en eigen indicatornaam", () => {
   assert.ok(tpl.includes("GEEN BEWEZEN EDGE"));
 });
 
-test("geen orders, geen signalen, geen volume, geen alerts in fase 1", () => {
+test("geen orders, geen signalen, geen volume", () => {
   assert.ok(!/\bstrategy\(|strategy\.entry/.test(code), "geen strategy-calls");
   assert.ok(!/volume/i.test(code), "geen volume-afgeleide niveaus (CFD-volume)");
-  assert.ok(!/alertcondition|alert\(/.test(code), "alerts komen pas later");
+  assert.ok(!/alertcondition/.test(code), "alleen alert() met JSON, geen alertcondition");
   assert.ok(!/\b(BUY|SELL|KOOP|VERKOOP)\b/.test(code), "geen koop/verkooplabels");
 });
 
@@ -97,5 +97,54 @@ test("poorten: onbekend telt nooit als ok, CONFIRMED eist trigger+locatie+event+
   // setups en de getoonde status alleen vanaf gesloten candles
   const conf = code.slice(code.indexOf("var int cs = 0"), code.indexOf("cPd := pdNow"));
   assert.match(conf, /if barstate\.isconfirmed\n {4}if sSt == 6/);
-  assert.ok(!/strategy\.|alert\(/.test(code));
+  assert.ok(!/strategy\./.test(code));
+});
+
+test("JSON-alert: precies één alert() bij een statuswissel, alleen op candle-close, schema BFX_EXEC_0.1", () => {
+  const calls = [...code.matchAll(/^\s*alert\(/gm)];
+  assert.equal(calls.length, 1, "één alert()-aanroep");
+  assert.match(code, /if barstate\.isconfirmed and cs != csPrev and alertWanted\(cs, csPrev\)/);
+  assert.match(code, /alert\(js, alert\.freq_once_per_bar_close\)/);
+  assert.ok(!/alert\.freq_all|alert\.freq_once_per_bar\b/.test(code));
+  for (const k of ["schema", "snapshot_id", "bar_close", "vorige_status", "macro", "poorten", "invalidatie", "onbekend", "let_op"])
+    assert.ok(code.includes(`\\"${k}\\"`), `veld ${k} ontbreekt`);
+  assert.match(code, /csPrev := cs\n {4}cs := sSt == 6/);
+});
+
+test("kaartmodi: Minimal 4 regels, Compact met BIAS/STRUCTUUR/LOCATIE/TRIGGER/EVENT/SETUP/POORTEN, Expanded zonder onderzoekstellingen", () => {
+  const kaart = code.slice(code.indexOf("if barstate.islast\n    tb.clear"), code.indexOf("jsStr(string s)"));
+  const minimal = kaart.slice(kaart.indexOf('if i_mode == "Minimal"'), kaart.indexOf("    else\n"));
+  assert.equal((minimal.match(/\brow[12]\(/g) || []).length, 4);
+  for (const label of ["BIAS", "STRUCTUUR", "LOCATIE", "TRIGGER", "EVENT", "SETUP", "POORTEN"]) assert.ok(kaart.includes(`"${label}"`), label);
+  assert.ok(!/"(Tellingen|Hypothesen|CBO-tellingen|Zones gemaakt)"/.test(kaart), "onderzoekstellingen horen in de Data Window");
+  const expanded = kaart.slice(kaart.indexOf('if i_mode == "Expanded"'));
+  assert.ok((expanded.match(/\brow[12]\(/g) || []).length <= 9, "Expanded voegt hooguit 9 regels toe");
+});
+
+test("JSON-alert is geldige JSON, ook met aanhalingstekens in teksten en onbekende getallen", () => {
+  const expr = code.match(/string js = (.*)\n/)[1];
+  assert.ok(!/\b(and|or|not)\b/.test(expr.replace(/"(?:[^"\\]|\\.)*"/g, "")), "expressie moet zonder Pine-operatoren naar JS te vertalen zijn");
+  const ctx = {
+    jsStr: (s) => JSON.stringify(String(s)), jsNum: (v) => (v == null || Number.isNaN(v) ? "null" : String(v)),
+    na: (v) => v == null, str: { tostring: String, format_time: () => "2026-10-28T09:00:00Z" },
+    syminfo: { tickerid: "FX:EURUSD", prefix: "FX" }, timeframe: { period: "30" }, time_close: 0,
+    ENG_VERSION: "2026-10-28 08:09 UTC", ENG_GENERATED: 1793174400000, BIAS_VERSIE: "BIAS50_1.2", BIAS_DATUM: 1793145600000,
+    setupName: (s) => ["N.V.T.", "UNKNOWN", "BLOCKED", "WATCH", "ARMED"][s], cs: 4, csPrev: 3, md: -1, pIdx: -16.1, biasFresh: true,
+    ctxNm: "4H", ctxDir: -1, ctxStg: 3, dirTxt: () => "Bearish", stgTxt: () => "continuation", lS: { dir: -1, stage: 3 }, lI: { dir: 1, stage: 1 },
+    cPd: null, cboName: () => 'BOX "VERZEGELD"', xSt: 4, xId: "EURUSD:30:1:2", az: null, gj: '"data":"ok","ruimte":"onbekend"',
+    sSt: 0, sS: null, stopP: 1.1135, sTgtN: "", frDn: "PDL", sT: null, frD: null, cRoom: null, evBlk: false, evNext: {}, unk: '"ruimte"',
+  };
+  const js = new Function(...Object.keys(ctx), `return ${expr};`)(...Object.values(ctx));
+  const o = JSON.parse(js);
+  assert.equal(o.schema, "BFX_EXEC_0.1");
+  assert.equal(o.status, "ARMED");
+  assert.equal(o.vorige_status, "WATCH");
+  assert.equal(o.cbo.state, 'BOX "VERZEGELD"');
+  assert.equal(o.structuur.pd_pct, null);
+  assert.deepEqual(o.onbekend, ["ruimte"]);
+  assert.equal(o.let_op, "decision support — geen order");
+});
+
+test("stop en ruimte nooit van een oude box", () => {
+  assert.match(code, /float stopP = na\(xsHi\) or md == 0 or not \(xSt == 4 or xSt == 5 or accRecent\) \? na :/);
 });
