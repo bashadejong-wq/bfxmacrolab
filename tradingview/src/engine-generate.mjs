@@ -16,8 +16,9 @@ const cut = (s, n) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
-export function buildEngine(data) {
-  const tpl = readFileSync(resolve(ROOT, "template/bfx_cbo_engine.pine"), "utf8");
+// tplFile: de Structure Engine gebruikt hetzelfde datablok met een eigen template (standaard: CBO).
+export function buildEngine(data, tplFile = "template/bfx_cbo_engine.pine") {
+  const tpl = readFileSync(resolve(ROOT, tplFile), "utf8");
   const biasDay = data.biasDatum ? new Date(data.biasDatum).toISOString().slice(0, 10) : null;
   const now = data.generatedAt;
   // Alleen high-impact events (gegroepeerd per tijd+valuta), komende 21 dagen + afgelopen 2 dagen (post-event-regime)

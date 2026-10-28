@@ -1,7 +1,8 @@
 //@version=6
 // BFX-STRUCTURE-ENGINE
 // ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE. Geen koop/verkoopsignalen, geen handelsadvies, geen automatische uitvoering.
-// Alleen prijsdata (geen volume, geen macro). Regels: docs/structure/STRUCTUUR-CONTRACT-0.1.md
+// Prijsdata + BFX-snapshot (Bias 5.0, events; alleen lezen). Geen volume. Regels: docs/structure/STRUCTUUR-CONTRACT-0.1.md
+// Datablok: {{VERSION}}
 indicator("BFX Structure Engine 0.1", shorttitle = "BFX STR 0.1", overlay = true, max_lines_count = 150, max_labels_count = 150, max_boxes_count = 40, max_bars_back = 500)
 
 // ═══ 0. Instellingen ═══════════════════════════════════════════
@@ -61,6 +62,23 @@ i_refOpen = input.bool(false, "Ook D/W Open als referentie", group = GR)
 i_refTaken = input.bool(false, "Ook geraakte niveaus tonen (vervaagd)", group = GR)
 r_max     = input.int(3, "Max. referenties", minval = 1, maxval = 6, group = GR)
 r_dist    = input.float(1.5, "Alleen binnen × daily ATR van de koers", minval = 0.2, step = 0.1, group = GR)
+const string GE = "Event (HYPOTHESE-vensters, gelijk aan CBO_0.1)"
+const string GG = "Poorten (HYPOTHESE)"
+const string GK = "Kosten"
+e_preCB   = input.int(60, "Centrale bank: blok vóór (min)", group = GE)
+e_postCB  = input.int(120, "Centrale bank: blok na (min)", group = GE)
+e_pre     = input.int(30, "High impact: blok vóór (min)", group = GE)
+e_post    = input.int(60, "High impact: blok na (min)", group = GE)
+e_disc    = input.int(180, "Post-event regime (min na event)", group = GE)
+g_trigAge = input.int(3, "Trigger: acceptatie max. n bars oud", minval = 1, group = GG)
+g_minRoom = input.float(1.0, "Ruimte: min. R tot eerste referentie", minval = 0, step = 0.1, group = GG)
+g_stopBuf = input.float(0.1, "Stop: buffer × ATR voorbij de box", minval = 0, step = 0.05, group = GG)
+g_swAge   = input.int(24, "Sweep telt mee als hij max. n bars oud is", minval = 1, group = GG)
+g_needSweep = input.bool(false, "Sweep verplicht voor CONFIRMED", group = GG)
+g_tMax    = input.int(32, "ACTIVE verloopt na n bars", minval = 4, group = GG)
+k_known   = input.bool(false, "Kosten bekend (anders: KOSTEN ONBEKEND)", group = GK)
+k_spread  = input.float(0.0, "Spread (pips) — aanname", group = GK)
+k_slip    = input.float(0.0, "Slippage per kant (pips) — aanname", group = GK)
 
 // ═══ 1. Typen en kleuren ════════════════════════════════════════
 type Piv
@@ -115,6 +133,93 @@ color cAmb  = #F0A020
 
 float atr = ta.atr(h_atrLen)
 int tfSec = timeframe.in_seconds()
+
+// ═══ 1b. BFX-data (gegenereerd, alleen lezen) ═══════════════════
+type PairBias
+    string basis
+    string quote
+    float  idx
+    string lbl
+    string status
+    string tekst
+type CcyK
+    string ccy
+    float  idx
+    string kp
+type Inv
+    string paar
+    string tekst
+    string horizon
+type Ev
+    int    t
+    string ccy
+    bool   cb
+    string name
+var array<PairBias> pairs = array.new<PairBias>()
+var array<CcyK>     ccyk  = array.new<CcyK>()
+var array<Inv>      invs  = array.new<Inv>()
+var array<Ev>       evs   = array.new<Ev>()
+addPair(string b, string q, float i, string l, string s, string t) =>
+    pairs.push(PairBias.new(b, q, i, l, s, t))
+addCcy(string c, float i, string k) =>
+    ccyk.push(CcyK.new(c, i, k))
+addInv(string p, string t, string h) =>
+    invs.push(Inv.new(p, t, h))
+addEv(int t, string c, bool cb, string n) =>
+    evs.push(Ev.new(t, c, cb, n))
+
+// ═══ DATA-START ═══
+{{DATA}}
+// ═══ DATA-EINDE ═══
+
+// Macro (BIAS_5.0, zelfde regel als CBO_0.1): ≥ +15 long, ≤ −15 short, alleen als de bias actueel is
+string cb = syminfo.basecurrency
+string cq = syminfo.currency
+findPair() =>
+    PairBias f = na
+    for p in pairs
+        if (p.basis == cb and p.quote == cq) or (p.basis == cq and p.quote == cb)
+            f := p
+            break
+    f
+findInv() =>
+    Inv f = na
+    for v in invs
+        if v.paar == cb + cq or v.paar == cq + cb
+            f := v
+            break
+    f
+expectedBiasDay() =>
+    string tz = "Europe/Amsterdam"
+    int t = timenow
+    if hour(t, tz) * 60 + minute(t, tz) < 330
+        t := t - 86400000
+    int dow = dayofweek(t, tz)
+    int back = dow == dayofweek.sunday ? 2 : dow == dayofweek.saturday ? 1 : 0
+    timestamp("UTC", year(t, tz), month(t, tz), dayofmonth(t, tz)) - back * 86400000
+PairBias pb = findPair()
+float pIdx = na(pb) ? na : (pb.basis != cb ? -pb.idx : pb.idx)
+bool  biasFresh = BIAS_DATUM > 0 and BIAS_DATUM >= expectedBiasDay()
+bool  snapFresh = timenow - ENG_GENERATED <= 36 * 3600000
+int   macroDir = na(pIdx) or not biasFresh ? 0 : pIdx >= 15 ? 1 : pIdx <= -15 ? -1 : 0
+
+// Events van basis/quote: blok- en post-eventstatus op tijdstip t
+evAt(int t) =>
+    bool blk = false
+    bool post = false
+    Ev nxt = na
+    for e in evs
+        if e.ccy == cb or e.ccy == cq
+            int pre = (e.cb ? e_preCB : e_pre) * 60000
+            int aft = (e.cb ? e_postCB : e_post) * 60000
+            if t >= e.t - pre and t <= e.t + aft
+                blk := true
+            if t > e.t and t <= e.t + e_disc * 60000
+                post := true
+            if e.t >= t and na(nxt)
+                nxt := e
+    [blk, post, nxt]
+[evBlk, evPost, evNext] = evAt(time_close)
 
 // ═══ 2. Structuurlaag ═══════════════════════════════════════════
 // Eén laag één bar verder, alleen op gesloten candles. Een pivot dat op déze bar bevestigt telt pas vanaf de volgende bar.
@@ -217,7 +322,7 @@ htfState(int L) =>
 int h4Dir = na
 int h4Stg = na
 float h4Pd = na
-if i_rowH4 and tfSec < 14400
+if (i_rowH4 or tfSec <= 1800) and tfSec < 14400
     [a1, a2, a3] = request.security(syminfo.tickerid, "240", htfState(h_lenS), lookahead = barmerge.lookahead_on)
     h4Dir := a1
     h4Stg := a2
@@ -225,7 +330,7 @@ if i_rowH4 and tfSec < 14400
 int dDir = na
 int dStg = na
 float dPd = na
-if i_rowD and tfSec < 86400
+if (i_rowD or tfSec == 3600 or tfSec == 14400) and tfSec < 86400
     [c1, c2, c3] = request.security(syminfo.tickerid, "D", htfState(h_lenS), lookahead = barmerge.lookahead_on)
     dDir := c1
     dStg := c2
@@ -420,8 +525,8 @@ if barstate.isconfirmed
     cZF += (f1 == 1 ? 1 : 0) + (f2 == 1 ? 1 : 0)
     cZx += (p1 == -1 ? 1 : 0) + (p2 == -1 ? 1 : 0) + (f1 == -1 ? 1 : 0) + (f2 == -1 ? 1 : 0)
 
-// ═══ 5b. CBO-module: box-statemachine met de regels van CBO_0.1 (zonder events en zonder meting) ═══
-// 0 GEEN CONTEXT · 1 CONTEXT GELDIG · 2 VORMT · 3 KANDIDAAT · 4 VERZEGELD · 5 BREAKOUT · 6 ACCEPTATIE · 9 MISLUKT · 10 VERLOPEN
+// ═══ 5b. CBO-module: box-statemachine met de regels van CBO_0.1 (met eventblokkade, zonder meting) ═══
+// 0 GEEN CONTEXT · 1 CONTEXT GELDIG · 2 VORMT · 3 KANDIDAAT · 4 VERZEGELD · 5 BREAKOUT · 6 ACCEPTATIE · 9 MISLUKT · 10 VERLOPEN · 11 EVENT BLOCK
 cboName(int s) =>
     switch s
         0 => "GEEN CONTEXT"
@@ -433,6 +538,7 @@ cboName(int s) =>
         6 => "ACCEPTATIE"
         9 => "MISLUKT"
         10 => "VERLOPEN"
+        11 => "EVENT BLOCK"
         => "?"
 
 bool cboTF = tfSec == 900 or tfSec == 1800 or tfSec == 3600 or tfSec == 14400
@@ -456,7 +562,8 @@ float er  = math.abs(close - close[c_erLen]) / math.max(math.sum(math.abs(close 
 float rngB = high - low
 bool ctxUp = not na(ctxSlope) and ctxSlope > 0 and ctxClose > ctxEma
 bool ctxDn = not na(ctxSlope) and ctxSlope < 0 and ctxClose < ctxEma
-string regime = rngB >= c_expMult * atr ? "expansie" : rvP > c_highVol ? "hoge volatiliteit" : er < c_erChaos and rvP > 50 ? "chaotisch" : rvP < c_lowVol ? "lage volatiliteit" : rvP < c_compVol and er < c_erTrend ? "compressie" : er >= c_erTrend and (ctxUp or ctxDn) ? "trend" : "balans"
+// Post-event-regime alleen op bars ≤ 1 uur (zoals CBO_0.1)
+string regime = evPost and tfSec <= 3600 ? "post-event" : rngB >= c_expMult * atr ? "expansie" : rvP > c_highVol ? "hoge volatiliteit" : er < c_erChaos and rvP > 50 ? "chaotisch" : rvP < c_lowVol ? "lage volatiliteit" : rvP < c_compVol and er < c_erTrend ? "compressie" : er >= c_erTrend and (ctxUp or ctxDn) ? "trend" : "balans"
 bool regimeOK = regime == "compressie" or regime == "balans" or regime == "trend" or regime == "lage volatiliteit"
 float hhN = ta.highest(high, c_nMin)
 float llN = ta.lowest(low, c_nMin)
@@ -490,11 +597,13 @@ var int cB = 0
 var int cA = 0
 var int cF = 0
 var int cE = 0
+var int cBlk = 0
+var int xAccB = na
 var int cZR = 0
 
 if barstate.isconfirmed and i_cbo and cboTF
     if xSt <= 1 or xSt >= 6
-        if regimeOK and (hhN - llN) <= c_wMax * atr
+        if regimeOK and not evBlk and (hhN - llN) <= c_wMax * atr
             xSt := 2
             xHi := hhN
             xLo := llN
@@ -509,11 +618,14 @@ if barstate.isconfirmed and i_cbo and cboTF
                 xTop += high[i] >= hhN - c_tol * ww ? 1 : 0
                 xBot += low[i] <= llN + c_tol * ww ? 1 : 0
         else
-            xSt := regimeOK ? 1 : 0
+            xSt := evBlk ? 11 : regimeOK ? 1 : 0
     else if xSt == 2 or xSt == 3
         float nh = math.max(xHi, high)
         float nl = math.min(xLo, low)
-        if (nh - nl) <= c_wMax * atr and xN < c_nMax
+        if evBlk
+            xSt := 11
+            cBlk += 1
+        else if (nh - nl) <= c_wMax * atr and xN < c_nMax
             xQuiet := (high <= xHi and low >= xLo) ? xQuiet + 1 : 0
             xHi := nh
             xLo := nl
@@ -540,6 +652,12 @@ if barstate.isconfirmed and i_cbo and cboTF
                 cS += 1
         else
             xSt := 1
+    else if xSt == 4 and evBlk
+        xSt := 11
+        cBlk += 1
+        xRes := 3
+        xEndT := time
+        xLast := "eventblokkade tijdens verzegelde box · " + str.format_time(time, "dd/MM HH:mm", i_tz)
     else if xSt == 4
         bool up = close > xsHi
         bool dn = close < xsLo
@@ -571,6 +689,7 @@ if barstate.isconfirmed and i_cbo and cboTF
                 xSt := 6
                 xRes := 1
                 xEndT := time
+                xAccB := bar_index
                 cA += 1
                 xLast := "acceptatie " + (xDir == 1 ? "↑" : "↓") + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
                 // OB-R: laatste tegencandle binnen de box, vóór de breakout-candle
@@ -597,7 +716,7 @@ if barstate.islast
             color cc = xRes == 1 ? (xDir > 0 ? cBull : cBear) : xRes == -1 ? cAmb : t3c
             int tEnd = xSt == 4 ? time : xSt == 5 ? time : nz(xEndT, time)
             xBxS := box.new(xsStartT, xsHi, tEnd, xsLo, xloc = xloc.bar_time, border_color = color.new(cc, 30), border_width = 1, bgcolor = color.new(cc, 92))
-            string res = xSt == 4 ? "VERZEGELD" : xSt == 5 ? "BREAKOUT " + (xDir > 0 ? "↑" : "↓") : xRes == 1 ? "ACCEPTATIE " + (xDir > 0 ? "↑" : "↓") : xRes == -1 ? "MISLUKT" : "VERLOPEN"
+            string res = xSt == 4 ? "VERZEGELD" : xSt == 5 ? "BREAKOUT " + (xDir > 0 ? "↑" : "↓") : xRes == 1 ? "ACCEPTATIE " + (xDir > 0 ? "↑" : "↓") : xRes == -1 ? "MISLUKT" : xRes == 3 ? "EVENT BLOCK" : "VERLOPEN"
             xLb := label.new(xsStartT, xsHi, "CBO · " + res, xloc = xloc.bar_time, style = label.style_label_lower_left, color = color.new(cc, 100), textcolor = cc, size = size.tiny, tooltip = "Box-ID " + xId + " · " + str.tostring(xsN) + " bars · regels CBO_0.1 (zonder eventblokkade)")
         if xSt == 2 or xSt == 3
             xBxF := box.new(xStartT, xHi, time, xLo, xloc = xloc.bar_time, border_color = color.new(t3c, 40), border_style = line.style_dashed, border_width = 1, bgcolor = na)
@@ -764,6 +883,120 @@ alignTxt(int d) =>
             zOk := true
     (lS.dir == d ? "✓" : "✕") + " swing · " + (lI.dir == d ? "✓" : "✕") + " internal · " + (na(pd) ? "?" : locOk ? "✓" : "✕") + (d == 1 ? " niet premium" : " niet discount") + " · " + (zOk ? "✓" : "✕") + " zone bij box"
 
+// ═══ 5d. Poorten en setupstatus (decision support, geen order) ═══
+// Poortwaarde: 1 = ✓ · 2 = ~ (laat door, met opmerking) · 0 = ? / wacht · −1 = ✕
+var int swBullB = na
+var int swBearB = na
+if wS == 1 or wI == 1
+    swBullB := bar_index
+if wS == -1 or wI == -1
+    swBearB := bar_index
+
+int    md = macroDir
+int    ctxDir = tfSec <= 1800 ? h4Dir : dDir
+int    ctxStg = tfSec <= 1800 ? h4Stg : dStg
+string ctxNm = tfSec <= 1800 ? "4H" : "D"
+int gData = not na(pb) and biasFresh and snapFresh and time >= BIAS_DATUM ? 1 : 0
+int gMacro = md != 0 ? 1 : -1
+int gHtf = na(ctxDir) ? 0 : md != 0 and ctxDir == md ? 1 : md != 0 and ctxDir == -md and (ctxStg == 2 or ctxStg == 3) ? -1 : 2
+float pdNow = pdOf(lS)
+bool inZoneD = false
+for z in zones
+    if md != 0 and z.dir == md and z.st >= 1 and z.st <= 3 and low <= z.top and high >= z.bot
+        inZoneD := true
+int gLoc = md == 0 ? 0 : inZoneD or (not na(pdNow) and (md == 1 ? pdNow <= 50 : pdNow >= 50)) ? 1 : na(pdNow) ? 0 : -1
+int swAgo = md == 1 ? (na(swBullB) ? na : bar_index - swBullB) : md == -1 ? (na(swBearB) ? na : bar_index - swBearB) : na
+int gSweep = not na(swAgo) and swAgo <= g_swAge ? 1 : 0
+bool accRecent = xRes == 1 and not na(xAccB) and bar_index - xAccB <= g_trigAge
+bool accD = accRecent and md != 0 and xDir == md
+bool boxD = xSt == 4 or (xSt == 5 and xDir == md) or accD
+bool against = md != 0 and xDir == -md and (xSt == 5 or accRecent)
+int gTrig = accD ? 1 : against ? -1 : boxD ? 0 : -1
+int gEvent = evBlk ? -1 : na(evNext) ? 0 : 1
+float stopP = na(xsHi) or md == 0 ? na : md == 1 ? xsLo - g_stopBuf * atr : xsHi + g_stopBuf * atr
+[frD, frDn] = firstRef(md == 0 ? 1 : md, close)
+float riskP = na(stopP) ? na : math.abs(close - stopP)
+float roomR = na(frD) or na(riskP) or riskP == 0 ? na : math.abs(frD - close) / riskP
+int gRoom = na(roomR) ? 0 : roomR >= g_minRoom ? 1 : -1
+float costPx = k_known ? (k_spread + 2 * k_slip) * syminfo.mintick * (syminfo.mintick <= 0.001 ? 10 : 1) : na
+int gCost = not k_known or na(riskP) or riskP == 0 ? 0 : costPx / riskP < 0.1 ? 1 : -1
+
+// 0 N.V.T. · 1 UNKNOWN · 2 BLOCKED · 3 WATCH · 4 ARMED · 5 CONFIRMED · 6 ACTIVE · 7 FAILED · 8 DOEL · 9 EXPIRED
+int gs = not cboTF ? 0 : gData != 1 ? 1 : gMacro != 1 or gEvent == -1 or gHtf == -1 ? 2 : gTrig == 1 and gLoc == 1 and gEvent == 1 and gRoom == 1 and gHtf >= 1 and (not g_needSweep or gSweep == 1) ? 5 : gLoc == 1 and boxD ? 4 : 3
+setupName(int s) =>
+    switch s
+        0 => "N.V.T."
+        1 => "UNKNOWN"
+        2 => "BLOCKED"
+        3 => "WATCH"
+        4 => "ARMED"
+        5 => "CONFIRMED"
+        6 => "ACTIVE"
+        7 => "FAILED"
+        8 => "DOEL GERAAKT"
+        9 => "EXPIRED"
+        => "?"
+
+// Setup volgen na CONFIRMED (één per box): instap = close, stop = overkant box ± buffer, doel = eerste referentie
+var int    sSt = 0
+var float  sE = na
+var float  sS = na
+var float  sT = na
+var int    sB = na
+var int    sDir = 0
+var int    sEndB = na
+var string sId = ""
+var string sTgtN = ""
+var int cConf = 0
+var int cFail = 0
+var int cDoel = 0
+var int cExp = 0
+// Laatst gesloten candle: status en poorten (geen tussenstanden van een lopende candle)
+var int cs = 0
+var array<int> cg = array.new_int(9, 0)
+var float cPd = na
+var float cRoom = na
+var int cSwAgo = na
+if barstate.isconfirmed
+    if sSt == 6
+        bool hitS = sDir == 1 ? low <= sS : high >= sS
+        bool hitT = not na(sT) and (sDir == 1 ? high >= sT : low <= sT)
+        if hitS
+            sSt := 7
+            sEndB := bar_index
+            cFail += 1
+        else if hitT
+            sSt := 8
+            sEndB := bar_index
+            cDoel += 1
+        else if bar_index - sB >= g_tMax
+            sSt := 9
+            sEndB := bar_index
+            cExp += 1
+    else if gs == 5 and sId != xId
+        sSt := 6
+        sE := close
+        sS := stopP
+        sT := frD
+        sTgtN := frDn
+        sB := bar_index
+        sDir := md
+        sId := xId
+        cConf += 1
+    cs := sSt == 6 ? (sB == bar_index ? 5 : 6) : sSt >= 7 and bar_index - sEndB <= 10 ? sSt : gs
+    cg.set(0, gData)
+    cg.set(1, gMacro)
+    cg.set(2, gHtf)
+    cg.set(3, gLoc)
+    cg.set(4, gSweep)
+    cg.set(5, gTrig)
+    cg.set(6, gEvent)
+    cg.set(7, gRoom)
+    cg.set(8, gCost)
+    cPd := pdNow
+    cRoom := roomR
+    cSwAgo := swAgo
+
 // Zichtbaarheid: per richting alleen de dichtstbijzijnde actieve zones; gebruikte zones alleen vervaagd in Expanded.
 var array<Zone> zShown = array.new<Zone>()
 if barstate.islast
@@ -805,13 +1038,15 @@ if barstate.islast
         eqLb := label.new(time, eq, "EQ 50%", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(t3c, 100), textcolor = t3c, size = size.tiny)
 
 // ═══ 7. Kaart ═══════════════════════════════════════════════════
-var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 40, border_width = 0, frame_width = 0)
+var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 60, border_width = 0, frame_width = 0)
 row2(int r, string a, string b, color ca, color cbb, string tip = "", string sz = size.small) =>
     tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
     tb.cell(1, r, b, text_color = cbb, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
 row1(int r, string a, color ca, string tip = "", string sz = size.small) =>
     tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
     tb.merge_cells(0, r, 1, r)
+gTxt(int g) =>
+    g == 1 ? "✓" : g == -1 ? "✕" : g == 2 ? "~" : "?"
 dirTxt(int d) =>
     d == 1 ? "Bullish" : d == -1 ? "Bearish" : "Neutraal"
 stgTxt(int g) =>
@@ -825,7 +1060,7 @@ lvlTxt(Lvl s) =>
 
 const string TIP_STG = "Mogelijke shift = eerste close-break tegen de richting (CHoCH) · shift bevestigd = eerste BoS daarna · continuation = volgende BoS · verzwakt = sweep aan de trendzijde (mislukte voortzetting). Alles op candle-close."
 if barstate.islast
-    tb.clear(0, 0, 1, 39)
+    tb.clear(0, 0, 1, 59)
     int r = 0
     if i_spacer > 0 and (i_pos == "Rechtsboven" or i_pos == "Linksboven")
         for k = 0 to i_spacer - 1
@@ -833,8 +1068,43 @@ if barstate.islast
             r += 1
     row1(r, syminfo.ticker + " · " + timeframe.period + " · TECHNISCHE STRUCTUUR", t1c, "", size.normal)
     r += 1
-    row1(r, "ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE · geen macro, geen signalen", cAmb, "Alle drempels zijn hypothesen (contract 0.1). Bias 5.0 blijft het hoofdoordeel.", size.tiny)
+    row1(r, "ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE · decision support, geen order", cAmb, "Alle drempels zijn hypothesen (contract 0.1). Bias 5.0 blijft het hoofdoordeel; poorten tonen alleen of de techniek die richting uitvoerbaar maakt.", size.tiny)
     r += 1
+    // Poorten en status van de laatst gesloten candle
+    string bDay = BIAS_DATUM > 0 ? str.format_time(BIAS_DATUM, "dd/MM", "UTC") : "–"
+    string ev2 = evBlk ? "BLOK actief" : na(evNext) ? "geen event in agenda — dekking onbekend" : "vrij · volgende " + evNext.ccy + " " + evNext.name + " " + str.format_time(evNext.t, "EEE HH:mm", i_tz) + " (over " + str.tostring(math.round((evNext.t - timenow) / 3600000)) + "u)"
+    array<string> gN = array.from("Data", "Macro", "HTF " + ctxNm, "Locatie", "Sweep", "CBO-trigger", "Event", "Ruimte", "Kosten")
+    array<string> gW = array.new<string>()
+    gW.push(cg.get(0) == 1 ? "BIAS " + BIAS_VERSIE + " " + bDay + " actueel" : na(pb) ? "geen bias voor dit paar" : not biasFresh ? "bias verouderd (" + bDay + ")" : not snapFresh ? "snapshot ouder dan 36 u — draai de generator" : "candle vóór biasdatum")
+    gW.push(md != 0 ? (md > 0 ? "long" : "short") + " toegestaan · index " + str.tostring(pIdx, "+0.0;-0.0") : "geen richting · index " + (na(pIdx) ? "–" : str.tostring(pIdx, "+0.0;-0.0")) + " (drempel ±15)")
+    gW.push(na(ctxDir) ? "onbekend" : ctxNm + " swing " + dirTxt(ctxDir) + " · " + stgTxt(ctxStg))
+    gW.push(md == 0 ? "–" : "swing-PD " + (na(cPd) ? "–" : str.tostring(cPd, "0") + "%") + (md == 1 ? " (long wil ≤ 50% of long-zone)" : " (short wil ≥ 50% of short-zone)"))
+    gW.push(cg.get(4) == 1 ? "sweep " + str.tostring(cSwAgo) + " bars geleden" + (g_needSweep ? "" : " (info)") : "geen recente sweep in macrorichting" + (g_needSweep ? " — verplicht" : " (info, niet verplicht)"))
+    gW.push(not cboTF ? "–" : cboName(xSt) + (xSt == 5 or accRecent ? " " + (xDir > 0 ? "↑" : "↓") : "") + (cg.get(5) == 1 ? " in macrorichting" : cg.get(5) == -1 and against ? " — tegen macro" : xSt == 4 ? " — wacht op breakout-close" : xSt == 5 ? " — wacht op acceptatie" : " — geen verzegelde box"))
+    gW.push(ev2)
+    gW.push(na(cRoom) ? (na(stopP) ? "geen box" : "geen niet-geraakte referentie") : str.tostring(cRoom, "0.0") + "R tot " + frDn + " (min " + str.tostring(g_minRoom, "0.0") + "R)")
+    gW.push(k_known ? (cg.get(8) == 1 ? "< 10% van R" : cg.get(8) == -1 ? "≥ 10% van R" : "geen R") : "KOSTEN ONBEKEND (blokkeert niet)")
+    string gLine = ""
+    for i = 0 to 8
+        gLine += (i > 0 ? " · " : "") + array.get(gN, i) + " " + (i == 4 and cg.get(i) == 0 and not g_needSweep ? "–" : gTxt(cg.get(i)))
+    string nxt = cs == 0 ? "poorten alleen op 15m/30m/1H/4H" : cs == 1 ? "wacht op actuele Bias 5.0 (" + gW.get(0) + ")" : cs == 2 ? (cg.get(1) != 1 ? "geen nieuwe trade: macro zonder richting" : cg.get(6) == -1 ? "wacht tot het eventblok voorbij is" : "wacht: " + ctxNm + "-structuur staat tegen de macro") : cs == 3 ? (cg.get(3) != 1 ? "wacht op " + (md == 1 ? "discount of long-zone" : "premium of short-zone") : "wacht op een verzegelde CBO-box") : cs == 4 ? (xSt == 4 ? "wacht op breakout-close " + (md == 1 ? "boven " + str.tostring(xsHi, format.mintick) : "onder " + str.tostring(xsLo, format.mintick)) : xSt == 5 ? "wacht op acceptatie (" + str.tostring(c_accK) + " closes buiten de box)" : "trigger ✓ maar " + (cg.get(7) != 1 ? "ruimte " + gTxt(cg.get(7)) : cg.get(6) != 1 ? "event " + gTxt(cg.get(6)) : g_needSweep and cg.get(4) != 1 ? "sweep ontbreekt" : "HTF onbekend")) : cs == 5 ? "alle poorten ✓ — handmatige beoordeling, geen order" : cs == 6 ? "instap " + str.tostring(sE, format.mintick) + " · stop " + str.tostring(sS, format.mintick) + " · doel " + (na(sT) ? "–" : sTgtN + " " + str.tostring(sT, format.mintick)) : cs == 7 ? "stop geraakt" : cs == 8 ? "doel " + sTgtN + " geraakt" : "verlopen na " + str.tostring(g_tMax) + " bars"
+    color sc = cs == 5 or cs == 6 or cs == 8 ? (sDir != 0 and cs != 5 ? (sDir > 0 ? cBull : cBear) : (md > 0 ? cBull : cBear)) : cs == 4 or cs == 2 or cs == 7 ? cAmb : cs == 3 ? t1c : t3c
+    row2(r, "Setup", setupName(cs) + (md != 0 and cs >= 3 ? (md > 0 ? " · LONG-zijde" : " · SHORT-zijde") : ""), t2c, sc, "Status op de laatst gesloten candle. WATCH = richting en context ok · ARMED = op locatie met box/trigger · CONFIRMED = alle verplichte poorten ✓. Geen totaalscore, geen order.", size.normal)
+    r += 1
+    row2(r, "Volgende stap", nxt, t2c, t1c)
+    r += 1
+    if i_mode != "Minimal"
+        Inv iv = findInv()
+        row2(r, "Bias", "BIAS " + BIAS_VERSIE + " · " + cb + "/" + cq + " " + (na(pIdx) ? "–" : str.tostring(pIdx, "+0.0;-0.0")) + " · " + (md == 1 ? "long" : md == -1 ? "short" : "geen richting") + " · " + bDay + (biasFresh ? " actueel" : " verouderd"), t2c, md == 1 ? cBull : md == -1 ? cBear : t2c, na(iv) ? "Geen daily-invalidatie in de snapshot." : "Macro-invalidatie: " + iv.tekst)
+        r += 1
+        row2(r, "Poorten", gLine, t2c, t1c, "✓ ok · ✕ faalt · ~ laat door met opmerking · ? onbekend/wacht. Onbekend telt nooit als ok.")
+        r += 1
+        row2(r, "Event", ev2, t2c, evBlk ? cAmb : na(evNext) ? t3c : t1c, "Blok: centrale bank " + str.tostring(e_preCB) + "/" + str.tostring(e_postCB) + " min, overig high impact " + str.tostring(e_pre) + "/" + str.tostring(e_post) + " min vóór/na. Kalenderdekking niet bewezen.")
+        r += 1
+    if i_mode == "Expanded"
+        for i = 0 to 8
+            row2(r, "  " + array.get(gN, i), gTxt(cg.get(i)) + " " + gW.get(i), t3c, cg.get(i) == 1 ? t2c : cg.get(i) == -1 ? cAmb : t3c, "", size.tiny)
+            r += 1
     row2(r, "Swing", lvlTxt(lS), t2c, dirCol(lS.dir), TIP_STG)
     r += 1
     row2(r, "Internal", lvlTxt(lI), t2c, dirCol(lI.dir), TIP_STG)
@@ -932,6 +1202,12 @@ plot(cB, "CBO breakouts", display = display.data_window)
 plot(cA, "CBO acceptatie", display = display.data_window)
 plot(cF, "CBO mislukt", display = display.data_window)
 plot(cE, "CBO verlopen", display = display.data_window)
+plot(cs, "Setup status (0 nvt·1 unk·2 blk·3 watch·4 armed·5 conf·6 act·7 fail·8 doel·9 exp)", display = display.data_window)
+plot(cConf, "Setups CONFIRMED", display = display.data_window)
+plot(cFail, "Setups FAILED", display = display.data_window)
+plot(cDoel, "Setups DOEL", display = display.data_window)
+plot(cExp, "Setups EXPIRED", display = display.data_window)
+plot(cBlk, "CBO eventblokkades", display = display.data_window)
 plot(rPDH, "PDH", display = display.data_window)
 plot(rPDL, "PDL", display = display.data_window)
 plot(bar_index + 1, "Bars geladen", display = display.data_window)

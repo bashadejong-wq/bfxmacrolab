@@ -179,3 +179,58 @@ Dit is beschrijvend. De poorten (WATCH/ARMED/CONFIRMED) komen in fase 3.
 ## 14. Parameters fase 2 (HYPOTHESE)
 
 `c_volLen 20 · c_volPct 250 · c_lowVol 15 · c_highVol 85 · c_compVol 40 · c_erLen 20 · c_erTrend 0.35 · c_erChaos 0.12 · c_expMult 2.0 · c_nMin 8 · c_nMax 24 · c_wMax 1.25 · c_tol 0.15 · c_tMin 2 · c_nSeal 3 · c_expiry 2.0 · c_body 0.5 · c_accK 2 · r_max 3 · r_dist 1.5`
+
+---
+
+# Fase 3 (28-10-2026): Bias 5.0, events, eventblokkade en poorten
+
+## 15. Data (alleen lezen, verzegelde snapshot)
+
+- `src/structure-generate.mjs` vult `{{DATA}}` met hetzelfde blok als de CBO-engine: dezelfde `buildEngine`, alleen een ander template.
+  Het blok bevat de BIAS_5.0-paren, de valuta's, de daily-invalidaties en de high-impact events (vanaf 2 dagen terug).
+  `CAL_COVERAGE_PROVEN = false`.
+- Er wordt niets naar de database geschreven.
+- De macrorichting volgt dezelfde regel als CBO_0.1: `pIdx ≥ 15` long, `≤ −15` short, anders geen richting.
+  Daarvoor moet de bias actueel zijn (`biasFresh`).
+
+## 16. Eventblokkade in de CBO-module (zoals CBO_0.1)
+
+- **Blok**: centrale bank 60 min vóór tot 120 min na; overig high impact 30 min vóór tot 60 min na.
+  Alleen events van de basis- of de quotevaluta tellen.
+- **Post-event-regime**: tot 180 min na een event, alleen op TF ≤ 1H. Het regime is dan niet geschikt.
+- Tijdens een blok gaat een vormende of verzegelde box naar **EVENT BLOCK** (st 11) en start er geen nieuwe box.
+
+## 17. Poorten (richting `d` = macrorichting)
+
+| Poort | ✓ | ✕ | ? |
+|---|---|---|---|
+| Data | bias van het paar aanwezig en actueel, snapshot < 36 u oud | — | bias ontbreekt of is verouderd, snapshot ouder dan 36 u, of bar vóór de biasdatum |
+| Macro | `d ≠ 0` | geen richting (neutraal) | (zie Data) |
+| HTF-structuur | swing van de context-TF = `d` | context-swing = `−d` én stage 2/3 (bevestigd of continuation) | context-swing neutraal, mogelijke shift of verzwakt (laat door, met opmerking) |
+| Locatie | long: swing-PD ≤ 50% of koers in een actieve long-zone · short: PD ≥ 50% of in een short-zone | anders | geen swingrange |
+| Sweep (info, verplicht met `g_needSweep`) | sweep in richting `d` (swing of internal) in de laatste `g_swAge` bars | — | — |
+| CBO-trigger | **ACCEPTATIE** in `d`, maximaal `g_trigAge` bars geleden | breakout tegen `d`, of geen verzegelde box | — |
+| Event | geen blok, agenda geladen | blok actief | geen toekomstig event in de agenda (dekking onbekend) |
+| Ruimte | eerste niet-geraakte referentie in `d` ≥ `g_minRoom` R (stop = overkant box ± `g_stopBuf` ATR) | < `g_minRoom` R | geen box of geen referentie |
+| Kosten (info) | bekend en < 10% van de R | ≥ 10% van de R | onbekend (blokkeert niet) |
+
+Context-TF: 4H voor 15m/30m en D voor 1H/4H. Op andere TF's zijn de poorten **n.v.t.**
+
+## 18. Status (op gesloten candles)
+
+| Status | Regel |
+|---|---|
+| UNKNOWN | Data is ? |
+| BLOCKED | macro ✕, event-blok, of HTF ✕ |
+| WATCH | richting en HTF in orde, maar locatie ✕ of geen box/trigger |
+| ARMED | locatie ✓ én (box verzegeld, breakout in `d`, of acceptatie in `d`) |
+| CONFIRMED | trigger ✓ + locatie ✓ + event ✓ + ruimte ✓ (+ sweep ✓ als verplicht) |
+| ACTIVE | na CONFIRMED: instap = close, stop = overkant box ± buffer, doel = eerste referentie |
+| FAILED / DOEL / EXPIRED | stop geraakt (stop eerst bij gelijktijdig) / doel geraakt / na `g_tMax` bars; daarna nog 10 bars zichtbaar |
+
+Elke poort toont zijn reden. Er is **geen totaalscore**. Dit is decision support en geen order.
+Retrospectieve tellingen zijn **geen bewijs**: de bias bestaat alleen vanaf de biasdatum, en die geldt als grens (zie Data).
+
+## 19. Parameters fase 3 (HYPOTHESE)
+
+`e_preCB 60 · e_postCB 120 · e_pre 30 · e_post 60 · e_disc 180 · g_trigAge 3 · g_minRoom 1.0 · g_stopBuf 0.1 · g_swAge 24 · g_needSweep false · g_tMax 32 · k_known false · k_spread 0.0 · k_slip 0.0`

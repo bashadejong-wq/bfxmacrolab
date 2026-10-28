@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { ROOT } from "../src/config.mjs";
+import { buildStructure } from "../src/structure-generate.mjs";
 
 const tpl = readFileSync(resolve(ROOT, "template/bfx_structure_engine.pine"), "utf8");
 const code = tpl.replace(/\/\/.*$/gm, "");
@@ -41,12 +42,15 @@ test("HTF alleen van gesloten candles: elke request.security leest een [1]-funct
   for (const c of calls) assert.ok(/(htfState|ctxVals|dAtrV)\(/.test(c) && c.includes("lookahead_on"), c);
 });
 
-test("CBO-module: breakout alleen op close met body-eis, OB-R alleen bij acceptatie", () => {
+test("CBO-module: breakout alleen op close met body-eis, OB-R alleen bij acceptatie, eventblokkade zoals CBO_0.1", () => {
   const cbo = code.slice(code.indexOf("if barstate.isconfirmed and i_cbo and cboTF"), code.indexOf("var box xBxS"));
   assert.match(cbo, /bool up = close > xsHi/);
   assert.match(cbo, /outB \/ body >= c_body/);
   assert.ok(cbo.indexOf('addZone("OB-R"') > cbo.indexOf("xSt := 6"), "OB-R pas na ACCEPTATIE");
-  assert.ok(!/eventblok|evBlk/.test(cbo), "eventblokkade hoort bij fase 3");
+  assert.match(cbo, /if regimeOK and not evBlk and \(hhN - llN\) <= c_wMax \* atr/);
+  assert.match(cbo, /if evBlk\n {12}xSt := 11/);
+  assert.match(cbo, /else if xSt == 4 and evBlk\n {8}xSt := 11/);
+  assert.match(code, /evPost and tfSec <= 3600 \? "post-event"/);
 });
 
 test("referentielijnen starten bij de wick-candle en tellen geraakt alleen op gesloten candles", () => {
@@ -56,8 +60,8 @@ test("referentielijnen starten bij de wick-candle en tellen geraakt alleen op ge
 });
 
 test("elke HYPOTHESE-parameter staat met dezelfde standaard in het contract", () => {
-  const inputs = [...tpl.matchAll(/^((?:h|c|r)_\w+)\s*=\s*input\.(?:int|float|bool)\(([\w.]+)/gm)];
-  assert.ok(inputs.length >= 31);
+  const inputs = [...tpl.matchAll(/^((?:h|c|r|e|g|k)_\w+)\s*=\s*input\.(?:int|float|bool)\(([\w.]+)/gm)];
+  assert.ok(inputs.length >= 45);
   for (const [, name, def] of inputs) {
     const m = contract.match(new RegExp(`\\b${name} (\\w[\\w.]*)`));
     assert.ok(m, `${name} ontbreekt in het contract`);
@@ -69,4 +73,29 @@ test("zonevarianten blijven gescheiden en zones hebben een stabiel ID", () => {
   assert.ok(code.includes('addZone("OB-P"') && code.includes('addZone("OB-F"') && code.includes('addZone("OB-R"'));
   assert.match(code, /syminfo\.ticker \+ "-" \+ timeframe\.period \+ "-" \+ kind \+ "-" \+ str\.format_time\(time\[k\], "yyyyMMdd-HHmm", "UTC"\)/);
   assert.ok(code.includes("hasZone(id)"), "dubbele zone-ID's worden niet opnieuw gemaakt");
+});
+
+test("generator vult het Structure-template met hetzelfde BFX-datablok (alleen lezen)", () => {
+  const NOW = Date.UTC(2026, 9, 28, 9, 0);
+  const out = buildStructure({
+    generatedAt: NOW, biasDatum: Date.UTC(2026, 9, 28), biasVersie: "BIAS50_1.1",
+    pairs: [{ basis: "EUR", quote: "USD", idx: -20, label: "BEARISH", status: "geen", tekst: "t" }],
+    currencies: [], outlookRows: [],
+    events: [{ time: NOW + 3600000, ccy: "USD", impact: 3, name: "FOMC Rate Decision" }],
+  });
+  assert.ok(out.code.includes("// BFX-STRUCTURE-ENGINE") && !out.code.includes("{{DATA}}") && !out.code.includes("{{VERSION}}"));
+  assert.match(out.code, /const bool {3}CAL_COVERAGE_PROVEN = false/);
+  assert.ok(out.code.includes('addEv(' + (NOW + 3600000) + ', "USD", true'));
+  assert.equal(out.events, 1);
+});
+
+test("poorten: onbekend telt nooit als ok, CONFIRMED eist trigger+locatie+event+ruimte, historie vóór biasdatum = UNKNOWN", () => {
+  assert.match(code, /int gData = not na\(pb\) and biasFresh and snapFresh and time >= BIAS_DATUM \? 1 : 0/);
+  assert.match(code, /int gEvent = evBlk \? -1 : na\(evNext\) \? 0 : 1/);
+  assert.match(code, /int gRoom = na\(roomR\) \? 0 :/);
+  assert.match(code, /gTrig == 1 and gLoc == 1 and gEvent == 1 and gRoom == 1 and gHtf >= 1 and \(not g_needSweep or gSweep == 1\) \? 5/);
+  // setups en de getoonde status alleen vanaf gesloten candles
+  const conf = code.slice(code.indexOf("var int cs = 0"), code.indexOf("cPd := pdNow"));
+  assert.match(conf, /if barstate\.isconfirmed\n {4}if sSt == 6/);
+  assert.ok(!/strategy\.|alert\(/.test(code));
 });

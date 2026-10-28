@@ -77,8 +77,8 @@ De productielayout is niet geopend, het productie-worktree staat op `ea1318a` en
 - ~~OB-R~~ (fase 2 gedaan)
 - ~~slimme referentielijnen~~ (fase 2 gedaan)
 - ~~CBO-integratie~~ (fase 2 gedaan, zonder eventblokkade)
-- Bias 5.0- en eventkoppeling
-- execution gates en de statussen WATCH/ARMED/CONFIRMED
+- ~~Bias 5.0- en eventkoppeling~~ (fase 3 gedaan)
+- ~~execution gates en de statussen WATCH/ARMED/CONFIRMED~~ (fase 3 gedaan)
 - de modi Minimal/Compact/Expanded volgens het nieuwe kaartontwerp
 - JSON-alerts en het bewijslogboek
 - bevriezen en de forwardmeting
@@ -145,3 +145,69 @@ In deze matrix gaf dat geen enkel telverschil, omdat er in de geladen historie g
 | NZDUSD | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 0.57076 | 0.56705 | 195/185 |
 
 Screenshots: `screenshots/03-usdjpy-15m-cbo.png` (box geaccepteerd ↑, referenties PDL/PWH) en `screenshots/04-gbpusd-30m-cbo.png`.
+
+---
+
+# Fase 3 (28-10-2026, 09:05–09:20): Bias 5.0, events, eventblokkade, poorten
+
+Snapshot: `node src/structure-generate.mjs` (alleen lezen): 28 paren, 36 high-impact events, BIAS50_1.2 van 28-10.
+`buildEngine` kreeg alleen een optionele templateparameter. De CBO-uitvoer is aantoonbaar gelijk: hash vóór en na `bc9a6613…`.
+
+| Test | Uitkomst |
+|---|---|
+| Compileren | geslaagd, geen fouten |
+| Runtime: 7 majors × 15m/30m/1H/4H | 28/28 zonder fout |
+| CBO-module tegen CBO_0.1, nu mét eventblokkade en post-event-regime | **28/28 exact gelijk** |
+| Herladen (EURUSD 30m) | alle tellingen en de status identiek; alleen de live "Swing PD %" verschilt door de koers van de lopende candle |
+| `npm test` | 39/39 (onder meer: onbekend telt nooit als ok, CONFIRMED-regel, generator) |
+| EURUSD 30m nu | **WATCH · SHORT-zijde**. Bias −16,1 (short) ✓, 4H ✓, maar locatie ✕ (discount 10%) en geen verzegelde box |
+| GBPUSD 30m nu | **BLOCKED**: macro ✕, index +1,9 (drempel ±15) |
+| Status over 28 combinaties | 22 BLOCKED, 6 WATCH, 0 ARMED/CONFIRMED |
+
+**Waarom 0 CONFIRMED**: de macropoort geldt pas vanaf de biasdatum (28-10 00:00 UTC).
+De historie daarvoor is bewust UNKNOWN, zodat er geen schijnresultaten met de bias van vandaag ontstaan.
+CONFIRMED kan dus pas vanaf vandaag forward ontstaan.
+
+**Bekende punten**
+
+1. In Expanded is de kaart nu erg lang: hij valt op een 1000 px hoog scherm over de legenda. Compact is wel goed.
+   Herontwerp van de modi = latere fase.
+2. De CBO-engine in dezelfde layout toont nog de snapshot van 27/10 23:31 (bias "verouderd").
+   Dat komt doordat de LaunchAgent uit staat; het is geen fout van deze engine.
+3. Kosten: de pip-omrekening gebruikt `mintick ≤ 0.001 → ×10`. Daardoor rekenen JPY-paren goed.
+   In CBO_0.1 staat `< 0.001`; dat is een kleine fout bij JPY, maar CBO is bevroren en blijft ongewijzigd.
+
+## Matrix fase 3
+
+| Paar | TF | fout | CBO STR | CBO 0.1 | gelijk | eventblok | setup-status nu | CONFIRMED | FAILED/DOEL/EXPIRED |
+|---|---|---|---|---|---|---|---|---|---|
+| EURUSD | 15 | false | 43/4/4 | 43/4/4 | ja | 0 | WATCH | 0 | 0/0/0 |
+| GBPUSD | 15 | false | 47/2/2 | 47/2/2 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDJPY | 15 | false | 40/7/7 | 40/7/7 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| AUDUSD | 15 | false | 42/2/2 | 42/2/2 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDCHF | 15 | false | 44/3/3 | 44/3/3 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDCAD | 15 | false | 30/2/2 | 30/2/2 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| NZDUSD | 15 | false | 25/3/2 | 25/3/2 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| EURUSD | 30 | false | 64/5/5 | 64/5/5 | ja | 0 | WATCH | 0 | 0/0/0 |
+| GBPUSD | 30 | false | 41/9/9 | 41/9/9 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDJPY | 30 | false | 31/6/6 | 31/6/6 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| AUDUSD | 30 | false | 30/3/3 | 30/3/3 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDCHF | 30 | false | 33/2/2 | 33/2/2 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDCAD | 30 | false | 30/5/5 | 30/5/5 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| NZDUSD | 30 | false | 11/0/0 | 11/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| EURUSD | 60 | false | 59/2/2 | 59/2/2 | ja | 0 | WATCH | 0 | 0/0/0 |
+| GBPUSD | 60 | false | 60/2/2 | 60/2/2 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDJPY | 60 | false | 22/6/6 | 22/6/6 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| AUDUSD | 60 | false | 9/0/0 | 9/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDCHF | 60 | false | 16/1/1 | 16/1/1 | ja | 0 | WATCH | 0 | 0/0/0 |
+| USDCAD | 60 | false | 35/1/1 | 35/1/1 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| NZDUSD | 60 | false | 7/0/0 | 7/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| EURUSD | 240 | false | 7/0/0 | 7/0/0 | ja | 0 | WATCH | 0 | 0/0/0 |
+| GBPUSD | 240 | false | 3/0/0 | 3/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDJPY | 240 | false | 9/0/0 | 9/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| AUDUSD | 240 | false | 2/0/0 | 2/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| USDCHF | 240 | false | 2/0/0 | 2/0/0 | ja | 0 | WATCH | 0 | 0/0/0 |
+| USDCAD | 240 | false | 3/0/0 | 3/0/0 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+| NZDUSD | 240 | false | 6/1/1 | 6/1/1 | ja | 0 | BLOCKED | 0 | 0/0/0 |
+
+Screenshots: `screenshots/05-eurusd-30m-watch.png` (Compact, WATCH) en `screenshots/06-gbpusd-30m-expanded-blocked.png` (Expanded, BLOCKED met reden per poort).
