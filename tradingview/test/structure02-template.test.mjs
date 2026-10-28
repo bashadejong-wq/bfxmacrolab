@@ -63,13 +63,14 @@ test("parameterhash bevat elke effectieve T/M/A-schakelaar, elke referentie en e
 
 test("filtermotor: onbekend telt nooit, CONFIRMED alleen met alle filters + trigger, zonder trigger hooguit ARMED", () => {
   const gs = toJs(line(/^int gs = (.+)$/m));
-  const f = Function("eCbM", "cboTF", "eMacroM", "vData", "blocked", "md", "filtOk", "anyTrig", "trigOk", "boxD", `return ${gs};`);
-  const base = { eCbM: true, cboTF: true, eMacroM: true, vData: 1, blocked: false, md: 1, filtOk: true, anyTrig: true, trigOk: true, boxD: true };
+  const f = Function("eCbM", "cboTF", "eMacroM", "vData", "blocked", "md", "filtOk", "roomOk", "anyTrig", "trigOk", "boxD", `return ${gs};`);
+  const base = { eCbM: true, cboTF: true, eMacroM: true, vData: 1, blocked: false, md: 1, filtOk: true, roomOk: true, anyTrig: true, trigOk: true, boxD: true };
   const run = (o) => f(...Object.values({ ...base, ...o }));
   assert.equal(run({}), 5);
   assert.equal(run({ trigOk: false }), 4);
   assert.equal(run({ trigOk: false, boxD: false }), 3);
   assert.equal(run({ filtOk: false }), 3);
+  assert.equal(run({ roomOk: false }), 4, "ruimte nog onbekend: ARMED mag, CONFIRMED niet");
   assert.equal(run({ blocked: true }), 2);
   assert.equal(run({ vData: 0 }), 1);
   assert.equal(run({ cboTF: false }), 0);
@@ -186,4 +187,12 @@ test("generator vult het 0.2-template met hetzelfde datablok", () => {
     return; // de generator eist het volledige datablok; de inhoud is al door structure-template.test gedekt
   }
   assert.doesNotMatch(out, /\{\{[A-Z_]+\}\}/);
+});
+
+test("na-vergelijkingen: een lege referentie wordt gezet (p != na is in Pine nooit waar)", () => {
+  assert.match(code, /if not na\(p\) and \(na\(r\.p\) or p != r\.p or t != r\.t0\)/);
+});
+
+test("ABSORPTION-PROXY: niveau weg of vervangen na ≥ absMin tests = INVALID (break komt eerst uit de structuurlaag)", () => {
+  assert.match(code, /if na\(lvl\) or \(not na\(a\.lvl\) and lvl != a\.lvl\)\s*\n\s*if a\.n >= n_absMin\s*\n\s*r := 9/);
 });
