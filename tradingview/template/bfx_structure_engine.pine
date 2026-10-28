@@ -9,7 +9,7 @@ const string GW = "Weergave"
 const string GH = "HYPOTHESE-parameters (niet bewezen)"
 const string GZ = "Zones (HYPOTHESE)"
 i_mode    = input.string("Compact", "Weergave", options = ["Minimal", "Compact", "Expanded"], group = GW)
-i_pos     = input.string("Rechtsboven", "Positie kaart", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GW)
+i_pos     = input.string("Linksonder", "Positie kaart", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GW)
 i_spacer  = input.int(0, "Lege regels boven kaart", minval = 0, maxval = 8, group = GW)
 i_tz      = input.string("Europe/Amsterdam", "Tijdzone weergave", group = GW)
 i_drawS   = input.bool(true, "Teken swingstructuur", group = GW)
@@ -238,16 +238,22 @@ drawSweep(int sw, float p, int t0, string pre) =>
         lbW.push(label.new(time, ext, pre + "Sweep", xloc = xloc.bar_time, style = sw > 0 ? label.style_label_up : label.style_label_down, color = color.new(c, 100), textcolor = c, size = size.tiny, tooltip = "Absorptie: wick door " + str.tostring(p, format.mintick) + ", close terug binnen · " + str.tostring(math.abs(ext - p) / atr, "0.00") + " ATR voorbij het niveau. Context, geen entry."))
         trim(lnW, lbW)
 
+// Breekt een hogere laag hetzelfde niveau op dezelfde bar, dan tekent alleen die hogere laag (geen dubbele labels).
+bool dupI = i_drawS and bS != 0 and bI != 0 and bPI == bPS
+bool dupF = (i_drawI and bI != 0 and bF != 0 and bPF == bPI) or (i_drawS and bS != 0 and bF != 0 and bPF == bPS)
 if i_drawS
     drawBrk(lnS, lbS, bS, bPS, bTS, "", line.style_solid, 2)
-if i_drawI
+if i_drawI and not dupI
     drawBrk(lnI, lbI, bI, bPI, bTI, "i-", line.style_dashed, 1)
-if i_drawF
+if i_drawF and not dupF
     drawBrk(lnF, lbF, bF, bPF, bTF, "f-", line.style_dotted, 1)
+// Per bar één sweeplabel: de hoogste laag die sweept.
 if i_drawSw
-    drawSweep(wS, wPS, wTS, "")
-    drawSweep(wI, wPI, wTI, "i-")
-    if i_drawF
+    if wS != 0
+        drawSweep(wS, wPS, wTS, "")
+    else if wI != 0
+        drawSweep(wI, wPI, wTI, "i-")
+    else if i_drawF and wF != 0
         drawSweep(wF, wPF, wTF, "f-")
 
 var string swTxt = "–"
@@ -258,8 +264,8 @@ if wI != 0
 if wS != 0
     swTxt := "swing " + (wS > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPS, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
 
-plotshape(i_conf and not na(phS), "Swing high bevestigd", shape.triangledown, location.abovebar, color.new(t3c, 30), size = size.tiny)
-plotshape(i_conf and not na(plS), "Swing low bevestigd", shape.triangleup, location.belowbar, color.new(t3c, 30), size = size.tiny)
+plotshape(i_conf and not na(phS), "Swing high bevestigd", shape.triangledown, location.abovebar, color.new(t3c, 30), size = size.tiny, display = display.pane)
+plotshape(i_conf and not na(plS), "Swing low bevestigd", shape.triangleup, location.belowbar, color.new(t3c, 30), size = size.tiny, display = display.pane)
 
 // ═══ 5. Zones (OB-P / OB-F) met lifecycle ═══════════════════════
 var array<Zone> zones = array.new<Zone>()
