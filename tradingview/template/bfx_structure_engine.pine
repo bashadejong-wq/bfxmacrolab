@@ -1,0 +1,524 @@
+//@version=6
+// BFX-STRUCTURE-ENGINE
+// ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE. Geen koop/verkoopsignalen, geen handelsadvies, geen automatische uitvoering.
+// Alleen prijsdata (geen volume, geen macro). Regels: docs/structure/STRUCTUUR-CONTRACT-0.1.md
+indicator("BFX Structure Engine 0.1", shorttitle = "BFX STR 0.1", overlay = true, max_lines_count = 150, max_labels_count = 150, max_boxes_count = 40, max_bars_back = 500)
+
+// ═══ 0. Instellingen ═══════════════════════════════════════════
+const string GW = "Weergave"
+const string GH = "HYPOTHESE-parameters (niet bewezen)"
+const string GZ = "Zones (HYPOTHESE)"
+i_mode    = input.string("Compact", "Weergave", options = ["Minimal", "Compact", "Expanded"], group = GW)
+i_pos     = input.string("Rechtsboven", "Positie kaart", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GW)
+i_spacer  = input.int(0, "Lege regels boven kaart", minval = 0, maxval = 8, group = GW)
+i_tz      = input.string("Europe/Amsterdam", "Tijdzone weergave", group = GW)
+i_drawS   = input.bool(true, "Teken swingstructuur", group = GW)
+i_drawI   = input.bool(true, "Teken internal structuur", group = GW)
+i_drawF   = input.bool(false, "Teken fractalstructuur", group = GW)
+i_drawSw  = input.bool(true, "Teken sweeps", group = GW)
+i_drawZ   = input.bool(true, "Teken zones", group = GW)
+i_zVar    = input.string("Beide", "Zonevariant tonen", options = ["OB-P", "OB-F", "Beide"], group = GW)
+i_zShow   = input.int(2, "Max. actieve zones per richting", minval = 0, maxval = 5, group = GW)
+i_eq      = input.bool(true, "Teken equilibrium (50%) van de swingrange", group = GW)
+i_conf    = input.bool(false, "Markeer bevestigingsmoment swingpivots", group = GW)
+i_maxDraw = input.int(10, "Max. lijnen/labels per laag", minval = 2, maxval = 30, group = GW)
+i_rowH4   = input.bool(true, "Kaart: 4H-swingrij", group = GW)
+i_rowD    = input.bool(true, "Kaart: daily-swingrij", group = GW)
+h_lenS    = input.int(10, "Swing: pivotlengte (bars links én rechts)", minval = 3, group = GH)
+h_lenI    = input.int(5, "Internal: pivotlengte", minval = 2, group = GH)
+h_lenF    = input.int(2, "Fractal: pivotlengte", minval = 1, group = GH)
+h_atrLen  = input.int(14, "ATR-lengte", minval = 2, group = GH)
+h_buf     = input.float(0.05, "Breakbuffer × ATR", minval = 0, step = 0.01, tooltip = "BoS/CHoCH: de close moet minstens dit voorbij het niveau liggen.", group = GH)
+h_body    = input.bool(false, "Break vereist hele body voorbij niveau", group = GH)
+h_swWick  = input.float(0.3, "Sweep: min. wickaandeel van de candle", minval = 0, maxval = 1, step = 0.05, group = GH)
+h_mit     = input.float(50, "Zone GEBRUIKT bij mitigatie (%)", minval = 5, maxval = 100, group = GZ)
+h_zAge    = input.int(300, "Zone verloopt na (bars)", minval = 20, group = GZ)
+h_zMaxH   = input.float(1.5, "Zone: max. hoogte × ATR", minval = 0.2, step = 0.1, group = GZ)
+h_fvgLook = input.int(20, "OB-F: zoek FVG in laatste n bars", minval = 3, maxval = 100, group = GZ)
+
+// ═══ 1. Typen en kleuren ════════════════════════════════════════
+type Piv
+    float price
+    int   oBar
+    int   oTime
+    int   cBar
+    int   cTime
+    bool  broken = false
+    bool  swept = false
+
+type Lvl
+    string tag
+    int    dir = 0
+    int    stage = 0
+    Piv    hi
+    Piv    lo
+    float  tTop
+    float  tBot
+    int    nBos = 0
+    int    nChoch = 0
+    int    nSweep = 0
+    string lastEv = ""
+    int    lastEvTime
+
+type Zone
+    string id
+    string kind
+    string src
+    int    dir
+    float  top
+    float  bot
+    int    oTime
+    int    cBar
+    int    cTime
+    int    st = 0
+    float  pen = 0.0
+    int    tests = 0
+    bool   inside = false
+    string why = ""
+    bool   vis = false
+    box    bx
+
+bool dark = (color.r(chart.bg_color) * 299 + color.g(chart.bg_color) * 587 + color.b(chart.bg_color) * 114) / 1000 < 128
+color t1c = dark ? #E6E8EE : #1A1D24
+color t2c = dark ? #9AA1B2 : #555C6B
+color t3c = dark ? #6E7586 : #8A909E
+color bgc = dark ? color.new(#131722, 6) : color.new(#FFFFFF, 6)
+color cBull = #26A65B
+color cBear = #E5484D
+color cAmb  = #F0A020
+
+float atr = ta.atr(h_atrLen)
+int tfSec = timeframe.in_seconds()
+
+// ═══ 2. Structuurlaag ═══════════════════════════════════════════
+// Eén laag één bar verder, alleen op gesloten candles. Een pivot dat op déze bar bevestigt telt pas vanaf de volgende bar.
+// brk: ±1 BoS · ±2 CHoCH · ±3 eerste break vanuit neutraal (teken = richting). sw: +1 bullish sweep (low genomen), −1 bearish sweep (high genomen).
+stepLvl(Lvl s, float ph, float pl, int L) =>
+    int brk = 0
+    float bP = na
+    int bT = na
+    int bB = na
+    int sw = 0
+    float sP = na
+    int sT = na
+    if barstate.isconfirmed
+        float b = h_buf * atr
+        float upRef = h_body ? math.min(open, close) : close
+        float dnRef = h_body ? math.max(open, close) : close
+        float rng = high - low
+        if not na(s.hi) and not s.hi.broken
+            if upRef > s.hi.price + b
+                s.hi.broken := true
+                brk := s.dir == 1 ? 1 : s.dir == 0 ? 3 : 2
+                bP := s.hi.price
+                bT := s.hi.oTime
+                bB := s.hi.oBar
+            else if not s.hi.swept and high > s.hi.price and close < s.hi.price and rng > 0 and (high - math.max(open, close)) / rng >= h_swWick
+                s.hi.swept := true
+                sw := -1
+                sP := s.hi.price
+                sT := s.hi.oTime
+        if brk == 0 and not na(s.lo) and not s.lo.broken
+            if dnRef < s.lo.price - b
+                s.lo.broken := true
+                brk := s.dir == -1 ? -1 : s.dir == 0 ? -3 : -2
+                bP := s.lo.price
+                bT := s.lo.oTime
+                bB := s.lo.oBar
+            else if sw == 0 and not s.lo.swept and low < s.lo.price and close > s.lo.price and rng > 0 and (math.min(open, close) - low) / rng >= h_swWick
+                s.lo.swept := true
+                sw := 1
+                sP := s.lo.price
+                sT := s.lo.oTime
+        if brk != 0
+            int d = brk > 0 ? 1 : -1
+            int ab = math.abs(brk)
+            if ab == 1
+                s.stage := s.stage == 1 ? 2 : 3
+                s.nBos += 1
+            else
+                s.stage := 1
+                s.nChoch += ab == 2 ? 1 : 0
+            s.dir := d
+            s.lastEv := (ab == 1 ? "BoS" : ab == 2 ? "CHoCH" : "Break") + (d == 1 ? " ↑" : " ↓")
+            s.lastEvTime := time
+        if sw != 0
+            s.nSweep += 1
+            if s.stage >= 2 and sw == -s.dir
+                s.stage := 4
+        if not na(ph)
+            s.hi := Piv.new(ph, bar_index - L, time[L], bar_index, time)
+            s.tTop := ph
+        else if not na(s.tTop)
+            s.tTop := math.max(s.tTop, high)
+        if not na(pl)
+            s.lo := Piv.new(pl, bar_index - L, time[L], bar_index, time)
+            s.tBot := pl
+        else if not na(s.tBot)
+            s.tBot := math.min(s.tBot, low)
+    [brk, bP, bT, bB, sw, sP, sT]
+
+pdOf(Lvl s) =>
+    float top = s.tTop
+    float bot = s.tBot
+    na(top) or na(bot) or top <= bot ? na : (close - bot) / (top - bot) * 100
+
+var Lvl lS = Lvl.new("S")
+var Lvl lI = Lvl.new("I")
+var Lvl lF = Lvl.new("F")
+float phS = ta.pivothigh(high, h_lenS, h_lenS)
+float plS = ta.pivotlow(low, h_lenS, h_lenS)
+float phI = ta.pivothigh(high, h_lenI, h_lenI)
+float plI = ta.pivotlow(low, h_lenI, h_lenI)
+float phF = ta.pivothigh(high, h_lenF, h_lenF)
+float plF = ta.pivotlow(low, h_lenF, h_lenF)
+[bS, bPS, bTS, bBS, wS, wPS, wTS] = stepLvl(lS, phS, plS, h_lenS)
+[bI, bPI, bTI, bBI, wI, wPI, wTI] = stepLvl(lI, phI, plI, h_lenI)
+[bF, bPF, bTF, bBF, wF, wPF, wTF] = stepLvl(lF, phF, plF, h_lenF)
+
+// ═══ 3. Hogere timeframes (technische oriëntatie, geen macro) ═══
+// expr[1] + lookahead_on = laatste gesloten HTF-candle; alleen opgevraagd als de rij aan staat (lazy).
+htfState(int L) =>
+    var Lvl s = Lvl.new("H")
+    float ph = ta.pivothigh(high, L, L)
+    float pl = ta.pivotlow(low, L, L)
+    [x1, x2, x3, x4, x5, x6, x7] = stepLvl(s, ph, pl, L)
+    int d = s.dir
+    int g = s.stage
+    float p = pdOf(s)
+    [d[1], g[1], p[1]]
+
+int h4Dir = na
+int h4Stg = na
+float h4Pd = na
+if i_rowH4 and tfSec < 14400
+    [a1, a2, a3] = request.security(syminfo.tickerid, "240", htfState(h_lenS), lookahead = barmerge.lookahead_on)
+    h4Dir := a1
+    h4Stg := a2
+    h4Pd := a3
+int dDir = na
+int dStg = na
+float dPd = na
+if i_rowD and tfSec < 86400
+    [c1, c2, c3] = request.security(syminfo.tickerid, "D", htfState(h_lenS), lookahead = barmerge.lookahead_on)
+    dDir := c1
+    dStg := c2
+    dPd := c3
+
+// ═══ 4. Tekenen: structuur en sweeps ════════════════════════════
+var array<line>  lnS = array.new<line>()
+var array<label> lbS = array.new<label>()
+var array<line>  lnI = array.new<line>()
+var array<label> lbI = array.new<label>()
+var array<line>  lnF = array.new<line>()
+var array<label> lbF = array.new<label>()
+var array<line>  lnW = array.new<line>()
+var array<label> lbW = array.new<label>()
+
+trim(array<line> la, array<label> lb) =>
+    while la.size() > i_maxDraw
+        la.shift().delete()
+    while lb.size() > i_maxDraw
+        lb.shift().delete()
+
+drawBrk(array<line> la, array<label> lb, int brk, float p, int t0, string pre, string sty, int w) =>
+    if brk != 0 and not na(p) and not na(t0)
+        color c = brk > 0 ? cBull : cBear
+        int ab = math.abs(brk)
+        string tx = pre + (ab == 1 ? "BoS" : ab == 2 ? "CHoCH" : "Break")
+        la.push(line.new(t0, p, time, p, xloc = xloc.bar_time, color = color.new(c, 15), style = sty, width = w))
+        lb.push(label.new(int((t0 + time) / 2), p, tx, xloc = xloc.bar_time, style = brk > 0 ? label.style_label_down : label.style_label_up, color = color.new(c, 100), textcolor = c, size = size.tiny, tooltip = tx + " op close " + str.format_time(time, "dd/MM HH:mm", i_tz) + " · niveau " + str.tostring(p, format.mintick)))
+        trim(la, lb)
+
+drawSweep(int sw, float p, int t0, string pre) =>
+    if sw != 0 and not na(p) and not na(t0)
+        color c = sw > 0 ? cBull : cBear
+        float ext = sw > 0 ? low : high
+        lnW.push(line.new(t0, p, time, p, xloc = xloc.bar_time, color = color.new(c, 45), style = line.style_dotted, width = 1))
+        lbW.push(label.new(time, ext, pre + "Sweep", xloc = xloc.bar_time, style = sw > 0 ? label.style_label_up : label.style_label_down, color = color.new(c, 100), textcolor = c, size = size.tiny, tooltip = "Absorptie: wick door " + str.tostring(p, format.mintick) + ", close terug binnen · " + str.tostring(math.abs(ext - p) / atr, "0.00") + " ATR voorbij het niveau. Context, geen entry."))
+        trim(lnW, lbW)
+
+if i_drawS
+    drawBrk(lnS, lbS, bS, bPS, bTS, "", line.style_solid, 2)
+if i_drawI
+    drawBrk(lnI, lbI, bI, bPI, bTI, "i-", line.style_dashed, 1)
+if i_drawF
+    drawBrk(lnF, lbF, bF, bPF, bTF, "f-", line.style_dotted, 1)
+if i_drawSw
+    drawSweep(wS, wPS, wTS, "")
+    drawSweep(wI, wPI, wTI, "i-")
+    if i_drawF
+        drawSweep(wF, wPF, wTF, "f-")
+
+var string swTxt = "–"
+if wF != 0
+    swTxt := "fractal " + (wF > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPF, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+if wI != 0
+    swTxt := "internal " + (wI > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPI, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+if wS != 0
+    swTxt := "swing " + (wS > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPS, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+
+plotshape(i_conf and not na(phS), "Swing high bevestigd", shape.triangledown, location.abovebar, color.new(t3c, 30), size = size.tiny)
+plotshape(i_conf and not na(plS), "Swing low bevestigd", shape.triangleup, location.belowbar, color.new(t3c, 30), size = size.tiny)
+
+// ═══ 5. Zones (OB-P / OB-F) met lifecycle ═══════════════════════
+var array<Zone> zones = array.new<Zone>()
+var int cZP = 0
+var int cZF = 0
+var int cZx = 0
+stName(int st) =>
+    st == 0 ? "NIEUW" : st == 1 ? "ACTIEF" : st == 2 ? "GETEST" : st == 3 ? "GEDEELTELIJK" : st == 4 ? "GEBRUIKT" : "ONGELDIG"
+
+hasZone(string id) =>
+    bool f = false
+    for z in zones
+        if z.id == id
+            f := true
+            break
+    f
+
+// Maakt een zone op de candle k bars terug. 1 = gemaakt · 0 = bestond al · −1 = te hoog (overgeslagen)
+addZone(string kind, string src, int dir, int k) =>
+    float top = dir > 0 ? math.max(open[k], close[k]) : high[k]
+    float bot = dir > 0 ? low[k] : math.min(open[k], close[k])
+    string id = syminfo.ticker + "-" + timeframe.period + "-" + kind + "-" + str.format_time(time[k], "yyyyMMdd-HHmm", "UTC") + (dir > 0 ? "-L" : "-S")
+    int res = 0
+    if top - bot <= 0 or top - bot > h_zMaxH * atr
+        res := -1
+    else if not hasZone(id)
+        Zone z = Zone.new(id, kind, src, dir, top, bot, time[k], bar_index, time)
+        z.bx := box.new(time[k], top, time, bot, xloc = xloc.bar_time, border_color = na, bgcolor = na, text = "", text_size = size.tiny, text_halign = text.align_right, text_valign = text.align_center)
+        zones.push(z)
+        res := 1
+        if zones.size() > 16
+            int idx = 0
+            for [i, q] in zones
+                if q.st >= 4
+                    idx := i
+                    break
+            Zone old = zones.remove(idx)
+            if not na(old.bx)
+                old.bx.delete()
+    res
+
+// OB-P: extreem van het been sinds de oorsprong van het gebroken pivot; daarvan (≤ 3 bars terug) de laatste tegencandle.
+obPOff(int dir, int n) =>
+    int m = math.min(math.max(n, 1), 300)
+    int kx = na
+    float ex = na
+    for k = 1 to m
+        float v = dir > 0 ? low[k] : high[k]
+        if na(ex) or (dir > 0 ? v < ex : v > ex)
+            ex := v
+            kx := k
+    int res = kx
+    if not na(kx)
+        for j = kx to kx + 3
+            if dir > 0 ? close[j] < open[j] : close[j] > open[j]
+                res := j
+                break
+    res
+
+// OB-F: vroegste FVG van de impuls (niet ouder dan het extreem van het been); de laatste tegencandle op of vóór de FVG-start.
+obFOff(int dir, int n) =>
+    int m = math.min(math.max(n, 1), 300)
+    int kx = na
+    float ex = na
+    for k = 1 to m
+        float v = dir > 0 ? low[k] : high[k]
+        if na(ex) or (dir > 0 ? v < ex : v > ex)
+            ex := v
+            kx := k
+    int kf = na
+    int lim = math.min(h_fvgLook, nz(kx, 1))
+    for k = 0 to lim - 1
+        bool fvg = dir > 0 ? low[k] > high[k + 2] : high[k] < low[k + 2]
+        if fvg and k + 1 <= nz(kx, 0)
+            kf := k
+    int res = na
+    if not na(kf)
+        for j = kf + 2 to kf + 6
+            if dir > 0 ? close[j] < open[j] : close[j] > open[j]
+                res := j
+                break
+    res
+
+mkZones(int brk, int bB, string src) =>
+    int rP = 0
+    int rF = 0
+    if brk != 0 and not na(bB)
+        int d = brk > 0 ? 1 : -1
+        int n = bar_index - bB
+        int kp = obPOff(d, n)
+        if not na(kp)
+            rP := addZone("OB-P", src, d, kp)
+        int kf = obFOff(d, n)
+        if not na(kf)
+            rF := addZone("OB-F", src, d, kf)
+    [rP, rF]
+
+updZones() =>
+    for z in zones
+        if z.st < 5 and bar_index > z.cBar
+            float hgt = z.top - z.bot
+            bool touch = z.dir > 0 ? low <= z.top : high >= z.bot
+            if touch and not z.inside
+                z.tests += 1
+            z.inside := touch
+            float p = z.dir > 0 ? (z.top - low) / hgt : (high - z.bot) / hgt
+            z.pen := math.max(z.pen, math.max(0.0, math.min(1.0, p)))
+            if z.dir > 0 ? close < z.bot : close > z.top
+                z.st := 5
+                z.why := "close door zone"
+            else if bar_index - z.cBar > h_zAge
+                z.st := 5
+                z.why := "verlopen"
+            else if z.st < 4
+                z.st := z.pen * 100 >= h_mit ? 4 : z.pen * 100 >= h_mit / 2 ? 3 : z.pen > 0 ? 2 : 1
+            if z.st < 4
+                z.bx.set_right(time)
+            if z.st == 5
+                z.bx.delete()
+
+if barstate.isconfirmed
+    updZones()
+    [p1, f1] = mkZones(bS, bBS, "S")
+    [p2, f2] = mkZones(bI, bBI, "I")
+    cZP += (p1 == 1 ? 1 : 0) + (p2 == 1 ? 1 : 0)
+    cZF += (f1 == 1 ? 1 : 0) + (f2 == 1 ? 1 : 0)
+    cZx += (p1 == -1 ? 1 : 0) + (p2 == -1 ? 1 : 0) + (f1 == -1 ? 1 : 0) + (f2 == -1 ? 1 : 0)
+
+// Zichtbaarheid: per richting alleen de dichtstbijzijnde actieve zones; gebruikte zones alleen vervaagd in Expanded.
+var array<Zone> zShown = array.new<Zone>()
+if barstate.islast
+    zShown.clear()
+    for z in zones
+        z.vis := false
+    for d in array.from(1, -1)
+        array<float> dist = array.new<float>()
+        array<Zone> cand = array.new<Zone>()
+        for z in zones
+            if z.dir == d and z.st >= 1 and z.st <= 3 and (i_zVar == "Beide" or z.kind == i_zVar)
+                cand.push(z)
+                dist.push(math.abs(close - (z.top + z.bot) / 2))
+        if cand.size() > 0 and i_zShow > 0
+            array<int> ord = dist.sort_indices()
+            for k = 0 to math.min(i_zShow, ord.size()) - 1
+                Zone zz = cand.get(ord.get(k))
+                zz.vis := true
+                zShown.push(zz)
+    for z in zones
+        if z.st < 5
+            color c = z.dir > 0 ? cBull : cBear
+            bool vis = i_drawZ and z.vis
+            bool faded = i_drawZ and z.st == 4 and i_mode == "Expanded" and (i_zVar == "Beide" or z.kind == i_zVar)
+            z.bx.set_bgcolor(vis ? color.new(c, 86) : faded ? color.new(c, 95) : na)
+            z.bx.set_border_color(vis ? color.new(c, 50) : faded ? color.new(c, 85) : na)
+            z.bx.set_text(vis or faded ? z.kind + " · " + stName(z.st) : "")
+            z.bx.set_text_color(vis ? color.new(c, 20) : color.new(c, 70))
+
+// ═══ 6. Equilibrium van de swingrange ═══════════════════════════
+var line eqL = na
+var label eqLb = na
+if barstate.islast
+    eqL.delete()
+    eqLb.delete()
+    if i_eq and not na(lS.tTop) and not na(lS.tBot) and not na(lS.hi) and not na(lS.lo) and lS.tTop > lS.tBot
+        float eq = (lS.tTop + lS.tBot) / 2
+        eqL := line.new(math.min(lS.hi.oTime, lS.lo.oTime), eq, time, eq, xloc = xloc.bar_time, color = color.new(t3c, 40), style = line.style_dotted, width = 1)
+        eqLb := label.new(time, eq, "EQ 50%", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(t3c, 100), textcolor = t3c, size = size.tiny)
+
+// ═══ 7. Kaart ═══════════════════════════════════════════════════
+var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 30, border_width = 0, frame_width = 0)
+row2(int r, string a, string b, color ca, color cbb, string tip = "", string sz = size.small) =>
+    tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+    tb.cell(1, r, b, text_color = cbb, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+row1(int r, string a, color ca, string tip = "", string sz = size.small) =>
+    tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+    tb.merge_cells(0, r, 1, r)
+dirTxt(int d) =>
+    d == 1 ? "Bullish" : d == -1 ? "Bearish" : "Neutraal"
+stgTxt(int g) =>
+    g == 1 ? "mogelijke shift" : g == 2 ? "shift bevestigd" : g == 3 ? "continuation" : g == 4 ? "verzwakt" : "geen structuur"
+pdTxt(float p) =>
+    na(p) ? "–" : (p > 55 ? "premium " : p < 45 ? "discount " : "equilibrium ") + str.tostring(p, "0") + "%"
+dirCol(int d) =>
+    d == 1 ? cBull : d == -1 ? cBear : t2c
+lvlTxt(Lvl s) =>
+    dirTxt(s.dir) + " · " + stgTxt(s.stage) + (s.lastEv != "" ? " · " + s.lastEv + " " + str.format_time(s.lastEvTime, "dd/MM HH:mm", i_tz) : "")
+
+const string TIP_STG = "Mogelijke shift = eerste close-break tegen de richting (CHoCH) · shift bevestigd = eerste BoS daarna · continuation = volgende BoS · verzwakt = sweep aan de trendzijde (mislukte voortzetting). Alles op candle-close."
+if barstate.islast
+    tb.clear(0, 0, 1, 29)
+    int r = 0
+    if i_spacer > 0 and (i_pos == "Rechtsboven" or i_pos == "Linksboven")
+        for k = 0 to i_spacer - 1
+            tb.cell(0, r, " ", text_size = size.small)
+            r += 1
+    row1(r, syminfo.ticker + " · " + timeframe.period + " · TECHNISCHE STRUCTUUR", t1c, "", size.normal)
+    r += 1
+    row1(r, "ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE · geen macro, geen signalen", cAmb, "Alle drempels zijn hypothesen (contract 0.1). Bias 5.0 blijft het hoofdoordeel.", size.tiny)
+    r += 1
+    row2(r, "Swing", lvlTxt(lS), t2c, dirCol(lS.dir), TIP_STG)
+    r += 1
+    row2(r, "Internal", lvlTxt(lI), t2c, dirCol(lI.dir), TIP_STG)
+    r += 1
+    if i_mode != "Minimal"
+        row2(r, "Fractal", lvlTxt(lF), t2c, dirCol(lF.dir), TIP_STG)
+        r += 1
+    row2(r, "Locatie", "swingrange: " + pdTxt(pdOf(lS)), t2c, t1c, "Dealing range = laatste bevestigde swing high tot swing low (meegeschoven met het extreem daarna). <45% discount · 45–55% equilibrium · >55% premium.")
+    r += 1
+    if i_mode != "Minimal"
+        if i_rowD and tfSec < 86400
+            row2(r, "Daily swing", na(dDir) ? "laden…" : dirTxt(dDir) + " · " + stgTxt(dStg) + " · " + pdTxt(dPd), t2c, na(dDir) ? t3c : dirCol(dDir), "Laatste gesloten dagcandle. Technische oriëntatie, geen macrobias.")
+            r += 1
+        if i_rowH4 and tfSec < 14400
+            row2(r, "4H swing", na(h4Dir) ? "laden…" : dirTxt(h4Dir) + " · " + stgTxt(h4Stg) + " · " + pdTxt(h4Pd), t2c, na(h4Dir) ? t3c : dirCol(h4Dir), "Laatste gesloten 4H-candle. Technische oriëntatie, geen macrobias.")
+            r += 1
+        int nb = 0
+        int ns = 0
+        for z in zones
+            if z.st >= 1 and z.st <= 3
+                nb += z.dir > 0 ? 1 : 0
+                ns += z.dir < 0 ? 1 : 0
+        row2(r, "Zones", str.tostring(nb) + " bullish · " + str.tostring(ns) + " bearish actief" + (zShown.size() > 0 ? " · dichtst: " + zShown.get(0).kind + " " + str.tostring(zShown.get(0).bot, format.mintick) + "–" + str.tostring(zShown.get(0).top, format.mintick) + " (" + stName(zShown.get(0).st) + ")" : ""), t2c, t1c, "Zone verdwijnt na " + str.tostring(h_mit, "0") + "% mitigatie (GEBRUIKT) of bij een close door de zone (ONGELDIG).")
+        r += 1
+        row2(r, "Laatste sweep", swTxt, t2c, t1c, "Wick door een bevestigd niveau, close terug binnen (absorptie). Context, geen entry.")
+        r += 1
+    if i_mode == "Expanded"
+        row1(r, "— Onderzoek —", t3c, "", size.tiny)
+        r += 1
+        row2(r, "Tellingen", "S BoS " + str.tostring(lS.nBos) + " · CHoCH " + str.tostring(lS.nChoch) + " · sweep " + str.tostring(lS.nSweep) + " | I " + str.tostring(lI.nBos) + "/" + str.tostring(lI.nChoch) + "/" + str.tostring(lI.nSweep) + " | F " + str.tostring(lF.nBos) + "/" + str.tostring(lF.nChoch) + "/" + str.tostring(lF.nSweep), t3c, t2c, "BoS / CHoCH / sweep per laag over de geladen historie.", size.tiny)
+        r += 1
+        row2(r, "Zones gemaakt", "OB-P " + str.tostring(cZP) + " · OB-F " + str.tostring(cZF) + " · te hoog overgeslagen " + str.tostring(cZx), t3c, t2c, "", size.tiny)
+        r += 1
+        for z in zShown
+            row2(r, z.kind + (z.dir > 0 ? " ↑" : " ↓"), stName(z.st) + " · mitigatie " + str.tostring(z.pen * 100, "0") + "% · tests " + str.tostring(z.tests) + " · bron " + z.src, t3c, t2c, z.id, size.tiny)
+            r += 1
+        row2(r, "Hypothesen", "pivots S" + str.tostring(h_lenS) + "/I" + str.tostring(h_lenI) + "/F" + str.tostring(h_lenF) + " · buffer " + str.tostring(h_buf) + " ATR · sweepwick ≥ " + str.tostring(h_swWick * 100, "0") + "% · mitigatie " + str.tostring(h_mit, "0") + "% · verval " + str.tostring(h_zAge) + " bars", t3c, t2c, "", size.tiny)
+        r += 1
+        row1(r, "Pivot bevestigd na " + str.tostring(h_lenS) + " (swing) / " + str.tostring(h_lenI) + " (internal) gesloten bars; bruikbaar vanaf de bar erna.", t3c, "", size.tiny)
+        r += 1
+
+// ═══ 8. Meetwaarden in het datavenster (geen lijnen op de chart) ═══
+plot(lS.dir, "Swing richting", display = display.data_window)
+plot(lS.stage, "Swing stage", display = display.data_window)
+plot(lI.dir, "Internal richting", display = display.data_window)
+plot(lI.stage, "Internal stage", display = display.data_window)
+plot(lF.dir, "Fractal richting", display = display.data_window)
+plot(lS.nBos, "S BoS", display = display.data_window)
+plot(lS.nChoch, "S CHoCH", display = display.data_window)
+plot(lS.nSweep, "S sweeps", display = display.data_window)
+plot(lI.nBos, "I BoS", display = display.data_window)
+plot(lI.nChoch, "I CHoCH", display = display.data_window)
+plot(lI.nSweep, "I sweeps", display = display.data_window)
+plot(lF.nBos, "F BoS", display = display.data_window)
+plot(lF.nChoch, "F CHoCH", display = display.data_window)
+plot(lF.nSweep, "F sweeps", display = display.data_window)
+plot(cZP, "Zones OB-P", display = display.data_window)
+plot(cZF, "Zones OB-F", display = display.data_window)
+plot(cZx, "Zones overgeslagen", display = display.data_window)
+plot(pdOf(lS), "Swing PD %", display = display.data_window)
+plot(h4Dir, "4H richting", display = display.data_window)
+plot(dDir, "D richting", display = display.data_window)
+plot(bar_index + 1, "Bars geladen", display = display.data_window)
