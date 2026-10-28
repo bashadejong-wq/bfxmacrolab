@@ -102,25 +102,33 @@ test("poorten: onbekend telt nooit als ok, CONFIRMED eist trigger+locatie+event+
   assert.ok(!/strategy\./.test(code));
 });
 
-test("JSON-alert: precies één alert() bij een statuswissel, alleen op candle-close, schema BFX_EXEC_0.1", () => {
+test("JSON-alerts: statuswissel (BFX_EXEC_0.1) en kandidaten (BFX_KAND_0.1), allebei alleen op candle-close", () => {
   const calls = [...code.matchAll(/^\s*alert\(/gm)];
-  assert.equal(calls.length, 1, "één alert()-aanroep");
+  assert.equal(calls.length, 2, "twee alert()-aanroepen: statuswissel en kandidaten");
   assert.match(code, /if barstate\.isconfirmed and cs != csPrev and alertWanted\(cs, csPrev\)/);
+  assert.match(code, /if barstate\.isconfirmed and i_alertK and \(kTyp\.size\(\) > 0 or uLog\.size\(\) > 0\)/);
   assert.match(code, /alert\(js, alert\.freq_once_per_bar_close\)/);
+  assert.match(code, /alert\(kj, alert\.freq_once_per_bar_close\)/);
   assert.ok(!/alert\.freq_all|alert\.freq_once_per_bar\b/.test(code));
   for (const k of ["schema", "snapshot_id", "bar_close", "vorige_status", "macro", "poorten", "invalidatie", "onbekend", "let_op"])
     assert.ok(code.includes(`\\"${k}\\"`), `veld ${k} ontbreekt`);
   assert.match(code, /csPrev := cs\n {4}cs := sSt == 6/);
 });
 
-test("kaartmodi: Minimal 4 regels, Compact met BIAS/STRUCTUUR/LOCATIE/TRIGGER/EVENT/SETUP/POORTEN, Expanded zonder onderzoekstellingen", () => {
+test("kaartmodi: Minimal 3 regels, Compact 6, research alleen in Expanded, label overal, geen candle-tekst op de kaart", () => {
   const kaart = code.slice(code.indexOf("if barstate.islast\n    tb.clear"), code.indexOf("jsStr(string s)"));
   const minimal = kaart.slice(kaart.indexOf('if i_mode == "Minimal"'), kaart.indexOf("    else\n"));
-  assert.equal((minimal.match(/\brow[12]\(/g) || []).length, 4);
-  for (const label of ["BIAS", "STRUCTUUR", "LOCATIE", "TRIGGER", "EVENT", "SETUP", "POORTEN"]) assert.ok(kaart.includes(`"${label}"`), label);
-  assert.ok(!/"(Tellingen|Hypothesen|CBO-tellingen|Zones gemaakt)"/.test(kaart), "onderzoekstellingen horen in de Data Window");
+  const compact = kaart.slice(kaart.indexOf("    else\n"), kaart.indexOf('if i_mode == "Expanded"'));
   const expanded = kaart.slice(kaart.indexOf('if i_mode == "Expanded"'));
-  assert.ok((expanded.match(/\brow[12]\(/g) || []).length <= 9, "Expanded voegt hooguit 9 regels toe");
+  const rows = (x) => (x.match(/\brow[12]\(/g) || []).length;
+  assert.equal(rows(minimal), 3);
+  assert.equal(rows(compact), 6);
+  assert.ok(minimal.includes("LBL") && compact.includes("LBL"), "onderzoekslabel in Minimal en Compact");
+  assert.match(kaart, /const string LBL = "onderzoeksversie — geen bewezen edge"/);
+  for (const w of ["FWD_VERSIE", "Varianten", "fN"]) assert.ok(!compact.includes(w) && !minimal.includes(w), `${w} hoort alleen in Expanded`);
+  assert.ok(expanded.includes("— research (niet voor handelsbeslissingen) —"));
+  const zichtbaar = [...kaart.matchAll(/row[12]\(r, ([^\n]*)/g)].map((m) => m[1].replace(/tooltip|"[^"]*", size\.\w+\)$/g, ""));
+  assert.ok(!zichtbaar.some((x) => /candle|closes buiten|breakout-close/i.test(x.split(", t")[0])), "geen candle-tekst in zichtbare cellen");
 });
 
 test("JSON-alert is geldige JSON, ook met aanhalingstekens in teksten en onbekende getallen", () => {
@@ -135,6 +143,7 @@ test("JSON-alert is geldige JSON, ook met aanhalingstekens in teksten en onbeken
     ctxNm: "4H", ctxDir: -1, ctxStg: 3, dirTxt: () => "Bearish", stgTxt: () => "continuation", lS: { dir: -1, stage: 3 }, lI: { dir: 1, stage: 1 },
     cPd: null, cboName: () => 'BOX "VERZEGELD"', xSt: 4, xId: "EURUSD:30:1:2", az: null, gj: '"data":"ok","ruimte":"onbekend"',
     pIdxBar: -16.1, FWD_VERSIE: "STR_0.1-F", fwdFrozen: true, fwdNow: false,
+    TPL_SHA: "abc123", setupJs: "null",
     sSt: 0, sS: null, stopP: 1.1135, sTgtN: "", frDn: "PDL", sT: null, frD: null, cRoom: null, evBlk: false, evNext: {}, unk: '"ruimte"',
   };
   const js = new Function(...Object.keys(ctx), `return ${expr};`)(...Object.values(ctx));
@@ -146,7 +155,7 @@ test("JSON-alert is geldige JSON, ook met aanhalingstekens in teksten en onbeken
   assert.equal(o.structuur.pd_pct, null);
   assert.deepEqual(o.onbekend, ["ruimte"]);
   assert.equal(o.let_op, "decision support — geen order");
-  assert.deepEqual(o.forward, { versie: "STR_0.1-F", geldig: true, telt_mee: false });
+  assert.deepEqual(o.forward, { versie: "STR_0.1-F", template_sha256: "abc123", geldig: true, telt_mee: false });
   assert.equal(o.macro.index, -16.1);
 });
 
@@ -202,4 +211,42 @@ test("dagelijkse taak: raakt TradingView pas aan als het datablok compleet is en
   assert.ok(src.includes('LAYOUT_NAME = "BFX CBO Onderzoek"') && src.includes('LAYOUT_ID = "DcotUC2P"'));
   assert.ok(src.includes("headless: false") && !/headless:\s*true/.test(src));
   assert.ok(!/6b31RP4L|NlsYkVmV/.test(src), "nooit de productie- of eigen layout van Bas");
+});
+
+test("setupblok en kandidaatbericht zijn geldige JSON met alle logboekvelden", () => {
+  const pine2js = (expr) => expr;
+  const base = {
+    jsStr: (s) => JSON.stringify(String(s)), jsNum: (v) => (v == null || Number.isNaN(v) ? "null" : String(v)),
+    na: (v) => v == null, str: { tostring: String, format_time: () => "2026-10-29T08:00:00Z" },
+    syminfo: { tickerid: "FX:EURUSD", prefix: "FX", ticker: "EURUSD" }, timeframe: { period: "30" }, time_close: 0, tfSec: 1800, g_tMax: 32,
+  };
+  const sExpr = code.match(/string setupJs = (.*)\n/)[1];
+  const sctx = { ...base, sId: "EURUSD:30:1:2", sConfT: 1, sDir: -1, sE: 1.11, sS: 1.115, sT: 1.105, sTgtN: "PDL", sZoneId: "EURUSD-30-OB-P-x-S", sSweepId: "", sStrId: "EURUSD-30-S-y",
+    BIAS_VERSIE: "BIAS50_1.2", sBiasIdx: -16.1, sBiasAt: 1, sRegime: "balans", sFwd: true, sSt: 7, sLastR: -1, sMfe: 0.4, sMae: 1.0 };
+  const setup = JSON.parse(new Function(...Object.keys(sctx), `return ${pine2js(sExpr)};`)(...Object.values(sctx)));
+  for (const k of ["setup_id", "bevestigd_op", "entry", "stop", "doel", "expiry", "box_id", "zone_id", "sweep_id", "structuur_id", "bias", "telt_mee", "uitkomst", "r_bruto", "mfe_r", "mae_r"]) assert.ok(k in setup, k);
+  assert.equal(setup.uitkomst, "FAILED");
+  assert.equal(setup.bias.available_at, "2026-10-29T08:00:00Z");
+  const kExpr = code.match(/string kj = (.*)\n/)[1];
+  const kctx = { ...base, FWD_VERSIE: "STR_0.1-F", TPL_SHA: "abc", ENG_GENERATED: 1, close: 1.1, atr: 0.001, pIdxBar: -16.1, bp: 0, bpT: { get: () => 1 }, xId: "", regime: "balans", evBlk: false, evNext: null, kFwd: true, kl: '{"type":"swingbreak","richting":"short","varianten":4}', ul: '{"type":"cbo_acceptatie","start":"2026-10-29T07:00:00Z","richting":"long","varianten":25,"r":1.5,"mfe_r":1.6,"mae_r":0.2}' };
+  const k = JSON.parse(new Function(...Object.keys(kctx), `return ${kExpr};`)(...Object.values(kctx)));
+  assert.equal(k.schema, "BFX_KAND_0.1");
+  assert.equal(k.event, "onbekend");
+  assert.deepEqual(k.kandidaten[0], { type: "swingbreak", richting: "short", varianten: 4 });
+  assert.equal(k.afgerond[0].r, 1.5);
+});
+
+test("varianten: zes vooraf vastgelegde varianten met gelijke exit, alleen forward geteld, geen bitshift", () => {
+  assert.match(code, /const float STD_TGT = 1\.5/);
+  assert.ok(!/>>|<</.test(code.replace(/"(?:[^"\\]|\\.)*"/g, "")), "Pine kent geen bitshift");
+  assert.match(code, /if mF\.get\(k\)\n {20}uLog\.push\([^\n]*\n {20}for v = 0 to 5/);
+  for (const m of ['openStd(xDir, mk, fwdBar and xsT >= FWD_START, "cbo_acceptatie")', 'openStd(bS > 0 ? 1 : -1, 4, fwdBar, "swingbreak")', 'openStd(mdBar, 2, fwdBar, "nieuwe_biasdag")', 'openStd(sDir, 32, sFwd, "confirmed")']) assert.ok(code.includes(m), m);
+});
+
+test("chart: hooguit één box, twee zones in totaal, drie referenties, labels in de vaste rail", () => {
+  assert.match(code, /if not na\(xsT\) and boxNu\n[\s\S]*?\n {8}else if xSt == 2 or xSt == 3/);
+  assert.ok(!code.includes("for d in array.from(1, -1)"), "geen selectie per richting meer");
+  assert.match(tpl, /i_zShow {3}= input\.int\(2, "Max\. actieve zones op de chart \(totaal\)"/);
+  assert.match(tpl, /r_max {5}= input\.int\(3,/);
+  for (const l of ['label.new(time + 4 * tfSec * 1000, xsHi, "CBO · "', 'label.new(time + 4 * tfSec * 1000, eq, "EQ 50%"', "label.new(railT, p, nm.get(i)"]) assert.ok(code.includes(l), l);
 });

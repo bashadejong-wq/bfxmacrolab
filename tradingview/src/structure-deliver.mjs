@@ -3,7 +3,9 @@
 //   node src/structure-deliver.mjs           genereren → plakken → opslaan → layout opslaan → herladen → versie controleren
 // Veiligheid: alleen layout "BFX CBO Onderzoek"; alleen plakken als de editor "BFX Structure Engine 0.1" toont;
 // nooit headless (TradingView trekt dan de sessie in); geen productielayout, geen database-schrijfacties.
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { appendFileSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "./config.mjs";
 import { loadFromSupabase } from "./generate.mjs";
@@ -14,11 +16,63 @@ export const LAYOUT_ID = "DcotUC2P";
 export const LAYOUT_NAME = "BFX CBO Onderzoek";
 export const SCRIPT = "BFX Structure Engine 0.1";
 export const MARKER = "// BFX-STRUCTURE-ENGINE";
-export const EXIT = { OK: 0, DATA: 2, SESSIE: 3, LAYOUT: 4, EDITOR: 5, COMPILE: 6, VERIFY: 7, FOUT: 9 };
+export const EXIT = { OK: 0, DATA: 2, SESSIE: 3, LAYOUT: 4, EDITOR: 5, COMPILE: 6, VERIFY: 7, BEZET: 8, FOUT: 9 };
 // Ingelogd TradingView-profiel van de productietaak (zelfde account; de taken draaien na elkaar, nooit tegelijk)
 const PROFILE = process.env.STR_TV_PROFILE || "/Users/bashajong/Claude/bfxmacrolab-tradingview/tradingview/.tv-profile";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * Is BIAS_5.0 van vandaag aantoonbaar gereed? Drie onafhankelijke signalen uit de publieke views (alleen lezen):
+ * 1) alle paren (mirror_bias50_paar) dragen de datum van vandaag en één versie;
+ * 2) de forwardhistorie (mirror_bias50_historie, bron=forward) heeft vandaag een rij per valuta;
+ * 3) elke paarindex = (basis − quote)/2 uit die historie (± 0,01) — de twee bronnen spreken elkaar niet tegen.
+ */
+export function biasReady(data, now, expectCcy = 8) {
+  const today = day(now);
+  const datums = [...new Set(data.raw?.datums ?? [])];
+  const versies = [...new Set((data.raw?.versies ?? []).filter(Boolean))];
+  const hist = (data.history ?? []).filter((h) => h.datum === today && h.bron === "forward");
+  const ccy = new Map(hist.map((h) => [String(h.valuta).toUpperCase(), Number(h.index)]));
+  const bad = (data.pairs ?? []).filter((p) => !ccy.has(p.basis) || !ccy.has(p.quote) || Math.abs((ccy.get(p.basis) - ccy.get(p.quote)) / 2 - p.idx) > 0.01);
+  const details = { datums, versies, hist_vandaag: hist.length, paren: data.pairs?.length ?? 0, inconsistent: bad.map((p) => p.basis + p.quote) };
+  if (datums.length !== 1 || datums[0] !== today) return { ok: false, wacht: true, reden: `paren niet allemaal van ${today} (${datums.join(",") || "geen"})`, details };
+  if (versies.length !== 1) return { ok: false, reden: `meerdere biasversies (${versies.join(",")})`, details };
+  if (hist.length < expectCcy) return { ok: false, wacht: true, reden: `forwardhistorie ${today} onvolledig (${hist.length}/${expectCcy})`, details };
+  if (bad.length) return { ok: false, reden: `paarindex ≠ (basis−quote)/2 voor ${bad.map((p) => p.basis + p.quote).join(",")}`, details };
+  return { ok: true, reden: "", details };
+}
+
+/**
+ * Sessieconflict voorkomen (TradingView: één sessie per account). Probes zijn injecteerbaar voor tests.
+ * Bezet als: het profiel al open is (Chromium-SingletonLock), de productietaak draait, of de TradingView-desktopapp draait (Bas).
+ */
+export function sessionBusy(probe = defaultProbe) {
+  const reasons = [];
+  if (probe.profileLocked()) reasons.push("TradingView-profiel is al open (productietaak of andere sessie)");
+  if (probe.productionRunning()) reasons.push("productietaak bfx-tv.mjs draait");
+  if (probe.desktopApp()) reasons.push("TradingView-desktopapp is open (Bas)");
+  return reasons;
+}
+const pgrep = (pat) => {
+  try {
+    return execFileSync("/usr/bin/pgrep", ["-f", pat], { encoding: "utf8" }).trim().length > 0;
+  } catch {
+    return false;
+  }
+};
+const defaultProbe = {
+  profileLocked: () => {
+    try {
+      lstatSync(resolve(PROFILE, "SingletonLock"));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  productionRunning: () => pgrep("bfx-tv.mjs"),
+  desktopApp: () => pgrep("/Applications/TradingView.app/Contents/MacOS/TradingView"),
+};
 
 /** Datacontrole vóór TradingView wordt aangeraakt. Puur, dus testbaar. */
 export function preflightStructure(out, biasDatum, now) {
@@ -39,10 +93,19 @@ async function generateChecked(entry, tries, waitMin) {
   for (let i = 1; ; i++) {
     const now = Date.now();
     const data = await loadFromSupabase(now);
+    const ready = biasReady(data, now);
+    entry.bias_gereed = ready.ok;
+    entry.bias_bewijs = ready.details;
+    if (!ready.ok) {
+      if (!ready.wacht || i >= tries) throw Object.assign(new Error(`bias niet aantoonbaar gereed: ${ready.reden}`), { code: EXIT.DATA });
+      await sleep(waitMin * 60000);
+      continue;
+    }
     const seen = readSeen();
     const out = buildStructure(data, seen);
     const pf = preflightStructure(out, data.biasDatum, now);
-    Object.assign(entry, { bias_datum: data.biasDatum ? day(data.biasDatum) : null, paren: out.pairs, events: out.events, bias_rijen: out.histRows, hash: out.hash, datablok_id: Math.round(data.generatedAt / 60000), poging: i });
+    const tplSha = createHash("sha256").update(readFileSync(resolve(config.outDir, "..", "template/bfx_structure_engine.pine"))).digest("hex");
+    Object.assign(entry, { bias_datum: data.biasDatum ? day(data.biasDatum) : null, bias_versie: data.biasVersie, bias_eerst_gezien: new Date(seen[day(now)] ?? now).toISOString(), paren: out.pairs, events: out.events, bias_rijen: out.histRows, template_sha256: tplSha, code_sha256: out.hash, datablok_id: Math.round(data.generatedAt / 60000), poging: i });
     if (pf.ok) {
       writeSeen(out.seen);
       mkdirSync(config.outDir, { recursive: true });
@@ -160,7 +223,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let code = EXIT.OK;
   try {
     const out = await generateChecked(entry, dry ? 1 : 4, 20);
-    if (!dry) await deliverToTradingView(entry, out);
+    if (!dry) {
+      // Wacht tot TradingView vrij is (max 3 × 15 min); daarna veilig stoppen zonder iets aan te raken
+      for (let i = 1; ; i++) {
+        const busy = sessionBusy();
+        entry.sessie_bezet = busy;
+        if (!busy.length) break;
+        if (i >= 4) throw Object.assign(new Error(`TradingView bezet: ${busy.join("; ")}`), { code: EXIT.BEZET });
+        await sleep(15 * 60000);
+      }
+      await deliverToTradingView(entry, out);
+    }
     entry.resultaat = "ok";
   } catch (e) {
     code = e.code ?? EXIT.FOUT;

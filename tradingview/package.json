@@ -8,7 +8,7 @@
     "generate": "node bfx-tv.mjs generate",
     "run": "node bfx-tv.mjs run",
     "example": "node bfx-tv.mjs generate --input examples/week44-alle.json",
-    "test": "node --test test/logic.test.mjs test/reconnect.test.mjs test/engine-generate.test.mjs test/structure-template.test.mjs",
+    "test": "node --test test/logic.test.mjs test/reconnect.test.mjs test/engine-generate.test.mjs test/structure-template.test.mjs test/forward-log.test.mjs",
     "check": "node bfx-tv.mjs check",
     "acceptatie": "node bfx-tv.mjs acceptatie"
   },

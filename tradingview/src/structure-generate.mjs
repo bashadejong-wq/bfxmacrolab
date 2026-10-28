@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { config } from "./config.mjs";
+import { ROOT, config } from "./config.mjs";
 import { buildEngine } from "./engine-generate.mjs";
 import { loadFromSupabase } from "./generate.mjs";
 
@@ -44,8 +44,9 @@ export function histLines(history = [], now = Date.now(), seen = {}) {
 export function buildStructure(data, seen = {}) {
   const out = buildEngine(data, STRUCTURE_TEMPLATE);
   const hist = histLines(data.history ?? [], data.generatedAt, seen);
-  const code = out.code.replace("{{HIST}}", hist.join("\n"));
-  return { ...out, code, hash: createHash("sha256").update(code).digest("hex"), histRows: hist.length - 4, seen };
+  const tplSha = createHash("sha256").update(readFileSync(resolve(ROOT, STRUCTURE_TEMPLATE))).digest("hex");
+  const code = out.code.replace("{{HIST}}", hist.join("\n")).replace("{{TPL_SHA}}", tplSha);
+  return { ...out, code, hash: createHash("sha256").update(code).digest("hex"), histRows: hist.length - 4, seen, tplSha };
 }
 
 export const readSeen = () => (existsSync(SEEN_FILE) ? JSON.parse(readFileSync(SEEN_FILE, "utf8")) : {});
