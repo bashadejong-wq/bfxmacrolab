@@ -9,6 +9,7 @@ import { buildEngine } from "./engine-generate.mjs";
 import { loadFromSupabase } from "./generate.mjs";
 
 export const STRUCTURE_TEMPLATE = "template/bfx_structure_engine.pine";
+export const STRUCTURE_TEMPLATE_02 = "template/bfx_structure_engine_02.pine";
 const HIST_DAYS = 120;
 
 // "Eerst gezien" per biasdatum (lokaal, append-only): een dag mag nooit eerder gelden dan hij bestond
@@ -41,10 +42,11 @@ export function histLines(history = [], now = Date.now(), seen = {}) {
   ];
 }
 
-export function buildStructure(data, seen = {}) {
-  const out = buildEngine(data, STRUCTURE_TEMPLATE);
+// tpl: STR_0.1 (bevroren, standaard) of STR_0.2 (gereedschapskist, onderzoek)
+export function buildStructure(data, seen = {}, tpl = STRUCTURE_TEMPLATE) {
+  const out = buildEngine(data, tpl);
   const hist = histLines(data.history ?? [], data.generatedAt, seen);
-  const tplSha = createHash("sha256").update(readFileSync(resolve(ROOT, STRUCTURE_TEMPLATE))).digest("hex");
+  const tplSha = createHash("sha256").update(readFileSync(resolve(ROOT, tpl))).digest("hex");
   const code = out.code.replace("{{HIST}}", hist.join("\n")).replace("{{TPL_SHA}}", tplSha);
   return { ...out, code, hash: createHash("sha256").update(code).digest("hex"), histRows: hist.length - 4, seen, tplSha };
 }
@@ -56,10 +58,11 @@ export function writeSeen(seen) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const out = buildStructure(await loadFromSupabase(Date.now()), readSeen());
+  const v02 = process.argv.includes("--v02");
+  const out = buildStructure(await loadFromSupabase(Date.now()), readSeen(), v02 ? STRUCTURE_TEMPLATE_02 : STRUCTURE_TEMPLATE);
   writeSeen(out.seen);
   mkdirSync(config.outDir, { recursive: true });
-  const file = resolve(config.outDir, "bfx_structure_engine.pine");
+  const file = resolve(config.outDir, v02 ? "bfx_structure_engine_02.pine" : "bfx_structure_engine.pine");
   writeFileSync(file, out.code);
   console.log(`Structure-Pine: ${file} · ${out.pairs} paren · ${out.events} high-impact events · ${out.histRows} forward-biasrijen · hash ${out.hash.slice(0, 12)} · ${out.code.length} bytes`);
 }

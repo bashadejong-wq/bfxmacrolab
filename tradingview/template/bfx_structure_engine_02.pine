@@ -1,0 +1,2069 @@
+//@version=6
+// BFX-STRUCTURE-ENGINE-02
+// ONDERZOEKSVERSIE — GEEN BEWEZEN EDGE. Geen koop/verkoopsignalen, geen handelsadvies, geen automatische uitvoering.
+// Prijsdata + BFX-snapshot (Bias 5.0, events; alleen lezen). Geen volume. Regels: docs/structure/STRUCTUUR-CONTRACT-0.1.md
+// Datablok: {{VERSION}}
+indicator("BFX Structure Engine 0.2", shorttitle = "BFX STR 0.2", overlay = true, max_lines_count = 200, max_labels_count = 200, max_boxes_count = 60, max_bars_back = 500)
+
+// ═══ 0. Instellingen ═══════════════════════════════════════════
+const string GW = "Weergave"
+const string GH = "HYPOTHESE-parameters (niet bewezen)"
+const string GZ = "Zones (HYPOTHESE)"
+i_mode    = input.string("Compact", "Weergave", options = ["Minimal", "Compact", "Expanded"], group = GW)
+i_pos     = input.string("Linksonder", "Positie kaart", options = ["Rechtsboven", "Rechtsonder", "Linksboven", "Linksonder"], group = GW)
+i_spacer  = input.int(0, "Lege regels boven kaart", minval = 0, maxval = 8, group = GW)
+i_tz      = input.string("Europe/Amsterdam", "Tijdzone weergave", group = GW)
+i_drawS   = input.bool(true, "Teken swingstructuur", group = GW)
+i_drawI   = input.bool(true, "Teken internal structuur", group = GW)
+i_drawF   = input.bool(false, "Teken fractalstructuur", group = GW)
+i_drawSw  = input.bool(true, "Teken sweeps", group = GW)
+i_drawZ   = input.bool(true, "Teken zones", group = GW)
+i_zVar    = input.string("Alle", "Zonevariant tonen", options = ["Alle", "OB-P", "OB-F", "OB-R"], group = GW)
+i_zShow   = input.int(2, "Max. actieve zones op de chart (totaal)", minval = 0, maxval = 5, group = GW)
+i_eq      = input.bool(true, "Teken equilibrium (50%) van de swingrange", group = GW)
+i_conf    = input.bool(false, "Markeer bevestigingsmoment swingpivots", group = GW)
+i_maxDraw = input.int(10, "Max. lijnen/labels per laag", minval = 2, maxval = 30, group = GW)
+i_rowH4   = input.bool(true, "Expanded: 4H-swing in structuurdetail", group = GW)
+i_rowD    = input.bool(true, "Expanded: daily-swing in structuurdetail", group = GW)
+i_alert   = input.string("ARMED en hoger", "Alerts bij statuswissel", options = ["Uit", "Alle wissels", "ARMED en hoger", "CONFIRMED en hoger"], tooltip = "Eén JSON-bericht (schema BFX_EXEC_0.1) op candle-close. Maak in TradingView zelf een alert met 'Any alert() function call'.", group = GW)
+h_lenS    = input.int(10, "Swing: pivotlengte (bars links én rechts)", minval = 3, group = GH)
+h_lenI    = input.int(5, "Internal: pivotlengte", minval = 2, group = GH)
+h_lenF    = input.int(2, "Fractal: pivotlengte", minval = 1, group = GH)
+h_atrLen  = input.int(14, "ATR-lengte", minval = 2, group = GH)
+h_buf     = input.float(0.05, "Breakbuffer × ATR", minval = 0, step = 0.01, tooltip = "BoS/CHoCH: de close moet minstens dit voorbij het niveau liggen.", group = GH)
+h_body    = input.bool(false, "Break vereist hele body voorbij niveau", group = GH)
+h_swWick  = input.float(0.3, "Sweep: min. wickaandeel van de candle", minval = 0, maxval = 1, step = 0.05, group = GH)
+h_mit     = input.float(50, "Zone GEBRUIKT bij mitigatie (%)", minval = 5, maxval = 100, group = GZ)
+h_zAge    = input.int(300, "Zone verloopt na (bars)", minval = 20, group = GZ)
+h_zMaxH   = input.float(1.5, "Zone: max. hoogte × ATR", minval = 0.2, step = 0.1, group = GZ)
+h_fvgLook = input.int(20, "OB-F: zoek FVG in laatste n bars", minval = 3, maxval = 100, group = GZ)
+const string GC = "CBO-box (HYPOTHESE, regels CBO_0.1)"
+const string GR = "Referentielijnen"
+i_cbo     = input.bool(true, "CBO-box tonen en koppelen", group = GC)
+c_volLen  = input.int(20, "Gerealiseerde vol: lengte", minval = 5, group = GC)
+c_volPct  = input.int(250, "Vol-percentiel: venster (bars)", minval = 50, group = GC)
+c_lowVol  = input.float(15, "Lage vol < percentiel", group = GC)
+c_highVol = input.float(85, "Hoge vol > percentiel", group = GC)
+c_compVol = input.float(40, "Compressie: vol < percentiel", group = GC)
+c_erLen   = input.int(20, "Efficiency ratio: lengte", minval = 5, group = GC)
+c_erTrend = input.float(0.35, "Trend: ER ≥", group = GC)
+c_erChaos = input.float(0.12, "Chaotisch: ER <", group = GC)
+c_expMult = input.float(2.0, "Expansie: bar-range ≥ × ATR", group = GC)
+c_nMin    = input.int(8, "Box: min. bars", minval = 3, group = GC)
+c_nMax    = input.int(24, "Box: max. bars", minval = 5, group = GC)
+c_wMax    = input.float(1.25, "Box: max. breedte × ATR", group = GC)
+c_tol     = input.float(0.15, "Test-tolerantie × boxbreedte", group = GC)
+c_tMin    = input.int(2, "Min. tests boven én onder", minval = 1, group = GC)
+c_nSeal   = input.int(3, "Verzegelen na n bars zonder nieuw extreem", minval = 1, group = GC)
+c_expiry  = input.float(2.0, "Verval: geen breakout binnen × boxduur", group = GC)
+c_body    = input.float(0.5, "Breakout: min. body-aandeel buiten box", group = GC)
+c_accK    = input.int(2, "Acceptatie: closes buiten box", minval = 1, group = GC)
+i_refs    = input.bool(true, "Referentielijnen tonen", group = GR)
+i_refOpen = input.bool(false, "Ook D/W Open als referentie", group = GR)
+i_refTaken = input.bool(false, "Ook geraakte niveaus tonen (vervaagd)", group = GR)
+r_max     = input.int(3, "Max. referenties", minval = 1, maxval = 6, group = GR)
+r_dist    = input.float(1.5, "Alleen binnen × daily ATR van de koers", minval = 0.2, step = 0.1, group = GR)
+const string GE = "Event (HYPOTHESE-vensters, gelijk aan CBO_0.1)"
+const string GG = "Poorten (HYPOTHESE)"
+const string GK = "Kosten"
+e_preCB   = input.int(60, "Centrale bank: blok vóór (min)", group = GE)
+e_postCB  = input.int(120, "Centrale bank: blok na (min)", group = GE)
+e_pre     = input.int(30, "High impact: blok vóór (min)", group = GE)
+e_post    = input.int(60, "High impact: blok na (min)", group = GE)
+e_disc    = input.int(180, "Post-event regime (min na event)", group = GE)
+g_trigAge = input.int(3, "Trigger: acceptatie max. n bars oud", minval = 1, group = GG)
+g_minRoom = input.float(1.0, "Ruimte: min. R tot eerste referentie", minval = 0, step = 0.1, group = GG)
+g_stopBuf = input.float(0.1, "Stop: buffer × ATR voorbij de box", minval = 0, step = 0.05, group = GG)
+g_swAge   = input.int(24, "Sweep telt mee als hij max. n bars oud is", minval = 1, group = GG)
+g_needSweep = input.bool(false, "Sweep verplicht voor CONFIRMED", group = GG)
+g_tMax    = input.int(32, "ACTIVE verloopt na n bars", minval = 4, group = GG)
+k_known   = input.bool(false, "Kosten bekend (anders: KOSTEN ONBEKEND)", group = GK)
+k_spread  = input.float(0.0, "Spread (pips) — aanname", group = GK)
+k_slip    = input.float(0.0, "Slippage per kant (pips) — aanname", group = GK)
+// Nieuwe instellingen altijd achteraan (input-ID's van bestaande instellingen mogen niet verschuiven)
+i_alertK  = input.bool(true, "Alerts: ook kandidaten (voor het forwardlogboek)", group = GW)
+
+// ═══ 0b. STR_0.2: preset, profiel en modules (Tonen · Meetellen · Alert) ═══
+const string GP2 = "① Preset en profiel"
+const string GMa = "② Macro (CUSTOM)"
+const string GSt = "③ Structuur (CUSTOM)"
+const string GCb = "④ CBO (CUSTOM)"
+const string GZo = "⑤ Zones (CUSTOM)"
+const string GLq = "⑥ Liquidity en auction (CUSTOM)"
+const string GRf = "⑦ Referenties (CUSTOM)"
+const string GAl = "⑧ Status-alerts (CUSTOM)"
+const string GN2 = "⑨ Nieuwe drempels 0.2 (HYPOTHESE)"
+i_preset  = input.string("CLEAN", "Preset", options = ["CLEAN", "INTRADAY", "SWING", "FULL RESEARCH", "CUSTOM"], tooltip = "Een preset bepaalt de effectieve instellingen. Alleen bij CUSTOM tellen de schakelaars in ②–⑧. De kaart toont altijd de effectieve modules en de parameterhash.", group = GP2)
+i_profile = input.string("AUTO", "Timeframeprofiel", options = ["AUTO", "CUSTOM"], tooltip = "AUTO: context-TF en referenties per chart-TF. CUSTOM: context zoals AUTO, referenties volgens ⑦.", group = GP2)
+// Macro
+u_macroT  = input.bool(true, "Bias 5.0 tonen", group = GMa, inline = "ma")
+u_macroM  = input.bool(true, "als richtingsfilter", group = GMa, inline = "ma")
+u_evT     = input.bool(true, "Events tonen", group = GMa, inline = "ev")
+u_evM     = input.bool(true, "als blokkade", group = GMa, inline = "ev")
+u_invT    = input.bool(true, "Scenario/invalidatie tonen (Expanded)", group = GMa)
+// Structuur
+u_swT     = input.bool(true, "Swing tonen", group = GSt, inline = "sw")
+u_inT     = input.bool(false, "Internal tonen", group = GSt, inline = "sw")
+u_frT     = input.bool(false, "Fractal tonen", group = GSt, inline = "sw")
+u_bosT    = input.bool(true, "BoS tonen", group = GSt, inline = "bo")
+u_bosM    = input.bool(false, "meetellen (trigger)", group = GSt, inline = "bo")
+u_bosA    = input.bool(false, "alert", group = GSt, inline = "bo")
+u_chT     = input.bool(false, "CHoCH tonen", group = GSt, inline = "ch")
+u_chM     = input.bool(false, "meetellen", group = GSt, inline = "ch")
+u_chA     = input.bool(false, "alert", group = GSt, inline = "ch")
+u_shT     = input.bool(true, "Structure shift tonen", group = GSt, inline = "sh")
+u_shA     = input.bool(false, "alert", group = GSt, inline = "sh")
+u_swA     = input.bool(false, "Alert nieuwe swing", group = GSt)
+u_htfM    = input.bool(true, "HTF-structuur als filter", group = GSt)
+// CBO
+u_cbFormT = input.bool(false, "Forming boxes tonen", group = GCb, inline = "cf")
+u_cbT     = input.bool(true, "Sealed/breakout tonen", group = GCb, inline = "cf")
+u_cbExpT  = input.bool(false, "Verlopen/mislukte box tonen", group = GCb)
+u_cbM     = input.bool(true, "CBO als trigger meetellen", group = GCb, inline = "cm")
+u_cbA     = input.bool(true, "alert sealed/breakout", group = GCb, inline = "cm")
+u_cbRetM  = input.bool(false, "Retest verplicht", group = GCb, inline = "cr")
+u_cbRetA  = input.bool(false, "alert retest", group = GCb, inline = "cr")
+u_roomM   = input.bool(true, "Ruimte tot referentie meetellen", group = GCb)
+// Zones
+u_obpT    = input.bool(true, "OB-P", group = GZo, inline = "z1")
+u_obfT    = input.bool(true, "OB-F", group = GZo, inline = "z1")
+u_obrT    = input.bool(true, "OB-R", group = GZo, inline = "z1")
+u_fvgT    = input.bool(false, "FVG", group = GZo, inline = "z1")
+u_zUnt    = input.bool(true, "Toon untouched", group = GZo, inline = "z2")
+u_zTes    = input.bool(true, "getest", group = GZo, inline = "z2")
+u_zPar    = input.bool(true, "gedeeltelijk", group = GZo, inline = "z2")
+u_zSpent  = input.string("Verbergen", "Gebruikte zones", options = ["Verbergen", "Vervagen"], group = GZo)
+u_zLocM   = input.string("Uit", "Zone als locatievoorwaarde", options = ["Uit", "OB-P", "OB-F", "OB-R", "FVG", "Elk type"], group = GZo)
+u_zA      = input.bool(false, "Alert zone-entry", group = GZo)
+// Liquidity en auction
+u_swpT    = input.bool(false, "Sweep tonen", group = GLq, inline = "s1")
+u_swpM    = input.bool(false, "meetellen (trigger)", group = GLq, inline = "s1")
+u_swpA    = input.bool(false, "alert", group = GLq, inline = "s1")
+u_fbT     = input.bool(false, "Failed breakout tonen", group = GLq, inline = "f1")
+u_fbA     = input.bool(false, "alert", group = GLq, inline = "f1")
+u_accT    = input.bool(false, "Acceptance/rejection tonen", group = GLq, inline = "a1")
+u_accM    = input.bool(false, "acceptance als trigger", group = GLq, inline = "a1")
+u_accA    = input.bool(false, "alert", group = GLq, inline = "a1")
+u_absT    = input.bool(false, "ABSORPTION-PROXY tonen", group = GLq, inline = "b1")
+u_absM    = input.bool(false, "meetellen (trigger)", group = GLq, inline = "b1")
+u_absA    = input.bool(false, "alert", group = GLq, inline = "b1")
+u_pdT     = input.bool(true, "Premium/EQ/discount tonen", group = GLq, inline = "p1")
+u_pdM     = input.bool(true, "als locatievoorwaarde", group = GLq, inline = "p1")
+// Referenties (CUSTOM-profiel)
+u_rDO     = input.bool(true, "D open", group = GRf, inline = "o1")
+u_rWO     = input.bool(false, "W open", group = GRf, inline = "o1")
+u_rMO     = input.bool(false, "M open", group = GRf, inline = "o1")
+u_rQO     = input.bool(false, "Q open", group = GRf, inline = "o1")
+u_rYO     = input.bool(false, "Y open", group = GRf, inline = "o1")
+u_rPD     = input.bool(true, "PDH/PDL", group = GRf, inline = "o2")
+u_rPW     = input.bool(true, "PWH/PWL", group = GRf, inline = "o2")
+u_rPM     = input.bool(false, "PMH/PML", group = GRf, inline = "o2")
+u_rAs     = input.bool(false, "Asia", group = GRf, inline = "o3")
+u_rLo     = input.bool(false, "London OR", group = GRf, inline = "o3")
+u_rNy     = input.bool(false, "NY OR", group = GRf, inline = "o3")
+u_rSw     = input.bool(true, "Dichtstbijzijnde swing high/low", group = GRf)
+u_rLbl    = input.bool(true, "Labels in de rail", group = GRf, inline = "o4")
+u_rTaken  = input.string("Verbergen", "Geraakte niveaus", options = ["Verbergen", "Vervagen"], group = GRf, inline = "o4")
+u_rProj   = input.int(4, "Projectie voorbij laatste bar (bars)", minval = 1, maxval = 30, group = GRf)
+// Status-alerts
+u_aArm    = input.bool(true, "ARMED", group = GAl, inline = "al")
+u_aConf   = input.bool(true, "CONFIRMED", group = GAl, inline = "al")
+u_aInv    = input.bool(true, "Invalidatie (FAILED)", group = GAl, inline = "al")
+// Nieuwe drempels
+n_fbBars  = input.int(3, "Failed breakout: binnen n bars terug", minval = 1, group = GN2)
+n_accK    = input.int(2, "Acceptance: closes voorbij", minval = 1, group = GN2)
+n_accDisp = input.float(0.5, "Acceptance: min. afstand × ATR", step = 0.1, group = GN2)
+n_dispATR = input.float(1.5, "Displacement: range ≥ × ATR (body ≥ 70%)", step = 0.1, group = GN2)
+n_absTol  = input.float(0.1, "Absorptie-proxy: tolerantie × ATR", step = 0.05, group = GN2)
+n_absWin  = input.int(20, "Absorptie-proxy: venster (bars)", minval = 3, group = GN2)
+n_absMin  = input.int(3, "Absorptie-proxy: min. tests", minval = 2, group = GN2)
+n_absNet  = input.float(0.5, "Absorptie-proxy: max. netto voortgang × ATR", step = 0.1, group = GN2)
+n_absDisp = input.float(1.0, "Absorptie-proxy: bevestiging weg van niveau × ATR", step = 0.1, group = GN2)
+n_absExp  = input.int(10, "Absorptie-proxy: verval na laatste test (bars)", minval = 1, group = GN2)
+n_fvgMin  = input.float(0.2, "FVG: min. hoogte × ATR", step = 0.05, group = GN2)
+n_refTol  = input.float(0.1, "Referentie: test-tolerantie × ATR", step = 0.05, group = GN2)
+n_chAge   = input.int(24, "CHoCH-filter: max. leeftijd (bars)", minval = 1, group = GN2)
+n_retMax  = input.int(8, "CBO-retest: binnen n bars", minval = 1, group = GN2)
+n_retTol  = input.float(0.25, "CBO-retest: tolerantie × ATR", step = 0.05, group = GN2)
+
+// ═══ 0c. Effectieve instellingen (preset bepaalt; alleen CUSTOM volgt ②–⑧) ═══
+bool pC = i_preset == "CUSTOM"
+bool pI = i_preset == "INTRADAY"
+bool pS = i_preset == "SWING"
+bool pF = i_preset == "FULL RESEARCH"
+int  tfS0 = timeframe.in_seconds()
+// Profiel (AUTO): context-TF en referenties per chart-TF
+int  prof = tfS0 <= 900 ? 1 : tfS0 <= 3600 ? 2 : tfS0 <= 14400 ? 3 : 4
+string ctxTF2 = prof == 1 ? "60" : prof == 2 ? "240" : prof == 3 ? "D" : "W"
+bool eMacroT = pC ? u_macroT : true
+bool eMacroM = pC ? u_macroM : true
+bool eEvT    = pC ? u_evT : true
+bool eEvM    = pC ? u_evM : true
+bool eInvT   = pC ? u_invT : true
+bool eSwT    = pC ? u_swT : true
+bool eInT    = pC ? u_inT : pI or pF
+bool eFrT    = pC ? u_frT : pF
+bool eBosT   = pC ? u_bosT : true
+bool eBosM   = pC ? u_bosM : false
+bool eBosA   = pC ? u_bosA : pI or pF
+bool eChT    = pC ? u_chT : pF
+bool eChM    = pC ? u_chM : false
+bool eChA    = pC ? u_chA : false
+bool eShT    = pC ? u_shT : true
+bool eShA    = pC ? u_shA : pF
+bool eSwA    = pC ? u_swA : false
+bool eHtfM   = pC ? u_htfM : true
+bool eCbFormT = pC ? u_cbFormT : pI or pF
+bool eCbT    = pC ? u_cbT : true
+bool eCbExpT = pC ? u_cbExpT : pF
+bool eCbM    = pC ? u_cbM : true
+bool eCbA    = pC ? u_cbA : true
+bool eCbRetM = pC ? u_cbRetM : false
+bool eCbRetA = pC ? u_cbRetA : pF
+bool eRoomM  = pC ? u_roomM : true
+bool eObpT   = pC ? u_obpT : not pI
+bool eObfT   = pC ? u_obfT : not pS
+bool eObrT   = pC ? u_obrT : true
+bool eFvgT   = pC ? u_fvgT : pI or pF
+bool eZUnt   = pC ? u_zUnt : true
+bool eZTes   = pC ? u_zTes : true
+bool eZPar   = pC ? u_zPar : true
+bool eZFade  = pC ? u_zSpent == "Vervagen" : pF
+string eZLoc = pC ? u_zLocM : "Uit"
+bool eZA     = pC ? u_zA : false
+bool eSwpT   = pC ? u_swpT : pI or pF
+bool eSwpM   = pC ? u_swpM : false
+bool eSwpA   = pC ? u_swpA : pI or pF
+bool eFbT    = pC ? u_fbT : pI or pF
+bool eFbA    = pC ? u_fbA : pF
+bool eAccT   = pC ? u_accT : pF
+bool eAccM   = pC ? u_accM : false
+bool eAccA   = pC ? u_accA : pF
+bool eAbsT   = pC ? u_absT : pF
+bool eAbsM   = pC ? u_absM : false
+bool eAbsA   = pC ? u_absA : pF
+bool ePdT    = pC ? u_pdT : true
+bool ePdM    = pC ? u_pdM : true
+bool eAArm   = pC ? u_aArm : true
+bool eAConf  = pC ? u_aConf : true
+bool eAInv   = pC ? u_aInv : true
+// Referenties: profiel (AUTO) of eigen keuze (CUSTOM-profiel); INTRADAY voegt sessies toe; FULL RESEARCH alles van het profiel
+bool autoR = i_profile == "AUTO"
+bool eRDO = autoR ? prof <= 2 : u_rDO
+bool eRWO = autoR ? prof == 2 or prof == 3 : u_rWO
+bool eRMO = autoR ? prof >= 3 : u_rMO
+bool eRQO = autoR ? prof == 4 : u_rQO
+bool eRYO = autoR ? prof == 4 : u_rYO
+bool eRPD = autoR ? prof <= 2 : u_rPD
+bool eRPW = autoR ? prof == 2 or prof == 3 : u_rPW
+bool eRPM = autoR ? prof >= 3 : u_rPM
+bool eRAs = autoR ? prof == 1 and (pI or pF or pC) : u_rAs
+bool eRLo = autoR ? prof == 1 and (pI or pF or pC) : u_rLo
+bool eRNy = autoR ? prof == 1 and (pI or pF or pC) : u_rNy
+bool eRSw = pC ? u_rSw : true
+int  eRMax = pF ? 6 : pC ? r_max : 3
+int  eZMax = pF ? 4 : pC ? i_zShow : 2
+// Parameterhash: numerieke vingerafdruk (mod 2^31−1, polynoom 31) over preset, profiel, alle effectieve modules en drempels
+hmix(float h, float v) =>
+    (h * 31 + math.round(v * 1000)) % 2147483647
+b2f(bool b) =>
+    b ? 1.0 : 0.0
+float PH = 7
+PH := hmix(PH, pC ? 5 : pF ? 4 : pS ? 3 : pI ? 2 : 1)
+PH := hmix(PH, autoR ? 1 : 2)
+for v in array.from(b2f(eMacroT), b2f(eMacroM), b2f(eEvT), b2f(eEvM), b2f(eSwT), b2f(eInT), b2f(eFrT), b2f(eBosT), b2f(eBosM), b2f(eBosA), b2f(eChT), b2f(eChM), b2f(eChA), b2f(eShT), b2f(eShA), b2f(eSwA), b2f(eHtfM), b2f(eCbFormT), b2f(eCbT), b2f(eCbExpT), b2f(eCbM), b2f(eCbA), b2f(eCbRetM), b2f(eCbRetA), b2f(eRoomM), b2f(eObpT), b2f(eObfT), b2f(eObrT), b2f(eFvgT), b2f(eZUnt), b2f(eZTes), b2f(eZPar), b2f(eZFade), b2f(eZA), b2f(eSwpT), b2f(eSwpM), b2f(eSwpA), b2f(eFbT), b2f(eFbA), b2f(eAccT), b2f(eAccM), b2f(eAccA), b2f(eAbsT), b2f(eAbsM), b2f(eAbsA), b2f(ePdT), b2f(ePdM), b2f(eAArm), b2f(eAConf), b2f(eAInv), b2f(eRDO), b2f(eRWO), b2f(eRMO), b2f(eRQO), b2f(eRYO), b2f(eRPD), b2f(eRPW), b2f(eRPM), b2f(eRAs), b2f(eRLo), b2f(eRNy), b2f(eRSw), float(eRMax), float(eZMax), float(eZLoc == "Uit" ? 0 : eZLoc == "OB-P" ? 1 : eZLoc == "OB-F" ? 2 : eZLoc == "OB-R" ? 3 : eZLoc == "FVG" ? 4 : 5))
+    PH := hmix(PH, v)
+for v in array.from(float(h_lenS), float(h_lenI), float(h_lenF), float(h_atrLen), float(h_buf), b2f(h_body), float(h_swWick), float(h_mit), float(h_zAge), float(h_zMaxH), float(h_fvgLook), float(c_volLen), float(c_volPct), float(c_lowVol), float(c_highVol), float(c_compVol), float(c_erLen), float(c_erTrend), float(c_erChaos), float(c_expMult), float(c_nMin), float(c_nMax), float(c_wMax), float(c_tol), float(c_tMin), float(c_nSeal), float(c_expiry), float(c_body), float(c_accK), float(e_preCB), float(e_postCB), float(e_pre), float(e_post), float(e_disc), float(g_trigAge), float(g_minRoom), float(g_stopBuf), float(g_swAge), float(g_tMax), float(n_fbBars), float(n_accK), float(n_accDisp), float(n_dispATR), float(n_absTol), float(n_absWin), float(n_absMin), float(n_absNet), float(n_absDisp), float(n_absExp), float(n_fvgMin), float(n_refTol), float(n_chAge), float(n_retMax), float(n_retTol), float(r_dist))
+    PH := hmix(PH, v)
+string PHASH = str.tostring(PH, "0")
+
+// ═══ 1. Typen en kleuren ════════════════════════════════════════
+type Piv
+    float price
+    int   oBar
+    int   oTime
+    int   cBar
+    int   cTime
+    bool  broken = false
+    bool  swept = false
+
+type Lvl
+    string tag
+    int    dir = 0
+    int    stage = 0
+    int    cdir = 0
+    Piv    hi
+    Piv    lo
+    float  tTop
+    float  tBot
+    int    nBos = 0
+    int    nChoch = 0
+    int    nSweep = 0
+    string lastEv = ""
+    int    lastEvTime
+
+type Zone
+    string id
+    string kind
+    string src
+    int    dir
+    float  top
+    float  bot
+    int    oTime
+    int    cBar
+    int    cTime
+    int    st = 0
+    float  pen = 0.0
+    int    tests = 0
+    bool   inside = false
+    string why = ""
+    bool   vis = false
+    int    tEnd
+    box    bx
+
+// Gebeurtenissen van deze gesloten bar (STR_0.2): type + JSON-fragment; alerts filteren later per type
+var array<string> evTyp = array.new_string()
+var array<string> evJs = array.new_string()
+if barstate.isconfirmed
+    evTyp.clear()
+    evJs.clear()
+emit(string typ, string js) =>
+    evTyp.push(typ)
+    evJs.push(js)
+
+bool dark = (color.r(chart.bg_color) * 299 + color.g(chart.bg_color) * 587 + color.b(chart.bg_color) * 114) / 1000 < 128
+color t1c = dark ? #E6E8EE : #1A1D24
+color t2c = dark ? #9AA1B2 : #555C6B
+color t3c = dark ? #6E7586 : #8A909E
+color bgc = dark ? color.new(#131722, 6) : color.new(#FFFFFF, 6)
+color cBull = #26A65B
+color cBear = #E5484D
+color cAmb  = #F0A020
+
+float atr = ta.atr(h_atrLen)
+int tfSec = timeframe.in_seconds()
+
+// ═══ 1b. BFX-data (gegenereerd, alleen lezen) ═══════════════════
+type PairBias
+    string basis
+    string quote
+    float  idx
+    string lbl
+    string status
+    string tekst
+type CcyK
+    string ccy
+    float  idx
+    string kp
+type Inv
+    string paar
+    string tekst
+    string horizon
+type Ev
+    int    t
+    string ccy
+    bool   cb
+    string name
+var array<PairBias> pairs = array.new<PairBias>()
+var array<CcyK>     ccyk  = array.new<CcyK>()
+var array<Inv>      invs  = array.new<Inv>()
+var array<Ev>       evs   = array.new<Ev>()
+addPair(string b, string q, float i, string l, string s, string t) =>
+    pairs.push(PairBias.new(b, q, i, l, s, t))
+addCcy(string c, float i, string k) =>
+    ccyk.push(CcyK.new(c, i, k))
+addInv(string p, string t, string h) =>
+    invs.push(Inv.new(p, t, h))
+addEv(int t, string c, bool cb, string n) =>
+    evs.push(Ev.new(t, c, cb, n))
+
+// ═══ DATA-START ═══
+{{DATA}}
+// ═══ DATA-EINDE ═══
+
+// Biashistorie per dag (alleen forward-rijen van BIAS_5.0, gegenereerd)
+var array<int>    hT = array.new_int()
+var array<string> hC = array.new_string()
+var array<float>  hI = array.new_float()
+addHist(int t, string c, float i) =>
+    hT.push(t)
+    hC.push(c)
+    hI.push(i)
+// ═══ HIST-START ═══
+{{HIST}}
+// ═══ HIST-EINDE ═══
+
+// Macro (BIAS_5.0, zelfde regel als CBO_0.1): ≥ +15 long, ≤ −15 short, alleen als de bias actueel is
+string cb = syminfo.basecurrency
+string cq = syminfo.currency
+findPair() =>
+    PairBias f = na
+    for p in pairs
+        if (p.basis == cb and p.quote == cq) or (p.basis == cq and p.quote == cb)
+            f := p
+            break
+    f
+findInv() =>
+    Inv f = na
+    for v in invs
+        if v.paar == cb + cq or v.paar == cq + cb
+            f := v
+            break
+    f
+expectedBiasDay() =>
+    string tz = "Europe/Amsterdam"
+    int t = timenow
+    if hour(t, tz) * 60 + minute(t, tz) < 330
+        t := t - 86400000
+    int dow = dayofweek(t, tz)
+    int back = dow == dayofweek.sunday ? 2 : dow == dayofweek.saturday ? 1 : 0
+    timestamp("UTC", year(t, tz), month(t, tz), dayofmonth(t, tz)) - back * 86400000
+PairBias pb = findPair()
+float pIdx = na(pb) ? na : (pb.basis != cb ? -pb.idx : pb.idx)
+bool  biasFresh = BIAS_DATUM > 0 and BIAS_DATUM >= expectedBiasDay()
+bool  snapFresh = timenow - ENG_GENERATED <= 36 * 3600000
+int   macroDir = na(pIdx) or not biasFresh ? 0 : pIdx >= 15 ? 1 : pIdx <= -15 ? -1 : 0
+
+// Bias per bar: paarindex = (basis − quote) / 2 uit de forwardhistorie. hT = geldig-vanaf (max van D 06:00 UTC en het
+// moment dat de generator die dag voor het eerst zag; nooit eerder dan hij bestond). Max 96 uur oud.
+var array<int>   bpT = array.new_int()
+var array<float> bpI = array.new_float()
+if barstate.isfirst and hT.size() > 0
+    for i = 0 to hT.size() - 1
+        if hC.get(i) == cb
+            for j = 0 to hT.size() - 1
+                if hT.get(j) == hT.get(i) and hC.get(j) == cq
+                    bpT.push(hT.get(i))
+                    bpI.push((hI.get(i) - hI.get(j)) / 2)
+var int bp = -1
+while bp + 1 < bpT.size() and time_close >= bpT.get(bp + 1)
+    bp += 1
+float pIdxBar = bp >= 0 and time_close - bpT.get(bp) <= 96 * 3600000 ? bpI.get(bp) : na
+int   mdBar = na(pIdxBar) ? 0 : pIdxBar >= 15 ? 1 : pIdxBar <= -15 ? -1 : 0
+
+// Events van basis/quote: blok- en post-eventstatus op tijdstip t
+evAt(int t) =>
+    bool blk = false
+    bool post = false
+    Ev nxt = na
+    for e in evs
+        if e.ccy == cb or e.ccy == cq
+            int pre = (e.cb ? e_preCB : e_pre) * 60000
+            int aft = (e.cb ? e_postCB : e_post) * 60000
+            if t >= e.t - pre and t <= e.t + aft
+                blk := true
+            if t > e.t and t <= e.t + e_disc * 60000
+                post := true
+            if e.t >= t and na(nxt)
+                nxt := e
+    [blk, post, nxt]
+[evBlk, evPost, evNext] = evAt(time_close)
+
+// ═══ 2. Structuurlaag ═══════════════════════════════════════════
+// Eén laag één bar verder, alleen op gesloten candles. Een pivot dat op déze bar bevestigt telt pas vanaf de volgende bar.
+// brk: ±1 BoS · ±2 CHoCH · ±3 eerste break vanuit neutraal (teken = richting). sw: +1 bullish sweep (low genomen), −1 bearish sweep (high genomen).
+stepLvl(Lvl s, float ph, float pl, int L) =>
+    int brk = 0
+    float bP = na
+    int bT = na
+    int bB = na
+    int sw = 0
+    float sP = na
+    int sT = na
+    if barstate.isconfirmed
+        float b = h_buf * atr
+        float upRef = h_body ? math.min(open, close) : close
+        float dnRef = h_body ? math.max(open, close) : close
+        float rng = high - low
+        if not na(s.hi) and not s.hi.broken
+            if upRef > s.hi.price + b
+                s.hi.broken := true
+                brk := s.dir == 1 ? 1 : s.dir == 0 ? 3 : 2
+                bP := s.hi.price
+                bT := s.hi.oTime
+                bB := s.hi.oBar
+            else if not s.hi.swept and high > s.hi.price and close < s.hi.price and rng > 0 and (high - math.max(open, close)) / rng >= h_swWick
+                s.hi.swept := true
+                sw := -1
+                sP := s.hi.price
+                sT := s.hi.oTime
+        if brk == 0 and not na(s.lo) and not s.lo.broken
+            if dnRef < s.lo.price - b
+                s.lo.broken := true
+                brk := s.dir == -1 ? -1 : s.dir == 0 ? -3 : -2
+                bP := s.lo.price
+                bT := s.lo.oTime
+                bB := s.lo.oBar
+            else if sw == 0 and not s.lo.swept and low < s.lo.price and close > s.lo.price and rng > 0 and (math.min(open, close) - low) / rng >= h_swWick
+                s.lo.swept := true
+                sw := 1
+                sP := s.lo.price
+                sT := s.lo.oTime
+        if brk != 0
+            int d = brk > 0 ? 1 : -1
+            int ab = math.abs(brk)
+            if ab == 1
+                s.stage := s.stage == 1 ? 2 : 3
+                s.nBos += 1
+            else
+                s.stage := 1
+                s.nChoch += ab == 2 ? 1 : 0
+            s.dir := d
+            // Bevestigde richting: pas bij stage ≥ 2 (een CHoCH alleen verandert cdir niet)
+            if s.stage >= 2
+                s.cdir := d
+            s.lastEv := (ab == 1 ? "BoS" : ab == 2 ? "CHoCH" : "Break") + (d == 1 ? " ↑" : " ↓")
+            s.lastEvTime := time
+        if sw != 0
+            s.nSweep += 1
+            if s.stage >= 2 and sw == -s.dir
+                s.stage := 4
+        if not na(ph)
+            s.hi := Piv.new(ph, bar_index - L, time[L], bar_index, time)
+            s.tTop := ph
+        else if not na(s.tTop)
+            s.tTop := math.max(s.tTop, high)
+        if not na(pl)
+            s.lo := Piv.new(pl, bar_index - L, time[L], bar_index, time)
+            s.tBot := pl
+        else if not na(s.tBot)
+            s.tBot := math.min(s.tBot, low)
+    [brk, bP, bT, bB, sw, sP, sT]
+
+pdOf(Lvl s) =>
+    float top = s.tTop
+    float bot = s.tBot
+    na(top) or na(bot) or top <= bot ? na : (close - bot) / (top - bot) * 100
+
+var Lvl lS = Lvl.new("S")
+var Lvl lI = Lvl.new("I")
+var Lvl lF = Lvl.new("F")
+float phS = ta.pivothigh(high, h_lenS, h_lenS)
+float plS = ta.pivotlow(low, h_lenS, h_lenS)
+float phI = ta.pivothigh(high, h_lenI, h_lenI)
+float plI = ta.pivotlow(low, h_lenI, h_lenI)
+float phF = ta.pivothigh(high, h_lenF, h_lenF)
+float plF = ta.pivotlow(low, h_lenF, h_lenF)
+[bS, bPS, bTS, bBS, wS, wPS, wTS] = stepLvl(lS, phS, plS, h_lenS)
+[bI, bPI, bTI, bBI, wI, wPI, wTI] = stepLvl(lI, phI, plI, h_lenI)
+[bF, bPF, bTF, bBF, wF, wPF, wTF] = stepLvl(lF, phF, plF, h_lenF)
+
+// ═══ 3. Hogere timeframes (technische oriëntatie, geen macro) ═══
+// expr[1] + lookahead_on = laatste gesloten HTF-candle; alleen opgevraagd als de rij aan staat (lazy).
+htfState(int L) =>
+    var Lvl s = Lvl.new("H")
+    float ph = ta.pivothigh(high, L, L)
+    float pl = ta.pivotlow(low, L, L)
+    [x1, x2, x3, x4, x5, x6, x7] = stepLvl(s, ph, pl, L)
+    int d = s.cdir
+    int g = s.stage
+    float p = pdOf(s)
+    [d[1], g[1], p[1]]
+
+int h4Dir = na
+int h4Stg = na
+float h4Pd = na
+if i_rowH4 and i_mode == "Expanded" and tfSec < 14400
+    [a1, a2, a3] = request.security(syminfo.tickerid, "240", htfState(h_lenS), lookahead = barmerge.lookahead_on)
+    h4Dir := a1
+    h4Stg := a2
+    h4Pd := a3
+int cxDir = na
+int cxStg = na
+float cxPd = na
+if (eHtfM or i_mode == "Expanded") and tfS0 < timeframe.in_seconds(ctxTF2)
+    [x1c, x2c, x3c] = request.security(syminfo.tickerid, ctxTF2, htfState(h_lenS), lookahead = barmerge.lookahead_on)
+    cxDir := x1c
+    cxStg := x2c
+    cxPd := x3c
+int dDir = na
+int dStg = na
+float dPd = na
+if i_rowD and i_mode == "Expanded" and tfSec < 86400
+    [c1, c2, c3] = request.security(syminfo.tickerid, "D", htfState(h_lenS), lookahead = barmerge.lookahead_on)
+    dDir := c1
+    dStg := c2
+    dPd := c3
+
+// ═══ 4. Tekenen: structuur en sweeps ════════════════════════════
+var array<line>  lnS = array.new<line>()
+var array<label> lbS = array.new<label>()
+var array<line>  lnI = array.new<line>()
+var array<label> lbI = array.new<label>()
+var array<line>  lnF = array.new<line>()
+var array<label> lbF = array.new<label>()
+var array<line>  lnW = array.new<line>()
+var array<label> lbW = array.new<label>()
+
+trim(array<line> la, array<label> lb) =>
+    while la.size() > i_maxDraw
+        la.shift().delete()
+    while lb.size() > i_maxDraw
+        lb.shift().delete()
+
+drawBrk(array<line> la, array<label> lb, int brk, float p, int t0, string pre, string sty, int w) =>
+    int ab0 = math.abs(brk)
+    if brk != 0 and not na(p) and not na(t0) and (ab0 == 2 ? eChT : eBosT)
+        color c = brk > 0 ? cBull : cBear
+        int ab = math.abs(brk)
+        string tx = pre + (ab == 1 ? "BoS" : ab == 2 ? "CHoCH" : "Break")
+        la.push(line.new(t0, p, time, p, xloc = xloc.bar_time, color = color.new(c, 15), style = sty, width = w))
+        lb.push(label.new(int((t0 + time) / 2), p, tx, xloc = xloc.bar_time, style = brk > 0 ? label.style_label_down : label.style_label_up, color = color.new(c, 100), textcolor = c, size = size.tiny, tooltip = tx + " op close " + str.format_time(time, "dd/MM HH:mm", i_tz) + " · niveau " + str.tostring(p, format.mintick)))
+        trim(la, lb)
+
+drawSweep(int sw, float p, int t0, string pre) =>
+    if sw != 0 and not na(p) and not na(t0)
+        color c = sw > 0 ? cBull : cBear
+        float ext = sw > 0 ? low : high
+        lnW.push(line.new(t0, p, time, p, xloc = xloc.bar_time, color = color.new(c, 45), style = line.style_dotted, width = 1))
+        lbW.push(label.new(time, ext, pre + "Sweep", xloc = xloc.bar_time, style = sw > 0 ? label.style_label_up : label.style_label_down, color = color.new(c, 100), textcolor = c, size = size.tiny, tooltip = "Sweep: wick door " + str.tostring(p, format.mintick) + ", close terug binnen · " + str.tostring(math.abs(ext - p) / atr, "0.00") + " ATR voorbij het niveau. Context, geen entry."))
+        trim(lnW, lbW)
+
+// Breekt een hogere laag hetzelfde niveau op dezelfde bar, dan tekent alleen die hogere laag (geen dubbele labels).
+bool dupI = eSwT and bS != 0 and bI != 0 and bPI == bPS
+bool dupF = (eInT and bI != 0 and bF != 0 and bPF == bPI) or (eSwT and bS != 0 and bF != 0 and bPF == bPS)
+if eSwT
+    drawBrk(lnS, lbS, bS, bPS, bTS, "", line.style_solid, 2)
+if eInT and not dupI
+    drawBrk(lnI, lbI, bI, bPI, bTI, "i-", line.style_dashed, 1)
+if eFrT and not dupF
+    drawBrk(lnF, lbF, bF, bPF, bTF, "f-", line.style_dotted, 1)
+// Per bar één sweeplabel: de hoogste laag die sweept.
+if eSwpT
+    if wS != 0
+        drawSweep(wS, wPS, wTS, "")
+    else if wI != 0
+        drawSweep(wI, wPI, wTI, "i-")
+    else if eFrT and wF != 0
+        drawSweep(wF, wPF, wTF, "f-")
+
+var string swTxt = "–"
+if wF != 0
+    swTxt := "fractal " + (wF > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPF, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+if wI != 0
+    swTxt := "internal " + (wI > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPI, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+if wS != 0
+    swTxt := "swing " + (wS > 0 ? "bullish" : "bearish") + " · " + str.tostring(wPS, format.mintick) + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+
+plotshape(i_conf and not na(phS), "Swing high bevestigd", shape.triangledown, location.abovebar, color.new(t3c, 30), size = size.tiny, display = display.pane)
+plotshape(i_conf and not na(plS), "Swing low bevestigd", shape.triangleup, location.belowbar, color.new(t3c, 30), size = size.tiny, display = display.pane)
+
+// ═══ 4b. Liquidity en auction (0.2): failed breakout, acceptance, displacement, ABSORPTION-PROXY + gebeurtenissen ═══
+// Alles op gesloten candles; een niveau telt pas nadat het bevestigd is (zie stepLvl). Prijsproxy's — geen orderflow.
+type Pend
+    float  lvl
+    int    d
+    int    b
+    int    cnt = 1
+    float  mx = 0.0
+    bool   done = false
+    string lay
+type Abs
+    float lvl
+    int   b0
+    int   bL
+    int   n = 0
+    float c0
+    float cL
+evId(string lay, string kind, int d) =>
+    syminfo.ticker + "-" + timeframe.period + "-" + lay + kind + "-" + str.format_time(time, "yyyyMMdd-HHmm", "UTC") + (d > 0 ? "-L" : "-S")
+// Break volgen: −1 = failed breakout (close terug binnen n_fbBars) · +1 = acceptance (n_accK closes voorbij én afstand ≥ n_accDisp × ATR)
+stepPend(Pend p) =>
+    int r = 0
+    if not na(p) and not p.done and bar_index > p.b
+        bool back = p.d == 1 ? close < p.lvl : close > p.lvl
+        if back
+            p.done := true
+            if bar_index - p.b <= n_fbBars
+                r := -1
+        else
+            p.cnt += 1
+            p.mx := math.max(p.mx, (close - p.lvl) * p.d)
+            if p.cnt >= n_accK and p.mx >= n_accDisp * atr
+                p.done := true
+                r := 1
+    r
+// ABSORPTION-PROXY aan één niveau (side 1 = high, −1 = low). Uitkomst: ±1 = bevestigd (richting weg van het niveau) · 8 = verlopen · 9 = ongeldig (break)
+stepAbs(Abs a, float lvl, int side) =>
+    int r = 0
+    if na(lvl)
+        a.n := 0
+    else
+        if na(a.lvl) or lvl != a.lvl
+            a.lvl := lvl
+            a.n := 0
+        float tol = n_absTol * atr
+        bool brk = side == 1 ? close > lvl + h_buf * atr : close < lvl - h_buf * atr
+        bool test = side == 1 ? high >= lvl - tol and close <= lvl : low <= lvl + tol and close >= lvl
+        if brk
+            if a.n > 0
+                r := 9
+            a.n := 0
+        else
+            if test and (a.n == 0 or bar_index - a.b0 <= n_absWin)
+                if a.n == 0
+                    a.b0 := bar_index
+                    a.c0 := close
+                a.n += 1
+                a.bL := bar_index
+                a.cL := close
+            if a.n > 0
+                bool conf = side == 1 ? close <= lvl - n_absDisp * atr : close >= lvl + n_absDisp * atr
+                if a.n >= n_absMin and math.abs(a.cL - a.c0) <= n_absNet * atr and conf and bar_index - a.bL <= n_absExp
+                    r := -side
+                    a.n := 0
+                else if bar_index - a.bL > n_absExp or bar_index - a.b0 > n_absWin + n_absExp
+                    if a.n >= n_absMin
+                        r := 8
+                    a.n := 0
+    r
+var Pend pdS = na
+var Pend pdI = na
+var Abs aSH = Abs.new(na, na, na, 0, na, na)
+var Abs aSL = Abs.new(na, na, na, 0, na, na)
+var Abs aIH = Abs.new(na, na, na, 0, na, na)
+var Abs aIL = Abs.new(na, na, na, 0, na, na)
+var int cdirPrev = 0
+var array<label> lbA = array.new<label>()
+bool dispNow = (high - low) >= n_dispATR * atr and math.abs(close - open) >= 0.7 * (high - low)
+var int cFB = 0
+var int cACC = 0
+var int cABS = 0
+var int cABSx = 0
+markA(string txt, int d, color c, string tip) =>
+    lbA.push(label.new(time, d > 0 ? low : high, txt, xloc = xloc.bar_time, style = d > 0 ? label.style_label_up : label.style_label_down, color = color.new(c, 100), textcolor = c, size = size.tiny, tooltip = tip))
+    while lbA.size() > i_maxDraw
+        lbA.shift().delete()
+if barstate.isconfirmed
+    // Nieuwe bevestigde swing (bevestigd op déze bar; oorsprong h_lenS bars terug)
+    if not na(phS) or not na(plS)
+        emit("swing", "{\"laag\":\"S\",\"soort\":\"" + (not na(phS) ? "high" : "low") + "\",\"prijs\":" + str.tostring(not na(phS) ? phS : plS) + ",\"origin_time\":\"" + str.format_time(time[h_lenS], "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") + "\",\"confirmed_at\":\"" + str.format_time(time, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") + "\"}")
+    // Breaks per laag (S en I): BoS / CHoCH / eerste break, met gebroken niveau, oorsprong en bevestigingscandle
+    for [k, b] in array.from(bS, bI)
+        if b != 0
+            string lay = k == 0 ? "S" : "I"
+            float lvP = k == 0 ? bPS : bPI
+            int lvT = k == 0 ? bTS : bTI
+            int ab = math.abs(b)
+            string kind = ab == 1 ? "BOS" : ab == 2 ? "CHOCH" : "BRK"
+            emit(ab == 2 ? "choch" : "bos", "{\"id\":\"" + evId(lay, kind, b) + "\",\"laag\":\"" + lay + "\",\"soort\":\"" + kind + "\",\"richting\":\"" + (b > 0 ? "long" : "short") + "\",\"niveau\":" + str.tostring(lvP) + ",\"niveau_origin\":\"" + str.format_time(lvT, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") + "\",\"bevestigd_op\":\"" + str.format_time(time, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") + "\"}")
+    // Bevestigde structure shift (confDir wisselt; een CHoCH alleen doet dat niet)
+    if lS.cdir != cdirPrev and lS.cdir != 0
+        emit("shift", "{\"laag\":\"S\",\"richting\":\"" + (lS.cdir > 0 ? "long" : "short") + "\",\"stage\":" + str.tostring(lS.stage) + "}")
+    cdirPrev := lS.cdir
+    // Sweeps
+    for [k, w] in array.from(wS, wI)
+        if w != 0
+            float sp = k == 0 ? wPS : wPI
+            emit("sweep", "{\"laag\":\"" + (k == 0 ? "S" : "I") + "\",\"richting\":\"" + (w > 0 ? "long" : "short") + "\",\"niveau\":" + str.tostring(sp) + ",\"wick_atr\":" + str.tostring(math.abs((w > 0 ? low : high) - sp) / atr, "#.##") + ",\"close\":" + str.tostring(close) + "}")
+    // Failed breakout / acceptance (S en I)
+    if bS != 0 and not na(bPS)
+        pdS := Pend.new(bPS, bS > 0 ? 1 : -1, bar_index, 1, (close - bPS) * (bS > 0 ? 1 : -1), false, "S")
+    if bI != 0 and not na(bPI)
+        pdI := Pend.new(bPI, bI > 0 ? 1 : -1, bar_index, 1, (close - bPI) * (bI > 0 ? 1 : -1), false, "I")
+    for p in array.from(pdS, pdI)
+        if not na(p)
+            int r = stepPend(p)
+            if r == -1
+                cFB += 1
+                emit("failed_breakout", "{\"laag\":\"" + p.lay + "\",\"niveau\":" + str.tostring(p.lvl) + ",\"break_richting\":\"" + (p.d > 0 ? "long" : "short") + "\",\"bars\":" + str.tostring(bar_index - p.b) + "}")
+                if eFbT
+                    markA("FB", -p.d, cAmb, "Failed breakout: close terug binnen " + str.tostring(p.lvl, format.mintick) + " na " + str.tostring(bar_index - p.b) + " bars")
+            if r == 1
+                cACC += 1
+                emit("acceptance", "{\"laag\":\"" + p.lay + "\",\"niveau\":" + str.tostring(p.lvl) + ",\"richting\":\"" + (p.d > 0 ? "long" : "short") + "\",\"afstand_atr\":" + str.tostring(p.mx / atr, "#.##") + "}")
+                if eAccT
+                    markA("ACC", p.d, p.d > 0 ? cBull : cBear, "Acceptance: " + str.tostring(n_accK) + " closes voorbij " + str.tostring(p.lvl, format.mintick) + ", " + str.tostring(p.mx / atr, "0.0") + " ATR")
+    // ABSORPTION-PROXY aan de actuele swing- en internalniveaus (niet gebroken)
+    array<Abs> as4 = array.from(aSH, aSL, aIH, aIL)
+    array<float> lv4 = array.from(na(lS.hi) or lS.hi.broken ? na : lS.hi.price, na(lS.lo) or lS.lo.broken ? na : lS.lo.price, na(lI.hi) or lI.hi.broken ? na : lI.hi.price, na(lI.lo) or lI.lo.broken ? na : lI.lo.price)
+    for k = 0 to 3
+        int side = k % 2 == 0 ? 1 : -1
+        int r = stepAbs(as4.get(k), lv4.get(k), side)
+        if r == 1 or r == -1
+            cABS += 1
+            emit("absorption_proxy", "{\"label\":\"ABSORPTION-PROXY\",\"laag\":\"" + (k < 2 ? "S" : "I") + "\",\"niveau\":" + str.tostring(lv4.get(k)) + ",\"richting\":\"" + (r > 0 ? "long" : "short") + "\",\"let_op\":\"prijsproxy, geen orderflow\"}")
+            if eAbsT
+                markA("ABSORPTION-PROXY", r, r > 0 ? cBull : cBear, "ABSORPTION-PROXY (prijsproxy, geen orderflow): ≥ " + str.tostring(n_absMin) + " tests van " + str.tostring(lv4.get(k), format.mintick) + " binnen " + str.tostring(n_absWin) + " bars, weinig netto voortgang, daarna ≥ " + str.tostring(n_absDisp) + " ATR weg van het niveau.")
+        else if r == 8 or r == 9
+            cABSx += 1
+
+// ═══ 5. Zones (OB-P / OB-F) met lifecycle ═══════════════════════
+var array<Zone> zones = array.new<Zone>()
+var int cZP = 0
+var int cZF = 0
+var int cZx = 0
+stName(int st) =>
+    st == 0 ? "NIEUW" : st == 1 ? "ACTIEF" : st == 2 ? "GETEST" : st == 3 ? "GEDEELTELIJK" : st == 4 ? "GEBRUIKT" : "ONGELDIG"
+
+hasZone(string id) =>
+    bool f = false
+    for z in zones
+        if z.id == id
+            f := true
+            break
+    f
+
+// Maakt een zone op de candle k bars terug. 1 = gemaakt · 0 = bestond al · −1 = te hoog (overgeslagen)
+addZoneB(string kind, string src, int dir, float top, float bot, int t0) =>
+    string id = syminfo.ticker + "-" + timeframe.period + "-" + kind + "-" + str.format_time(t0, "yyyyMMdd-HHmm", "UTC") + (dir > 0 ? "-L" : "-S")
+    int res = 0
+    if top - bot <= 0 or top - bot > h_zMaxH * atr
+        res := -1
+    else if not hasZone(id)
+        Zone z = Zone.new(id, kind, src, dir, top, bot, t0, bar_index, time)
+        z.bx := box.new(t0, top, time, bot, xloc = xloc.bar_time, border_color = na, bgcolor = na, text = "", text_size = size.tiny, text_halign = text.align_right, text_valign = text.align_center)
+        zones.push(z)
+        res := 1
+        // Begrensd geheugen: afgeronde zones eerst weg (geen onbeperkt groeiende arrays)
+        if zones.size() > 24
+            int idx = 0
+            for [i, q] in zones
+                if q.st >= 4
+                    idx := i
+                    break
+            Zone old = zones.remove(idx)
+            if not na(old.bx)
+                old.bx.delete()
+    res
+addZone(string kind, string src, int dir, int k) =>
+    addZoneB(kind, src, dir, dir > 0 ? math.max(open[k], close[k]) : high[k], dir > 0 ? low[k] : math.min(open[k], close[k]), time[k])
+
+// OB-P: extreem van het been sinds de oorsprong van het gebroken pivot; daarvan (≤ 3 bars terug) de laatste tegencandle.
+obPOff(int dir, int n) =>
+    int m = math.min(math.max(n, 1), 300)
+    int kx = na
+    float ex = na
+    for k = 1 to m
+        float v = dir > 0 ? low[k] : high[k]
+        if na(ex) or (dir > 0 ? v < ex : v > ex)
+            ex := v
+            kx := k
+    int res = kx
+    if not na(kx)
+        for j = kx to kx + 3
+            if dir > 0 ? close[j] < open[j] : close[j] > open[j]
+                res := j
+                break
+    res
+
+// OB-F: vroegste FVG van de impuls (niet ouder dan het extreem van het been); de laatste tegencandle op of vóór de FVG-start.
+obFOff(int dir, int n) =>
+    int m = math.min(math.max(n, 1), 300)
+    int kx = na
+    float ex = na
+    for k = 1 to m
+        float v = dir > 0 ? low[k] : high[k]
+        if na(ex) or (dir > 0 ? v < ex : v > ex)
+            ex := v
+            kx := k
+    int kf = na
+    int lim = math.min(h_fvgLook, nz(kx, 1))
+    for k = 0 to lim - 1
+        bool fvg = dir > 0 ? low[k] > high[k + 2] : high[k] < low[k + 2]
+        if fvg and k + 1 <= nz(kx, 0)
+            kf := k
+    int res = na
+    if not na(kf)
+        for j = kf + 2 to kf + 6
+            if dir > 0 ? close[j] < open[j] : close[j] > open[j]
+                res := j
+                break
+    res
+
+mkZones(int brk, int bB, string src) =>
+    int rP = 0
+    int rF = 0
+    if brk != 0 and not na(bB)
+        int d = brk > 0 ? 1 : -1
+        int n = bar_index - bB
+        // Lui: een zonetype wordt alleen berekend als het getoond wordt of als locatievoorwaarde telt
+        if eObpT or eZLoc == "OB-P" or eZLoc == "Elk type"
+            int kp = obPOff(d, n)
+            if not na(kp)
+                rP := addZone("OB-P", src, d, kp)
+        if eObfT or eZLoc == "OB-F" or eZLoc == "Elk type"
+            int kf = obFOff(d, n)
+            if not na(kf)
+                rF := addZone("OB-F", src, d, kf)
+    [rP, rF]
+
+updZones() =>
+    for z in zones
+        if z.st < 5 and bar_index > z.cBar
+            float hgt = z.top - z.bot
+            bool touch = z.dir > 0 ? low <= z.top : high >= z.bot
+            if touch and not z.inside
+                z.tests += 1
+                if z.tests == 1
+                    emit("zone_entry", "{\"zone_id\":\"" + z.id + "\",\"type\":\"" + z.kind + "\",\"richting\":\"" + (z.dir > 0 ? "long" : "short") + "\"}")
+            z.inside := touch
+            float p = z.dir > 0 ? (z.top - low) / hgt : (high - z.bot) / hgt
+            z.pen := math.max(z.pen, math.max(0.0, math.min(1.0, p)))
+            if z.dir > 0 ? close < z.bot : close > z.top
+                z.st := 5
+                z.why := "close door zone"
+            else if bar_index - z.cBar > h_zAge
+                z.st := 5
+                z.why := "verlopen"
+            else if z.st < 4
+                z.st := z.pen * 100 >= h_mit ? 4 : z.pen * 100 >= h_mit / 2 ? 3 : z.pen > 0 ? 2 : 1
+            if z.st < 4
+                z.bx.set_right(time)
+            if z.st >= 4 and na(z.tEnd)
+                z.tEnd := time
+            if z.st == 5
+                z.bx.delete()
+
+if barstate.isconfirmed
+    updZones()
+    [p1, f1] = mkZones(bS, bBS, "S")
+    [p2, f2] = mkZones(bI, bBI, "I")
+    cZP += (p1 == 1 ? 1 : 0) + (p2 == 1 ? 1 : 0)
+    cZF += (f1 == 1 ? 1 : 0) + (f2 == 1 ? 1 : 0)
+    cZx += (p1 == -1 ? 1 : 0) + (p2 == -1 ? 1 : 0) + (f1 == -1 ? 1 : 0) + (f2 == -1 ? 1 : 0)
+    // FVG (0.2): eigen zonetype, gescheiden van OB-F; ontstaat op de derde candle
+    if eFvgT or eZLoc == "FVG" or eZLoc == "Elk type"
+        if low > high[2] and low - high[2] >= n_fvgMin * atr
+            addZoneB("FVG", "F", 1, low, high[2], time[1])
+        if high < low[2] and low[2] - high >= n_fvgMin * atr
+            addZoneB("FVG", "F", -1, low[2], high, time[1])
+
+// ═══ 5b. CBO-module: box-statemachine met de regels van CBO_0.1 (met eventblokkade, zonder meting) ═══
+// 0 GEEN CONTEXT · 1 CONTEXT GELDIG · 2 VORMT · 3 KANDIDAAT · 4 VERZEGELD · 5 BREAKOUT · 6 ACCEPTATIE · 9 MISLUKT · 10 VERLOPEN · 11 EVENT BLOCK
+cboName(int s) =>
+    switch s
+        0 => "GEEN CONTEXT"
+        1 => "CONTEXT GELDIG"
+        2 => "FORMING"
+        3 => "FORMING (kandidaat)"
+        4 => "SEALED"
+        5 => "BREAKOUT_CANDIDATE"
+        6 => "BREAKOUT_CONFIRMED"
+        7 => "RETEST"
+        9 => "FAILED"
+        10 => "EXPIRED"
+        11 => "EVENT_BLOCK"
+        => "?"
+
+bool cboTF = tfSec == 900 or tfSec == 1800 or tfSec == 3600 or tfSec == 14400
+bool eCbOn = eCbT or eCbM or eCbFormT
+string ctxTF = tfSec <= 1800 ? "240" : "D"
+ctxVals() =>
+    float e = ta.ema(close, 50)
+    float sl = e - e[5]
+    [e[1], close[1], sl[1]]
+float ctxEma = na
+float ctxClose = na
+float ctxSlope = na
+if eCbOn and cboTF
+    [e1, e2, e3] = request.security(syminfo.tickerid, ctxTF, ctxVals(), lookahead = barmerge.lookahead_on)
+    ctxEma := e1
+    ctxClose := e2
+    ctxSlope := e3
+
+float rv  = ta.stdev(math.log(close / close[1]), c_volLen)
+float rvP = ta.percentrank(rv, c_volPct)
+float er  = math.abs(close - close[c_erLen]) / math.max(math.sum(math.abs(close - close[1]), c_erLen), syminfo.mintick)
+float rngB = high - low
+bool ctxUp = not na(ctxSlope) and ctxSlope > 0 and ctxClose > ctxEma
+bool ctxDn = not na(ctxSlope) and ctxSlope < 0 and ctxClose < ctxEma
+// Post-event-regime alleen op bars ≤ 1 uur (zoals CBO_0.1)
+string regime = evPost and tfSec <= 3600 ? "post-event" : rngB >= c_expMult * atr ? "expansie" : rvP > c_highVol ? "hoge volatiliteit" : er < c_erChaos and rvP > 50 ? "chaotisch" : rvP < c_lowVol ? "lage volatiliteit" : rvP < c_compVol and er < c_erTrend ? "compressie" : er >= c_erTrend and (ctxUp or ctxDn) ? "trend" : "balans"
+bool regimeOK = regime == "compressie" or regime == "balans" or regime == "trend" or regime == "lage volatiliteit"
+float hhN = ta.highest(high, c_nMin)
+float llN = ta.lowest(low, c_nMin)
+
+var int    xSt = 0
+var float  xHi = na
+var float  xLo = na
+var int    xStartT = na
+var int    xStartB = na
+var int    xN = 0
+var int    xTop = 0
+var int    xBot = 0
+var int    xQuiet = 0
+var float  xsHi = na
+var float  xsLo = na
+var int    xsStartT = na
+var int    xsT = na
+var int    xsB = na
+var int    xsN = 0
+var string xId = ""
+var int    xDir = 0
+var int    xBB = na
+var int    xBT = na
+var int    xEndT = na
+var int    xOut = 0
+var int    xRes = 0
+var string xLast = "–"
+var int cK = 0
+var int cS = 0
+var int cB = 0
+var int cA = 0
+var int cF = 0
+var int cE = 0
+var int cBlk = 0
+var int xAccB = na
+var int xRetB = na
+var bool xRetW = false
+var string xWhy = ""
+var int xStPrev = 0
+var int xSealB = na
+var int xBrkB = na
+var int cZR = 0
+
+if barstate.isconfirmed and eCbOn and cboTF
+    // RETEST (0.2): alleen als retest verplicht of als alert gekozen is; anders loopt de ketting exact als CBO_0.1
+    if xSt == 6 and xRetW
+        bool tchd = xDir == 1 ? low <= xsHi + n_retTol * atr : high >= xsLo - n_retTol * atr
+        if xDir == 1 ? close < xsHi : close > xsLo
+            xSt := 9
+            xRes := -1
+            xRetW := false
+            xEndT := time
+            xWhy := "terug in de box tijdens retest"
+            xLast := "retest mislukt (terug in box) · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+        else if tchd
+            xSt := 7
+            xRetB := bar_index
+            xRetW := false
+            xLast := "retest " + (xDir == 1 ? "↑" : "↓") + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+        else if bar_index - xAccB > n_retMax
+            xSt := 10
+            xRes := 2
+            xRetW := false
+            xEndT := time
+            xWhy := "geen retest binnen " + str.tostring(n_retMax) + " bars"
+            xLast := "retest uitgebleven · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+    else if xSt <= 1 or xSt >= 6
+        if regimeOK and not evBlk and (hhN - llN) <= c_wMax * atr
+            xSt := 2
+            xHi := hhN
+            xLo := llN
+            xN := c_nMin
+            xStartT := time[c_nMin - 1]
+            xStartB := bar_index - c_nMin + 1
+            xTop := 0
+            xBot := 0
+            xQuiet := 0
+            float ww = hhN - llN
+            for i = 0 to c_nMin - 1
+                xTop += high[i] >= hhN - c_tol * ww ? 1 : 0
+                xBot += low[i] <= llN + c_tol * ww ? 1 : 0
+        else
+            xSt := evBlk ? 11 : regimeOK ? 1 : 0
+    else if xSt == 2 or xSt == 3
+        float nh = math.max(xHi, high)
+        float nl = math.min(xLo, low)
+        if evBlk
+            xSt := 11
+            cBlk += 1
+        else if (nh - nl) <= c_wMax * atr and xN < c_nMax
+            xQuiet := (high <= xHi and low >= xLo) ? xQuiet + 1 : 0
+            xHi := nh
+            xLo := nl
+            xN += 1
+            float w2 = xHi - xLo
+            xTop += high >= xHi - c_tol * w2 ? 1 : 0
+            xBot += low <= xLo + c_tol * w2 ? 1 : 0
+            if xSt == 2 and xTop >= c_tMin and xBot >= c_tMin
+                xSt := 3
+                cK += 1
+            if xSt == 3 and xQuiet >= c_nSeal
+                // Verzegeling: vanaf hier liggen de grenzen vast
+                xSt := 4
+                xSealB := bar_index
+                xsHi := xHi
+                xsLo := xLo
+                xsStartT := xStartT
+                xsT := time_close
+                xsB := bar_index
+                xsN := xN
+                xId := syminfo.ticker + ":" + timeframe.period + ":" + str.tostring(xStartT) + ":" + str.tostring(xsT)
+                xDir := 0
+                xRes := 0
+                xEndT := na
+                cS += 1
+        else
+            xSt := 1
+    else if xSt == 4 and evBlk
+        xSt := 11
+        cBlk += 1
+        xRes := 3
+        xEndT := time
+        xLast := "eventblokkade tijdens verzegelde box · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+    else if xSt == 4
+        bool up = close > xsHi
+        bool dn = close < xsLo
+        float body = math.abs(close - open)
+        float outB = up ? close - math.max(open, xsHi) : dn ? math.min(open, xsLo) - close : 0
+        if (up or dn) and body > 0 and outB / body >= c_body
+            xSt := 5
+            xBrkB := bar_index
+            xDir := up ? 1 : -1
+            xBB := bar_index
+            xBT := time
+            xOut := 1
+            cB += 1
+        else if bar_index - xsB > c_expiry * xsN
+            xSt := 10
+            xRes := 2
+            xEndT := time
+            cE += 1
+            xWhy := "geen breakout binnen " + str.tostring(c_expiry) + " × boxduur"
+            xLast := "verlopen zonder breakout · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+    else if xSt == 5
+        if xDir == 1 ? close < xsHi : close > xsLo
+            xSt := 9
+            xRes := -1
+            xEndT := time
+            cF += 1
+            xWhy := "close terug in de box na breakout"
+            xLast := "breakout " + (xDir == 1 ? "↑" : "↓") + " mislukt (terug in box) · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+        else
+            xOut += 1
+            if xOut >= c_accK
+                xSt := 6
+                xRes := 1
+                xEndT := time
+                xAccB := bar_index
+                xRetW := eCbRetM or eCbRetA
+                cA += 1
+                xLast := "acceptatie " + (xDir == 1 ? "↑" : "↓") + " · " + str.format_time(time, "dd/MM HH:mm", i_tz)
+                // OB-R: laatste tegencandle binnen de box, vóór de breakout-candle
+                int kr = na
+                for j = bar_index - xBB + 1 to bar_index - xStartB
+                    if xDir > 0 ? close[j] < open[j] : close[j] > open[j]
+                        kr := j
+                        break
+                if not na(kr) and (eObrT or eZLoc == "OB-R" or eZLoc == "Elk type")
+                    int rr = addZone("OB-R", "C", xDir, kr)
+                    cZR += rr == 1 ? 1 : 0
+                    cZx += rr == -1 ? 1 : 0
+
+// CBO-gebeurtenissen (0.2): sealed / breakout / retest, één keer per toestandswissel
+if barstate.isconfirmed and eCbOn and cboTF
+    if xSt != xStPrev and (xSt == 4 or xSt == 5 or xSt == 6 or xSt == 7 or xSt == 9 or xSt == 10)
+        emit(xSt == 4 ? "cbo_sealed" : xSt == 5 ? "cbo_breakout" : xSt == 6 ? "cbo_confirmed" : xSt == 7 ? "cbo_retest" : xSt == 9 ? "cbo_failed" : "cbo_expired", "{\"box_id\":\"" + xId + "\",\"state\":\"" + cboName(xSt) + "\",\"boven\":" + str.tostring(xsHi) + ",\"onder\":" + str.tostring(xsLo) + ",\"richting\":\"" + (xDir > 0 ? "long" : xDir < 0 ? "short" : "") + "\"}")
+    xStPrev := xSt
+
+// Box tekenen: de laatste verzegelde box (kleur = uitkomst) en een eventuele box die nu vormt (gestippeld)
+var box xBxS = na
+var box xBxF = na
+var label xLb = na
+if barstate.islast
+    xBxS.delete()
+    xBxF.delete()
+    xLb.delete()
+    bool boxNu = xSt == 4 or xSt == 5 or (xSt == 6 and xRetW) or (xRes == 1 and not na(xAccB) and bar_index - xAccB <= g_trigAge) or (xSt == 7 and bar_index - xRetB <= g_trigAge)
+    bool boxOud = eCbExpT and not na(xsT) and (xRes == -1 or xRes == 2 or xRes == 3) and not na(xEndT) and bar_index - xsB < 400
+    if eCbOn and cboTF
+        if not na(xsT) and ((boxNu and eCbT) or (not boxNu and boxOud))
+            color cc = xRes == 1 ? (xDir > 0 ? cBull : cBear) : xRes == -1 ? cAmb : t3c
+            int tEnd = xSt == 4 ? time : xSt == 5 ? time : nz(xEndT, time)
+            xBxS := box.new(xsStartT, xsHi, tEnd, xsLo, xloc = xloc.bar_time, border_color = color.new(cc, 30), border_width = 1, bgcolor = color.new(cc, 92))
+            string res = xSt == 4 ? "SEALED" : xSt == 5 ? "BREAKOUT " + (xDir > 0 ? "↑" : "↓") : xSt == 7 ? "RETEST " + (xDir > 0 ? "↑" : "↓") : xRes == 1 ? "BREAKOUT_CONFIRMED " + (xDir > 0 ? "↑" : "↓") : xRes == -1 ? "FAILED" : xRes == 3 ? "EVENT_BLOCK" : "EXPIRED"
+            xLb := label.new(time + 4 * tfSec * 1000, xsHi, "CBO · " + res, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 100), textcolor = cc, size = size.tiny, tooltip = "Box-ID " + xId + " · TF " + timeframe.period + " · " + str.tostring(xsN) + " bars · start " + str.format_time(xsStartT, "dd/MM HH:mm", i_tz) + " · verzegeld " + str.format_time(xsT, "dd/MM HH:mm", i_tz) + " · " + str.tostring(xsLo, format.mintick) + "–" + str.tostring(xsHi, format.mintick) + " · expiry na " + str.tostring(math.round(c_expiry * xsN)) + " bars" + (xWhy != "" and xRes != 1 ? " · reden: " + xWhy : "") + " · regels CBO_0.1 (+ retest in 0.2)")
+        else if (xSt == 2 or xSt == 3) and eCbFormT
+            xBxF := box.new(xStartT, xHi, time, xLo, xloc = xloc.bar_time, border_color = color.new(t3c, 40), border_style = line.style_dashed, border_width = 1, bgcolor = na)
+
+// ═══ 5c. Referenties (0.2): opens, vorige periodes, sessies en swinglevels — oorsprong, ID, tijdzone en status ═══
+// Status op close: 0 UNTOUCHED · 1 TESTED (binnen n_refTol × ATR, niet erdoor) · 2 SWEPT (wick erdoor, close terug) · 3 ACCEPTED (n_accK closes erdoor) · 4 EXPIRED
+type Ref
+    string id
+    string nm
+    float  p
+    int    t0
+    int    sd
+    int    st = 0
+    int    tx
+    int    acc = 0
+    bool   on = false
+refStName(int s) =>
+    s == 0 ? "UNTOUCHED" : s == 1 ? "TESTED" : s == 2 ? "SWEPT" : s == 3 ? "ACCEPTED" : "EXPIRED"
+var array<Ref> refs = array.new<Ref>()
+if barstate.isfirst
+    for nm in array.from("D Open", "W Open", "M Open", "Q Open", "Y Open", "PDH", "PDL", "PWH", "PWL", "PMH", "PML", "Asia H", "Asia L", "LO H", "LO L", "NY H", "NY L", "Swing H", "Swing L")
+        refs.push(Ref.new("", nm, na, na, 0))
+// Zet een referentie; een nieuwe prijs of oorsprong = nieuw niveau (status opnieuw)
+setRef(int i, float p, int t, bool on) =>
+    Ref r = refs.get(i)
+    if not na(p) and (p != r.p or t != r.t0)
+        r.p := p
+        r.t0 := t
+        r.sd := close < p ? 1 : -1
+        r.st := 0
+        r.acc := 0
+        r.tx := t
+        r.id := syminfo.ticker + "-" + timeframe.period + "-" + r.nm + "-" + str.format_time(t, "yyyyMMdd-HHmm", "UTC")
+    r.on := on and not na(r.p)
+// Vorige periode: high/low vanaf de wick-candle + open van de huidige periode
+perHL(string tf) =>
+    bool nw = timeframe.change(tf)
+    var float h = na
+    var int ht = na
+    var float l = na
+    var int lt = na
+    var float ph = na
+    var int pht = na
+    var float pl = na
+    var int plt = na
+    var float op = na
+    var int opt = na
+    if nw
+        ph := h
+        pht := ht
+        pl := l
+        plt := lt
+        h := high
+        ht := time
+        l := low
+        lt := time
+        op := open
+        opt := time
+    else
+        if na(h) or high > h
+            h := high
+            ht := time
+        if na(l) or low < l
+            l := low
+            lt := time
+    [ph, pht, pl, plt, op, opt]
+[pdH2, pdHt2, pdL2, pdLt2, dOp2, dOt2] = perHL("D")
+[pwH2, pwHt2, pwL2, pwLt2, wOp2, wOt2] = perHL("W")
+[pmH2, pmHt2, pmL2, pmLt2, mOp2, mOt2] = perHL("M")
+[pqH2, pqHt2, pqL2, pqLt2, qOp2, qOt2] = perHL("3M")
+[pyH2, pyHt2, pyL2, pyLt2, yOp2, yOt2] = perHL("12M")
+// Sessie-range: pas bruikbaar NA afloop van de sessie (geen lopende range als niveau); IANA-tijdzone = zomer/winter automatisch
+sesHL(string sess, string tz) =>
+    bool inS = not na(time(timeframe.period, sess, tz))
+    var float h = na
+    var float l = na
+    var int t0 = na
+    var float rh = na
+    var float rl = na
+    var int rt = na
+    if inS and not inS[1]
+        h := high
+        l := low
+        t0 := time
+    else if inS
+        h := math.max(h, high)
+        l := math.min(l, low)
+    if not inS and inS[1]
+        rh := h
+        rl := l
+        rt := t0
+    [rh, rl, rt, inS and not inS[1]]
+[asH2, asL2, asT2, asNew] = sesHL("0900-1500", "Asia/Tokyo")
+[loH2, loL2, loT2, loNew] = sesHL("0800-0900", "Europe/London")
+[nyH2, nyL2, nyT2, nyNew] = sesHL("0800-0900", "America/New_York")
+bool intra = tfS0 < 86400
+if barstate.isconfirmed
+    setRef(0, dOp2, dOt2, eRDO and intra)
+    setRef(1, wOp2, wOt2, eRWO and tfS0 < 604800)
+    setRef(2, mOp2, mOt2, eRMO)
+    setRef(3, qOp2, qOt2, eRQO)
+    setRef(4, yOp2, yOt2, eRYO)
+    setRef(5, pdH2, pdHt2, eRPD and intra)
+    setRef(6, pdL2, pdLt2, eRPD and intra)
+    setRef(7, pwH2, pwHt2, eRPW and tfS0 < 604800)
+    setRef(8, pwL2, pwLt2, eRPW and tfS0 < 604800)
+    setRef(9, pmH2, pmHt2, eRPM)
+    setRef(10, pmL2, pmLt2, eRPM)
+    setRef(11, asH2, asT2, eRAs and tfS0 <= 3600)
+    setRef(12, asL2, asT2, eRAs and tfS0 <= 3600)
+    setRef(13, loH2, loT2, eRLo and tfS0 <= 3600)
+    setRef(14, loL2, loT2, eRLo and tfS0 <= 3600)
+    setRef(15, nyH2, nyT2, eRNy and tfS0 <= 3600)
+    setRef(16, nyL2, nyT2, eRNy and tfS0 <= 3600)
+    setRef(17, na(lS.hi) or lS.hi.broken ? na : lS.hi.price, na(lS.hi) ? na : lS.hi.oTime, eRSw)
+    setRef(18, na(lS.lo) or lS.lo.broken ? na : lS.lo.price, na(lS.lo) ? na : lS.lo.oTime, eRSw)
+    // Sessieniveaus verlopen zodra een nieuwe sessie begint
+    if asNew
+        for i in array.from(11, 12)
+            refs.get(i).st := 4
+    if loNew
+        for i in array.from(13, 14)
+            refs.get(i).st := 4
+    if nyNew
+        for i in array.from(15, 16)
+            refs.get(i).st := 4
+    // Statussen bijwerken
+    float tolR = n_refTol * atr
+    for r in refs
+        if r.on and not na(r.p) and r.st < 3 and time > r.t0
+            bool thru = r.sd == 1 ? high > r.p : low < r.p
+            bool clBeyond = r.sd == 1 ? close > r.p : close < r.p
+            bool near = r.sd == 1 ? high >= r.p - tolR : low <= r.p + tolR
+            if clBeyond
+                r.acc += 1
+                if r.acc >= n_accK
+                    r.st := 3
+                    r.tx := time
+            else
+                r.acc := 0
+                if thru
+                    r.st := 2
+                    r.tx := time
+                else if near and r.st == 0
+                    r.st := 1
+                    r.tx := time
+
+dAtrV() =>
+    float a = ta.atr(14)
+    a[1]
+float dAtr = na
+if barstate.islast or eRoomM
+    dAtr := request.security(syminfo.tickerid, "D", dAtrV(), lookahead = barmerge.lookahead_on)
+
+// Weergave: maximaal eRMax niveaus (dichtstbij, binnen r_dist × daily ATR) + apart de dichtstbijzijnde swing high/low
+var array<line>   refLn = array.new<line>()
+var array<label>  refLb = array.new<label>()
+var array<string> refNm = array.new<string>()
+var array<float>  refPx = array.new<float>()
+if barstate.islast
+    for l in refLn
+        l.delete()
+    for b in refLb
+        b.delete()
+    refLn.clear()
+    refLb.clear()
+    refNm.clear()
+    refPx.clear()
+    bool fade = (pC ? u_rTaken == "Vervagen" : pF)
+    array<float> dist = array.new<float>()
+    array<int>   idx = array.new<int>()
+    for i = 0 to refs.size() - 1
+        Ref r = refs.get(i)
+        bool open2 = r.st <= 1
+        if i < 17 and r.on and not na(r.p) and (open2 or (fade and r.st <= 3)) and (na(dAtr) or math.abs(r.p - close) <= r_dist * dAtr)
+            dist.push(math.abs(r.p - close) + (open2 ? 0 : 1e9))
+            idx.push(i)
+    for i in array.from(17, 18)
+        Ref r = refs.get(i)
+        if r.on and not na(r.p) and r.st <= 1
+            dist.push(-1)
+            idx.push(i)
+    int railT = time + u_rProj * tfS0 * 1000
+    if idx.size() > 0
+        array<int> ord = dist.sort_indices()
+        int shown = 0
+        for k = 0 to ord.size() - 1
+            int i = idx.get(ord.get(k))
+            bool isSw = i >= 17
+            if isSw or shown < eRMax
+                Ref r = refs.get(i)
+                bool taken = r.st >= 2
+                color lc = isSw ? color.new(t3c, 30) : taken ? color.new(t3c, 60) : color.new(t2c, 25)
+                refLn.push(line.new(r.t0, r.p, taken ? r.tx : railT, r.p, xloc = xloc.bar_time, color = lc, style = isSw ? line.style_dashed : taken ? line.style_dotted : line.style_solid, width = 1))
+                if (pC ? u_rLbl : true)
+                    refLb.push(label.new(railT, r.p, r.nm + (r.st == 0 ? "" : " · " + refStName(r.st)), xloc = xloc.bar_time, style = label.style_label_left, color = color.new(t3c, 100), textcolor = taken ? t3c : t2c, size = size.tiny, tooltip = r.id + " · " + str.tostring(r.p, format.mintick) + " · " + refStName(r.st) + " · oorsprong " + str.format_time(r.t0, "dd/MM HH:mm", i_tz) + " (" + i_tz + ")"))
+                if not isSw
+                    shown += 1
+                if not taken
+                    refNm.push(r.nm)
+                    refPx.push(r.p)
+
+// Eerste niet-geraakte (UNTOUCHED/TESTED) actieve referentie in richting d vanaf prijs p
+firstRef(int d, float p) =>
+    float best = na
+    string bn = ""
+    for r in refs
+        if r.on and not na(r.p) and r.st <= 1 and (d == 1 ? r.p > p : r.p < p) and (na(best) or math.abs(r.p - p) < math.abs(best - p))
+            best := r.p
+            bn := r.nm
+    [best, bn]
+
+// ═══ 5d. Filtermotor en setupstatus (decision support, geen order) ═══
+// De gebruiker kiest per module wat meetelt (preset of CUSTOM). Waarde per filter: 1 ✓ · 2 ~ (bekend, laat door) · 0 ? (ontbreekt) · −1 ✕
+// Regels: onbekend telt nooit als geslaagd; een verborgen filter dat meetelt staat altijd op de kaart; CONFIRMED alleen als ALLE meetellende filters ✓/~ zijn.
+// Richting d: Bias 5.0 als die meetelt; anders Bias als die een richting heeft; anders de bevestigde swingrichting (confDir, stage ≥ 2)
+int    md = eMacroM ? mdBar : mdBar != 0 ? mdBar : lS.cdir
+string dirBron = eMacroM ? "Bias 5.0 (telt mee)" : mdBar != 0 ? "Bias 5.0 (alleen info)" : "swingstructuur (confDir)"
+int    ctxDir = cxDir
+int    ctxStg = cxStg
+string ctxNm = ctxTF2 == "60" ? "1H" : ctxTF2 == "240" ? "4H" : ctxTF2
+// Laatste bevestigde gebeurtenis per richting (bar_index en tijd), alleen op gesloten candles
+var int swBullB = na
+var int swBearB = na
+var int swBullT = na
+var int swBearT = na
+var int tBosL = na
+var int tBosS = na
+var int tChL = na
+var int tChS = na
+var int tAccL = na
+var int tAccS = na
+var int tAbsL = na
+var int tAbsS = na
+if barstate.isconfirmed
+    if wS == 1 or wI == 1
+        swBullB := bar_index
+        swBullT := time
+    if wS == -1 or wI == -1
+        swBearB := bar_index
+        swBearT := time
+    for [k, ty] in evTyp
+        bool lng = str.contains(evJs.get(k), "\"richting\":\"long\"")
+        if ty == "bos"
+            if lng
+                tBosL := bar_index
+            else
+                tBosS := bar_index
+        if ty == "choch"
+            if lng
+                tChL := bar_index
+            else
+                tChS := bar_index
+        if ty == "acceptance"
+            if lng
+                tAccL := bar_index
+            else
+                tAccS := bar_index
+        if ty == "absorption_proxy"
+            if lng
+                tAbsL := bar_index
+            else
+                tAbsS := bar_index
+ageOf(int b) =>
+    na(b) ? na : bar_index - b
+recentB(int b) =>
+    not na(b) and bar_index - b <= g_trigAge
+pickD(int d, int bl, int bs) =>
+    d == 1 ? bl : d == -1 ? bs : na
+int vData  = not na(pIdxBar) ? 1 : 0
+int vMacro = na(pIdxBar) ? 0 : mdBar != 0 ? 1 : -1
+int vEvent = evBlk ? -1 : na(evNext) ? 0 : 1
+int vHtf   = na(ctxDir) or md == 0 ? 0 : ctxDir == md ? 1 : ctxDir == -md ? -1 : 2
+float pdNow = pdOf(lS)
+int vPd    = md == 0 or na(pdNow) ? 0 : (md == 1 ? pdNow <= 50 : pdNow >= 50) ? 1 : -1
+zLocType(string k) =>
+    eZLoc == "Elk type" or k == eZLoc
+bool inZoneD = false
+for z in zones
+    if md != 0 and z.dir == md and z.st >= 1 and z.st <= 3 and zLocType(z.kind) and low <= z.top and high >= z.bot
+        inZoneD := true
+int vZone  = md == 0 ? 0 : inZoneD ? 1 : -1
+int chB    = pickD(md, tChL, tChS)
+int vChoch = md == 0 ? 0 : not na(chB) and bar_index - chB <= n_chAge ? 1 : 0
+// CBO als trigger: acceptatie (of retest als die verplicht is) in richting d, binnen g_trigAge bars
+bool accRecent = xRes == 1 and not na(xAccB) and bar_index - xAccB <= g_trigAge
+bool retRecent = xSt == 7 and not na(xRetB) and bar_index - xRetB <= g_trigAge
+bool accD = md != 0 and xDir == md and (eCbRetM ? retRecent : accRecent or retRecent)
+bool boxD = xSt == 4 or (xSt == 5 and xDir == md) or (xSt == 6 and xRetW and xDir == md) or accD
+bool against = md != 0 and xDir == -md and (xSt == 5 or accRecent or retRecent)
+int vCbo   = not cboTF or md == 0 ? 0 : accD ? 1 : against ? -1 : 0
+int bosB = pickD(md, tBosL, tBosS)
+int swB  = pickD(md, swBullB, swBearB)
+int accB = pickD(md, tAccL, tAccS)
+int absB = pickD(md, tAbsL, tAbsS)
+int vBos   = recentB(bosB) ? 1 : 0
+int vSwp   = recentB(swB) ? 1 : 0
+int vAcc   = recentB(accB) ? 1 : 0
+int vAbs   = recentB(absB) ? 1 : 0
+int swAgo  = ageOf(swB)
+// Stop: CBO telt mee → overkant van de actuele box ± buffer; anders het tegenoverliggende bevestigde swingniveau ± buffer
+bool boxLive = xSt == 4 or xSt == 5 or (xSt == 6 and xRetW) or accRecent or retRecent
+float stopP = md == 0 ? na : eCbM ? (na(xsHi) or not boxLive ? na : md == 1 ? xsLo - g_stopBuf * atr : xsHi + g_stopBuf * atr) : md == 1 ? (na(lS.lo) ? na : lS.lo.price - g_stopBuf * atr) : (na(lS.hi) ? na : lS.hi.price + g_stopBuf * atr)
+[frD, frDn] = firstRef(md == 0 ? 1 : md, close)
+float riskP = na(stopP) ? na : math.abs(close - stopP)
+float roomR = na(frD) or na(riskP) or riskP == 0 ? na : math.abs(frD - close) / riskP
+int vRoom  = na(roomR) ? 0 : roomR >= g_minRoom ? 1 : -1
+// Filterlijst · soort: B = blokkeert bij ✕ · F = voorwaarde · T = trigger (moet op of vlak vóór de bar afgaan)
+var array<string> fNm  = array.from("Bias", "Events", "HTF", "PD", "Zone", "CHoCH", "Ruimte", "CBO", "BoS", "Sweep", "Acceptance", "ABS-PROXY")
+var array<string> fKey = array.from("macro", "events", "htf", "pd", "zone", "choch", "ruimte", "cbo", "bos", "sweep", "acceptance", "absorption_proxy")
+var array<string> fKind = array.from("B", "B", "B", "F", "F", "F", "F", "T", "T", "T", "T", "T")
+array<bool> fM = array.from(eMacroM, eEvM, eHtfM, ePdM, eZLoc != "Uit", eChM, eRoomM, eCbM, eBosM, eSwpM, eAccM, eAbsM)
+array<bool> fT = array.from(eMacroT, eEvT, i_mode == "Expanded", ePdT, eObpT or eObfT or eObrT or eFvgT, eChT, eRMax > 0, eCbT or eCbFormT, eBosT, eSwpT, eAccT, eAbsT)
+array<int>  fV = array.from(vMacro, vEvent, vHtf, vPd, vZone, vChoch, vRoom, vCbo, vBos, vSwp, vAcc, vAbs)
+bool anyTrig = false
+bool trigOk = true
+bool filtOk = true
+bool blocked = false
+int  lastTrigB = na
+for [i, nm] in fNm
+    if fM.get(i)
+        int v = fV.get(i)
+        if fKind.get(i) == "T"
+            anyTrig := true
+            trigOk := trigOk and v == 1
+        else
+            filtOk := filtOk and (v == 1 or v == 2)
+            blocked := blocked or (fKind.get(i) == "B" and v == -1)
+int tCbo = accD ? (eCbRetM ? xRetB : (retRecent ? xRetB : xAccB)) : na
+for [i, b] in array.from(tCbo, bosB, swB, accB, absB)
+    if fM.get(7 + i) and not na(b)
+        lastTrigB := na(lastTrigB) ? b : math.max(lastTrigB, b)
+// 0 N.V.T. (CBO telt mee maar bestaat niet op deze TF) · 1 UNKNOWN (Bias telt mee, geen geldige data) · 2 BLOCKED · 3 WATCH · 4 ARMED · 5 CONFIRMED
+// ARMED = alle voorwaarden ✓ (bij CBO: plus een actuele box); zonder meetellende trigger komt de status nooit verder dan ARMED
+int gs = eCbM and not cboTF ? 0 : eMacroM and vData != 1 ? 1 : blocked ? 2 : md == 0 ? 3 : filtOk and anyTrig and trigOk ? 5 : filtOk and (not eCbM or boxD) ? 4 : 3
+// Setup-sleutel: één setup per box (CBO) of per triggermoment (andere triggers)
+int    tOff = na(lastTrigB) ? 0 : math.min(bar_index - lastTrigB, 50)
+int    trigT = time[tOff]
+string trigKey = eCbM ? xId : na(lastTrigB) ? "" : syminfo.ticker + "-" + timeframe.period + "-TRG-" + str.format_time(trigT, "yyyyMMdd-HHmm", "UTC") + (md == 1 ? "-L" : "-S")
+// 0 N.V.T. · 1 UNKNOWN · 2 BLOCKED · 3 WATCH · 4 ARMED · 5 CONFIRMED · 6 ACTIVE · 7 FAILED · 8 DOEL · 9 EXPIRED
+setupName(int s) =>
+    switch s
+        0 => "N.V.T."
+        1 => "UNKNOWN"
+        2 => "BLOCKED"
+        3 => "WATCH"
+        4 => "ARMED"
+        5 => "CONFIRMED"
+        6 => "ACTIVE"
+        7 => "FAILED"
+        8 => "DOEL GERAAKT"
+        9 => "EXPIRED"
+        => "?"
+
+// Setup volgen na CONFIRMED (één per box): instap = close, stop = overkant box ± buffer, doel = eerste referentie
+var int    sSt = 0
+var float  sE = na
+var float  sS = na
+var float  sT = na
+var int    sB = na
+var int    sDir = 0
+var int    sEndB = na
+var string sId = ""
+var string sTgtN = ""
+var int cConf = 0
+var int cFail = 0
+var int cDoel = 0
+var int cExp = 0
+// Forwardmeting STR_0.1-F: alleen box én CONFIRMED ná de start, alleen met bevroren parameters
+const string FWD_VERSIE = "STR_0.2"
+const string TPL_SHA = "{{TPL_SHA}}"
+// STR_0.2 is NIET bevroren: geen forwardstart (besluit Bas). Ver in de toekomst = er telt nooit iets mee.
+int FWD_START = timestamp("UTC", 2100, 1, 1, 0, 0)
+// STR_0.2 is niet bevroren: nooit forward (de bevroren STR_0.1-F-parameters gelden hier niet)
+bool fwdFrozen = false
+var bool  sFwd = false
+var int    sConfT = na
+var float  sBiasIdx = na
+var int    sBiasAt = na
+var string sZoneId = ""
+var string sSweepId = ""
+var string sStrId = ""
+var float  sMfe = 0.0
+var float  sMae = 0.0
+var float  sLastR = na
+var string sRegime = ""
+var int   fN = 0
+var int   fW = 0
+var float fSum = 0.0
+var int   fOpen = 0
+// Retrospectief (geen bewijs): R van alle afgeronde setups in de geladen historie
+var int   rN = 0
+var float rSum = 0.0
+// Laatst gesloten candle: status en poorten (geen tussenstanden van een lopende candle)
+var int cs = 0
+var int csPrev = 0
+var array<int> cV = array.new_int(12, 0)
+var float cPd = na
+var float cRoom = na
+var int cSwAgo = na
+if barstate.isconfirmed
+    if sSt == 6
+        bool hitS = sDir == 1 ? low <= sS : high >= sS
+        bool hitT = not na(sT) and (sDir == 1 ? high >= sT : low <= sT)
+        float risk = math.abs(sE - sS)
+        if risk > 0
+            sMfe := math.max(sMfe, (sDir == 1 ? high - sE : sE - low) / risk)
+            sMae := math.max(sMae, (sDir == 1 ? sE - low : high - sE) / risk)
+        float rr = na
+        if hitS
+            sSt := 7
+            sEndB := bar_index
+            cFail += 1
+            rr := -1.0
+        else if hitT
+            sSt := 8
+            sEndB := bar_index
+            cDoel += 1
+            rr := risk > 0 ? math.abs(sT - sE) / risk : 0.0
+        else if bar_index - sB >= g_tMax
+            sSt := 9
+            sEndB := bar_index
+            cExp += 1
+            rr := risk > 0 ? (close - sE) * sDir / risk : 0.0
+        if not na(rr)
+            sLastR := rr
+            rN += 1
+            rSum += rr
+            if sFwd
+                fN += 1
+                fW += rr > 0 ? 1 : 0
+                fSum += rr
+                fOpen := 0
+    else if gs == 5 and trigKey != "" and sId != trigKey
+        sSt := 6
+        sE := close
+        sS := stopP
+        sT := frD
+        sTgtN := frDn
+        sB := bar_index
+        sDir := md
+        sId := trigKey
+        cConf += 1
+        sFwd := fwdFrozen and time_close >= FWD_START and xsT >= FWD_START
+        sConfT := time_close
+        sBiasIdx := pIdxBar
+        sBiasAt := bp >= 0 ? bpT.get(bp) : na
+        Zone zc = na
+        float zd = na
+        for z in zones
+            if z.st >= 1 and z.st <= 3 and z.dir == md and (na(zd) or math.abs(close - (z.top + z.bot) / 2) < zd)
+                zd := math.abs(close - (z.top + z.bot) / 2)
+                zc := z
+        sZoneId := na(zc) ? "" : zc.id
+        int swT = md == 1 ? swBullT : swBearT
+        sSweepId := na(swT) ? "" : syminfo.ticker + "-" + timeframe.period + "-SW-" + str.format_time(swT, "yyyyMMdd-HHmm", "UTC") + (md == 1 ? "-L" : "-S")
+        sStrId := na(lS.lastEvTime) ? "" : syminfo.ticker + "-" + timeframe.period + "-S-" + str.format_time(lS.lastEvTime, "yyyyMMdd-HHmm", "UTC")
+        sMfe := 0.0
+        sMae := 0.0
+        sLastR := na
+        sRegime := regime
+        fOpen := sFwd ? 1 : 0
+    csPrev := cs
+    cs := sSt == 6 ? (sB == bar_index ? 5 : 6) : sSt >= 7 and bar_index - sEndB <= 10 ? sSt : gs
+    for [i, v] in fV
+        cV.set(i, v)
+    cPd := pdNow
+    cRoom := roomR
+    cSwAgo := swAgo
+
+// ═══ 5e. Vooraf vastgelegde varianten (STR_0.1-F; gestandaardiseerde uitkomst, alleen forward telt) ═══
+// V1 CBO (elke acceptatie) · V2 Bias (eerste bar van een nieuwe forward-biasdag met |index| ≥ 15) · V3 Structure (elke swingbreak)
+// V4 Bias+CBO (acceptatie in biasrichting) · V5 Bias+Structure+CBO (V4 én context-TF niet tegen én swing = bias) · V6 Volledig (CONFIRMED)
+// Gelijke exit voor alle varianten: instap = close, stop = 1 ATR, doel = 1,5 R, verval na g_tMax bars; stop eerst bij gelijktijdige raak.
+const float STD_TGT = 1.5
+var array<float> mE = array.new_float()
+var array<float> mR = array.new_float()
+var array<int>   mD = array.new_int()
+var array<int>   mB = array.new_int()
+var array<int>   mMask = array.new_int()
+var array<bool>  mF = array.new_bool()
+var array<float> mMfe = array.new_float()
+var array<float> mMae = array.new_float()
+var array<string> mTyp = array.new_string()
+var array<int>   mT0 = array.new_int()
+var array<int>   vN = array.new_int(6, 0)
+var array<int>   vW = array.new_int(6, 0)
+var array<float> vSum = array.new_float(6, 0)
+var array<float> vMfe = array.new_float(6, 0)
+var array<float> vMae = array.new_float(6, 0)
+var int bpPrev = -1
+var array<string> kTyp = array.new_string()
+var array<int>    kDir = array.new_int()
+var array<int>    kMask = array.new_int()
+var array<string> uLog = array.new_string()
+openStd(int d, int mask, bool fwd, string typ) =>
+    if d != 0 and mask != 0 and atr > 0
+        mTyp.push(typ)
+        mT0.push(time_close)
+        mE.push(close)
+        mR.push(atr)
+        mD.push(d)
+        mB.push(bar_index)
+        mMask.push(mask)
+        mF.push(fwd)
+        mMfe.push(0.0)
+        mMae.push(0.0)
+if barstate.isconfirmed
+    // Lopende gestandaardiseerde metingen bijwerken (achterwaarts, zodat verwijderen veilig is)
+    uLog.clear()
+    if mE.size() > 0
+        for k = mE.size() - 1 to 0
+            float e = mE.get(k)
+            float rk = mR.get(k)
+            int d = mD.get(k)
+            mMfe.set(k, math.max(mMfe.get(k), (d == 1 ? high - e : e - low) / rk))
+            mMae.set(k, math.max(mMae.get(k), (d == 1 ? e - low : high - e) / rk))
+            bool hs = d == 1 ? low <= e - rk : high >= e + rk
+            bool ht = d == 1 ? high >= e + STD_TGT * rk : low <= e - STD_TGT * rk
+            float rr = hs ? -1.0 : ht ? STD_TGT : bar_index - mB.get(k) >= g_tMax ? (close - e) * d / rk : na
+            if not na(rr)
+                if mF.get(k)
+                    uLog.push("{\"type\":\"" + mTyp.get(k) + "\",\"start\":\"" + str.format_time(mT0.get(k), "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") + "\",\"richting\":\"" + (d == 1 ? "long" : "short") + "\",\"varianten\":" + str.tostring(mMask.get(k)) + ",\"risk\":" + str.tostring(rk, "#.########") + ",\"r\":" + str.tostring(rr, "#.####") + ",\"mfe_r\":" + str.tostring(mMfe.get(k), "#.####") + ",\"mae_r\":" + str.tostring(mMae.get(k), "#.####") + "}")
+                    for v = 0 to 5
+                        if math.floor(mMask.get(k) / math.pow(2, v)) % 2 == 1
+                            vN.set(v, vN.get(v) + 1)
+                            vW.set(v, vW.get(v) + (rr > 0 ? 1 : 0))
+                            vSum.set(v, vSum.get(v) + rr)
+                            vMfe.set(v, vMfe.get(v) + mMfe.get(k))
+                            vMae.set(v, vMae.get(v) + mMae.get(k))
+                mE.remove(k)
+                mR.remove(k)
+                mD.remove(k)
+                mB.remove(k)
+                mMask.remove(k)
+                mF.remove(k)
+                mMfe.remove(k)
+                mMae.remove(k)
+                mTyp.remove(k)
+                mT0.remove(k)
+    // Nieuwe kandidaten van deze bar (ook voor het logboek)
+    kTyp.clear()
+    kDir.clear()
+    kMask.clear()
+    bool fwdBar = fwdFrozen and time_close >= FWD_START
+    if xSt == 6 and xAccB == bar_index
+        int mk = 1
+        if md != 0 and xDir == md
+            mk += 8
+            if vHtf >= 1 and lS.dir == md
+                mk += 16
+        openStd(xDir, mk, fwdBar and xsT >= FWD_START, "cbo_acceptatie")
+        kTyp.push("cbo_acceptatie")
+        kDir.push(xDir)
+        kMask.push(mk)
+    if bS != 0
+        openStd(bS > 0 ? 1 : -1, 4, fwdBar, "swingbreak")
+        kTyp.push("swingbreak")
+        kDir.push(bS > 0 ? 1 : -1)
+        kMask.push(4)
+    if bp != bpPrev and bp >= 0 and mdBar != 0
+        openStd(mdBar, 2, fwdBar, "nieuwe_biasdag")
+        kTyp.push("nieuwe_biasdag")
+        kDir.push(mdBar)
+        kMask.push(2)
+    bpPrev := bp
+    if sSt == 6 and sB == bar_index
+        openStd(sDir, 32, sFwd, "confirmed")
+        kTyp.push("confirmed")
+        kDir.push(sDir)
+        kMask.push(32)
+
+// Zichtbaarheid (0.2): per type aan/uit, per status (untouched/getest/gedeeltelijk), gebruikte zones verbergen of vervagen; max eZMax dichtstbij
+zTypeOn(string k) =>
+    k == "OB-P" ? eObpT : k == "OB-F" ? eObfT : k == "OB-R" ? eObrT : k == "FVG" ? eFvgT : false
+zStOn(int st) =>
+    st == 1 ? eZUnt : st == 2 ? eZTes : st == 3 ? eZPar : false
+var array<Zone> zShown = array.new<Zone>()
+if barstate.islast
+    zShown.clear()
+    for z in zones
+        z.vis := false
+    array<float> dist = array.new<float>()
+    array<Zone> cand = array.new<Zone>()
+    for z in zones
+        if zTypeOn(z.kind) and zStOn(z.st)
+            cand.push(z)
+            dist.push(math.abs(close - (z.top + z.bot) / 2))
+    if cand.size() > 0 and eZMax > 0
+        array<int> ord = dist.sort_indices()
+        for k = 0 to math.min(eZMax, ord.size()) - 1
+            Zone zz = cand.get(ord.get(k))
+            zz.vis := true
+            zShown.push(zz)
+    for z in zones
+        if z.st < 5
+            color c = z.dir > 0 ? cBull : cBear
+            bool vis = z.vis
+            bool faded = eZFade and z.st == 4 and zTypeOn(z.kind)
+            z.bx.set_bgcolor(vis ? color.new(c, 86) : faded ? color.new(c, 95) : na)
+            z.bx.set_border_color(vis ? color.new(c, 50) : faded ? color.new(c, 85) : na)
+            z.bx.set_text(vis or faded ? z.kind + " · " + stName(z.st) : "")
+            z.bx.set_text_color(vis ? color.new(c, 20) : color.new(c, 70))
+
+// ═══ 6. Equilibrium van de swingrange ═══════════════════════════
+var line eqL = na
+var label eqLb = na
+if barstate.islast
+    eqL.delete()
+    eqLb.delete()
+    if i_eq and not na(lS.tTop) and not na(lS.tBot) and not na(lS.hi) and not na(lS.lo) and lS.tTop > lS.tBot
+        float eq = (lS.tTop + lS.tBot) / 2
+        eqL := line.new(math.min(lS.hi.oTime, lS.lo.oTime), eq, time, eq, xloc = xloc.bar_time, color = color.new(t3c, 40), style = line.style_dotted, width = 1)
+        eqLb := label.new(time + 4 * tfSec * 1000, eq, "EQ 50%", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(t3c, 100), textcolor = t3c, size = size.tiny)
+
+// ═══ 7. Kaart (Minimal · Compact · Expanded) ════════════════════
+var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 30, bgcolor = dark ? #131722 : #FFFFFF, border_width = 0, frame_width = 0)
+row2(int r, string a, string b, color ca, color cbb, string tip = "", string sz = size.small) =>
+    tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+    tb.cell(1, r, b, text_color = cbb, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+row1(int r, string a, color ca, string tip = "", string sz = size.small) =>
+    tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
+    tb.merge_cells(0, r, 1, r)
+gTxt(int g) =>
+    g == 1 ? "✓" : g == -1 ? "✕" : g == 2 ? "~" : "?"
+dirTxt(int d) =>
+    d == 1 ? "Bullish" : d == -1 ? "Bearish" : "Neutraal"
+stgTxt(int g) =>
+    g == 1 ? "mogelijke shift" : g == 2 ? "shift bevestigd" : g == 3 ? "continuation" : g == 4 ? "verzwakt" : "geen structuur"
+pdTxt(float p) =>
+    na(p) ? "–" : (p > 55 ? "premium " : p < 45 ? "discount " : "equilibrium ") + str.tostring(p, "0") + "%"
+dirCol(int d) =>
+    d == 1 ? cBull : d == -1 ? cBear : t2c
+lvlTxt(Lvl s) =>
+    dirTxt(s.dir) + " · " + stgTxt(s.stage) + (s.lastEv != "" ? " · " + s.lastEv + " " + str.format_time(s.lastEvTime, "dd/MM HH:mm", i_tz) : "")
+cut(string s, int n) =>
+    str.length(s) > n ? str.substring(s, 0, n - 1) + "…" : s
+sideTxt(int d) =>
+    d == 1 ? "LONG" : d == -1 ? "SHORT" : "GEEN RICHTING"
+// Dichtstbijzijnde actieve zone in richting d (of in elke richting bij d = 0)
+nearZone(int d) =>
+    Zone best = na
+    float bd = na
+    for z in zones
+        if z.st >= 1 and z.st <= 3 and (d == 0 or z.dir == d)
+            float dd = math.abs(close - (z.top + z.bot) / 2)
+            if na(bd) or dd < bd
+                bd := dd
+                best := z
+    best
+
+const string TIP_STG = "Mogelijke shift = eerste break tegen de richting (CHoCH) · shift bevestigd = eerste BoS daarna · continuation = volgende BoS · verzwakt = sweep aan de trendzijde. Filters gebruiken alleen de bevestigde richting (stage ≥ 2)."
+const string TIP_GATE = "✓ geslaagd · ✕ mislukt · ~ bekend, laat door · ? ontbreekt (telt nooit als geslaagd) · ○ alleen zichtbaar · – uit · * verborgen maar telt mee."
+tma(bool t, bool m, bool a) =>
+    string x = (t ? "T" : "") + (m ? "M" : "") + (a ? "A" : "")
+    x == "" ? "–" : x
+fSym(int i) =>
+    fM.get(i) ? gTxt(cV.get(i)) : fT.get(i) ? "○" : "–"
+if barstate.islast
+    tb.clear(0, 0, 1, 29)
+    int r = 0
+    if i_spacer > 0 and (i_pos == "Rechtsboven" or i_pos == "Linksboven")
+        for k = 0 to i_spacer - 1
+            tb.cell(0, r, " ", text_size = size.small)
+            r += 1
+    // Gedeelde teksten (status en filters van de laatst gesloten candle)
+    string ev2 = evBlk ? "BLOK actief" : na(evNext) ? "geen event in agenda — dekking onbekend" : "vrij · " + evNext.ccy + " " + cut(evNext.name, 28) + " " + str.format_time(evNext.t, "EEE HH:mm", i_tz) + " (over " + str.tostring(math.round((evNext.t - timenow) / 3600000)) + "u)"
+    string bDayBar = bp >= 0 ? str.format_time(bpT.get(bp), "dd/MM HH:mm", i_tz) : "–"
+    // Uitleg per filter (zelfde volgorde als fNm)
+    array<string> fWhy = array.new<string>()
+    fWhy.push(cV.get(0) == 1 ? str.lower(sideTxt(mdBar)) + " · index " + str.tostring(pIdxBar, "+0.0;-0.0") + " · geldig sinds " + bDayBar : bp < 0 ? "geen geldige forward-bias" : na(pIdxBar) ? "forward-bias ouder dan 96 u (" + bDayBar + ")" : "geen richting · index " + str.tostring(pIdxBar, "+0.0;-0.0") + " (drempel ±15)")
+    fWhy.push(ev2)
+    fWhy.push(na(ctxDir) ? ctxNm + " onbekend" : ctxNm + " " + str.lower(dirTxt(ctxDir)) + " · " + stgTxt(ctxStg))
+    fWhy.push(md == 0 ? "geen richting" : pdTxt(cPd) + (md == 1 ? " (long: ≤ 50%)" : " (short: ≥ 50%)"))
+    fWhy.push(eZLoc == "Uit" ? "zone telt niet mee" : (cV.get(4) == 1 ? "in " : "niet in ") + (eZLoc == "Elk type" ? "een" : eZLoc) + "-zone in richting")
+    fWhy.push(cV.get(5) == 1 ? "CHoCH in richting binnen " + str.tostring(n_chAge) + " bars" : "geen recente CHoCH in richting")
+    fWhy.push(na(cRoom) ? (na(stopP) ? "geen stopniveau" : "geen ongeraakte referentie") : str.tostring(cRoom, "0.0") + "R tot " + frDn + " (min " + str.tostring(g_minRoom, "0.0") + "R)")
+    fWhy.push(not cboTF ? "CBO niet op " + timeframe.period : cboName(xSt) + (cV.get(7) == 1 ? " in richting" : cV.get(7) == -1 ? " — tegen de richting" : xSt == 4 ? " — wacht op uitbraak" : xSt == 5 ? " — wacht op bevestiging" : ""))
+    fWhy.push(cV.get(8) == 1 ? "BoS " + str.tostring(ageOf(bosB)) + " bars geleden" : "geen recente BoS in richting")
+    fWhy.push(cV.get(9) == 1 ? "sweep " + str.tostring(cSwAgo) + " bars geleden" : "geen recente sweep in richting")
+    fWhy.push(cV.get(10) == 1 ? "acceptance " + str.tostring(ageOf(accB)) + " bars geleden" : "geen recente acceptance")
+    fWhy.push(cV.get(11) == 1 ? "ABSORPTION-PROXY " + str.tostring(ageOf(absB)) + " bars geleden (prijsproxy)" : "geen recente ABSORPTION-PROXY")
+    string actL = ""
+    string allL = ""
+    string okL = ""
+    string badL = ""
+    string waitF = ""
+    string waitT = ""
+    string blkW = ""
+    for [i, nm] in fNm
+        string sy = fSym(i)
+        allL += (i > 0 ? " · " : "") + nm + " " + sy
+        if fM.get(i)
+            int v = cV.get(i)
+            actL += (actL == "" ? "" : " · ") + nm + (fT.get(i) ? "" : "*") + " " + sy
+            if v == 1 or v == 2
+                okL += (okL == "" ? "" : " · ") + nm + ": " + fWhy.get(i)
+            else
+                badL += (badL == "" ? "" : " · ") + nm + " " + sy + ": " + fWhy.get(i)
+                if fKind.get(i) == "T"
+                    waitT += (waitT == "" ? "" : " of ") + nm
+                else
+                    waitF += (waitF == "" ? "" : ", ") + nm + " " + sy
+                if fKind.get(i) == "B" and v == -1 and blkW == ""
+                    blkW := nm + ": " + fWhy.get(i)
+    string nxt = cs == 0 ? "CBO telt mee maar bestaat niet op " + timeframe.period + " — kies CUSTOM zonder CBO-trigger" : cs == 1 ? "wacht op actuele Bias 5.0 (" + fWhy.get(0) + ")" : cs == 2 ? "geen nieuwe setup — " + blkW : cs == 3 ? (md == 0 ? "geen richting (Bias en structuur neutraal)" : waitF != "" ? "wacht op: " + waitF : "wacht op een actuele CBO-box") : cs == 4 ? (not anyTrig ? "geen trigger gekozen — maximaal ARMED" : eCbM and xSt == 4 ? "wacht op uitbraak " + (md == 1 ? "boven " + str.tostring(xsHi, format.mintick) : "onder " + str.tostring(xsLo, format.mintick)) : eCbM and xSt == 5 ? "wacht op bevestiging buiten de box" : "wacht op trigger: " + waitT) : cs == 5 ? "alle meetellende filters ✓ — handmatige beoordeling, geen order" : cs == 6 ? "instap " + str.tostring(sE, format.mintick) + " · stop " + str.tostring(sS, format.mintick) + " · doel " + (na(sT) ? "–" : sTgtN + " " + str.tostring(sT, format.mintick)) : cs == 7 ? "stop geraakt" : cs == 8 ? "doel " + sTgtN + " geraakt" : "verlopen zonder doel of stop"
+    color sc = cs == 5 or cs == 6 or cs == 8 ? (sDir != 0 and cs != 5 ? (sDir > 0 ? cBull : cBear) : (md > 0 ? cBull : cBear)) : cs == 4 or cs == 2 or cs == 7 ? cAmb : cs == 3 ? t1c : t3c
+    string why1 = cs == 2 ? str.substring(blkW, 0, math.max(0, str.pos(blkW, ":"))) + " ✕" : cs == 1 ? "data onbekend" : cs == 3 ? (md == 0 ? "geen richting" : "filters open") : cs == 4 ? (anyTrig ? "wacht op trigger" : "geen trigger gekozen") : cs >= 5 ? "filters ✓" : ""
+    Zone zN = nearZone(md)
+    string zTxt = na(zN) ? "geen actieve zone" + (md != 0 ? " in " + str.lower(sideTxt(md)) + "-richting" : "") : zN.kind + " " + str.tostring(zN.bot, format.mintick) + "–" + str.tostring(zN.top, format.mintick) + " (" + str.lower(stName(zN.st)) + ")"
+    string refTxt = refNm.size() == 0 ? "" : refNm.get(0) + " " + str.tostring((refPx.get(0) - close) / atr, "+0.0;-0.0") + " ATR"
+    string trigTxt = not cboTF ? "CBO niet actief op " + timeframe.period : cboName(xSt) + (xSt == 4 or xSt == 5 ? " " + str.tostring(xsLo, format.mintick) + "–" + str.tostring(xsHi, format.mintick) : xSt == 2 or xSt == 3 ? " (" + str.tostring(xN) + " bars)" : "") + (xSt == 5 or accRecent ? " " + (xDir > 0 ? "↑" : "↓") : "")
+    // Compacte triggerregel: de eerste meetellende trigger, anders CBO als die zichtbaar is
+    string trg1 = ""
+    for i = 7 to 11
+        if fM.get(i) and trg1 == ""
+            trg1 := i == 7 ? (not cboTF ? "CBO –" : cboName(xSt) + (xSt == 5 or accRecent ? " " + (xDir > 0 ? "↑" : "↓") : "")) : fNm.get(i) + " " + fSym(i)
+    trg1 := trg1 == "" ? (eCbT and cboTF ? cboName(xSt) + " (info)" : "geen trigger gekozen") : trg1
+    string kop = syminfo.ticker + " " + timeframe.period + " · " + sideTxt(md)
+    string biasRow = sideTxt(mdBar) + " · " + (na(pIdxBar) ? "–" : str.tostring(pIdxBar, "+0.0;-0.0")) + " · geldig sinds " + bDayBar
+    const string LBL = "STR 0.2 onderzoek — geen bewezen edge"
+    string tipKop = "Richting uit " + dirBron + ". Bias " + biasRow + " (BIAS " + BIAS_VERSIE + "). Preset " + i_preset + " · hash " + PHASH + ". Decision support, geen order."
+    // ── MINIMAL: richting · status · volgende actie ──
+    if i_mode == "Minimal"
+        row2(r, kop, LBL, dirCol(md), cAmb, tipKop, size.normal)
+        r += 1
+        row2(r, setupName(cs), why1, sc, t2c, TIP_GATE + " Filters: " + allL, size.normal)
+        r += 1
+        row1(r, "→ " + nxt, t1c)
+        r += 1
+    else
+        // ── COMPACT: bias · status · structuur · locatie · trigger · event · actieve filters ──
+        row2(r, kop, LBL, dirCol(md), cAmb, tipKop, size.normal)
+        r += 1
+        row2(r, setupName(cs), cut(nxt, 60), sc, t1c, TIP_GATE + " Filters: " + allL, size.normal)
+        r += 1
+        row2(r, "Structuur", ctxNm + " " + (na(ctxDir) ? "–" : str.lower(dirTxt(ctxDir))) + " · " + timeframe.period + " " + str.lower(dirTxt(lS.cdir)), t2c, dirCol(ctxDir), TIP_STG)
+        r += 1
+        row2(r, "Locatie", pdTxt(cPd) + " · " + (na(zN) ? "geen zone" : zN.kind) + (refTxt != "" ? " · " + refTxt : ""), t2c, t1c, zTxt + ". PD binnen de laatste bevestigde swingrange.")
+        r += 1
+        row2(r, "Trigger", trg1, t2c, t1c, trigTxt + ". CBO-regels = CBO_0.1 (+ retest-toestand). Laatste afloop: " + xLast)
+        r += 1
+        row2(r, "Event", evBlk ? "BLOK actief" : na(evNext) ? "dekking onbekend" : evNext.ccy + " " + cut(evNext.name, 22) + " " + str.format_time(evNext.t, "EEE HH:mm", i_tz), t2c, evBlk ? cAmb : na(evNext) ? t3c : t1c, ev2)
+        r += 1
+        row2(r, "Filters", actL == "" ? "geen filter telt mee" : cut(actL, 70), t2c, t2c, TIP_GATE + " Alleen meetellende filters. " + actL, size.small)
+        r += 1
+    // ── EXPANDED: het bewijs (bovenop Compact) ──
+    if i_mode == "Expanded"
+        row1(r, "— bewijs —", t3c, "", size.tiny)
+        r += 1
+        row2(r, "Alle filters", allL, t3c, t2c, TIP_GATE, size.tiny)
+        r += 1
+        row2(r, "✓", okL == "" ? "–" : cut(okL, 150), t3c, t2c, okL, size.tiny)
+        r += 1
+        row2(r, "✕ / ?", badL == "" ? "–" : cut(badL, 150), t3c, badL == "" ? t3c : cAmb, badL, size.tiny)
+        r += 1
+        row2(r, "Bias", biasRow + " · BIAS " + BIAS_VERSIE + " · snapshot " + ENG_VERSION, t3c, t2c, "Index = (basis − quote)/2 uit de forwardhistorie; geldig vanaf max(D 06:00 UTC, eerst gezien); drempel ±15; max 96 uur oud. Richting d komt uit: " + dirBron + ".", size.tiny)
+        r += 1
+        if eInvT
+            Inv iv = findInv()
+            row2(r, "Invalidatie", na(iv) ? "geen in de snapshot" : cut(iv.tekst, 110), t3c, t2c, na(iv) ? "" : iv.tekst + " (" + iv.horizon + ")", size.tiny)
+            r += 1
+        string zl = ""
+        for z in zShown
+            zl += (zl == "" ? "" : " · ") + z.kind + (z.dir > 0 ? "↑ " : "↓ ") + str.tostring(z.bot, format.mintick) + "–" + str.tostring(z.top, format.mintick) + " " + str.lower(stName(z.st)) + " " + str.tostring(z.pen * 100, "0") + "%"
+        row2(r, "Zones", zl == "" ? "geen getoonde zone" : zl, t3c, t2c, "Max " + str.tostring(eZMax) + " op de chart, dichtst bij de koers. OB-P/OB-F/OB-R/FVG zijn aparte typen.", size.tiny)
+        r += 1
+        string rl = ""
+        for [k, nm] in refNm
+            rl += (k > 0 ? " · " : "") + nm + " " + str.tostring(refPx.get(k), format.mintick)
+        row2(r, "Referenties", rl == "" ? "geen" : cut(rl, 120), t3c, t2c, "Max " + str.tostring(eRMax) + " dichtstbij; status op close (ongeraakt/getest/swept/geaccepteerd/verlopen).", size.tiny)
+        r += 1
+        if eCbOn and cboTF
+            row2(r, "CBO", trigTxt + " · regime " + regime + " · laatste: " + xLast, t3c, t2c, "Box-ID " + xId, size.tiny)
+            r += 1
+        if not na(stopP) and md != 0
+            row2(r, "Plan (geen order)", "instap ~" + str.tostring(close, format.mintick) + " · stop " + str.tostring(stopP, format.mintick) + " · doel " + (na(frD) ? "–" : frDn + " " + str.tostring(frD, format.mintick)) + " · " + (na(cRoom) ? "R ?" : str.tostring(cRoom, "0.0") + "R"), t3c, t2c, eCbM ? "Stop = overkant van de actuele box ± " + str.tostring(g_stopBuf) + " ATR" : "Stop = tegenoverliggend bevestigd swingniveau ± " + str.tostring(g_stopBuf) + " ATR" + "; doel = eerste ongeraakte referentie.", size.tiny)
+            r += 1
+        row2(r, "Structuur", ctxNm + " " + (na(ctxDir) ? "–" : str.lower(dirTxt(ctxDir)) + " " + stgTxt(ctxStg)) + " · swing " + str.lower(dirTxt(lS.cdir)) + " " + stgTxt(lS.stage) + " · internal " + str.lower(dirTxt(lI.cdir)) + " · sweep: " + swTxt, t3c, t2c, TIP_STG, size.tiny)
+        r += 1
+        // Preset, effectieve modules, overrides en parameterhash
+        array<string> mN = array.from("Bias", "Events", "Swing", "Internal", "Fractal", "BoS", "CHoCH", "Shift", "HTF", "CBO", "CBO-retest", "OB-P", "OB-F", "OB-R", "FVG", "Zone-loc", "Sweep", "FailedBO", "Accept", "ABS-PROXY", "PD", "Ruimte", "Status")
+        array<string> mEff = array.from(tma(eMacroT, eMacroM, false), tma(eEvT, eEvM, false), tma(eSwT, false, eSwA), tma(eInT, false, false), tma(eFrT, false, false), tma(eBosT, eBosM, eBosA), tma(eChT, eChM, eChA), tma(eShT, false, eShA), tma(false, eHtfM, false), tma(eCbT or eCbFormT, eCbM, eCbA), tma(false, eCbRetM, eCbRetA), tma(eObpT, false, false), tma(eObfT, false, false), tma(eObrT, false, false), tma(eFvgT, false, false), tma(false, eZLoc != "Uit", eZA), tma(eSwpT, eSwpM, eSwpA), tma(eFbT, false, eFbA), tma(eAccT, eAccM, eAccA), tma(eAbsT, eAbsM, eAbsA), tma(ePdT, ePdM, false), tma(false, eRoomM, false), tma(false, false, eAArm or eAConf or eAInv))
+        array<string> mClean = array.from("TM", "TM", "T", "–", "–", "T", "–", "T", "M", "TMA", "–", "T", "T", "T", "–", "–", "–", "–", "–", "–", "TM", "M", "A")
+        string effL = ""
+        string ovL = ""
+        for [k, nm] in mN
+            if mEff.get(k) != "–"
+                effL += (effL == "" ? "" : " · ") + nm + " " + mEff.get(k)
+            if pC and mEff.get(k) != mClean.get(k)
+                ovL += (ovL == "" ? "" : " · ") + nm + " " + mClean.get(k) + "→" + mEff.get(k)
+        string profNm = prof == 1 ? "5/15m→1H" : prof == 2 ? "30m/1H→4H" : prof == 3 ? "4H→D" : "D→W"
+        row2(r, "Preset", i_preset + " · profiel " + (autoR ? profNm : "CUSTOM") + " · hash " + PHASH, t3c, t2c, "De hash is de vingerafdruk van preset, profiel, alle effectieve T/M/A en alle drempels. Andere hash = andere variant; nooit samenvoegen.", size.tiny)
+        r += 1
+        row2(r, "Modules", cut(effL, 150), t3c, t2c, "T = tonen · M = meetellen · A = alert. " + effL, size.tiny)
+        r += 1
+        row2(r, "Overrides", pC ? (ovL == "" ? "geen (gelijk aan CLEAN)" : cut(ovL, 150)) : "geen (preset-matrix)", t3c, ovL == "" ? t3c : cAmb, pC ? "Verschil met CLEAN: " + ovL : "Alleen CUSTOM kent overrides.", size.tiny)
+        r += 1
+        row1(r, "— research (niet voor handelsbeslissingen) —", t3c, "", size.tiny)
+        r += 1
+        row2(r, FWD_VERSIE, "niet bevroren — geen meting · retro " + str.tostring(rN) + " setups (geen bewijs)", t3c, cAmb, "STR_0.2 heeft geen forwardstart. Een forwardmeting per preset en hash vraagt een besluit van Bas. Niet optellen bij STR_0.1-F of CBO_0.1-F. Geen edgeclaim.", size.tiny)
+        r += 1
+
+// ═══ 7b. Alerts: één JSON per statuswissel, alleen op candle-close ═══
+jsStr(string s) =>
+    "\"" + str.replace_all(str.replace_all(s, "\\", "\\\\"), "\"", "\\\"") + "\""
+jsNum(float v) =>
+    na(v) ? "null" : str.tostring(v, "#.########")
+gWord(int g) =>
+    g == 1 ? "ok" : g == -1 ? "faalt" : g == 2 ? "laat_door" : "onbekend"
+evWanted(string ty) =>
+    ty == "swing" ? eSwA : ty == "bos" ? eBosA : ty == "choch" ? eChA : ty == "shift" ? eShA : ty == "sweep" ? eSwpA : ty == "failed_breakout" ? eFbA : ty == "acceptance" ? eAccA : ty == "absorption_proxy" ? eAbsA : ty == "zone_entry" ? eZA : ty == "cbo_retest" ? eCbRetA : str.startswith(ty, "cbo_") ? eCbA : false
+string jsBase = "\"engine\":\"BFX Structure Engine 0.2\",\"versie\":" + jsStr(FWD_VERSIE) + ",\"preset\":" + jsStr(i_preset) + ",\"param_hash\":" + jsStr(PHASH) + ",\"template_sha256\":" + jsStr(TPL_SHA) + ",\"symbol\":" + jsStr(syminfo.tickerid) + ",\"feed\":" + jsStr(syminfo.prefix) + ",\"timeframe\":" + jsStr(timeframe.period) + ",\"bar_close\":" + jsStr(str.format_time(time_close, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC"))
+// Statusalerts: ARMED · CONFIRMED · invalidatie (FAILED/EXPIRED, of ARMED/CONFIRMED → BLOCKED), alleen bij een wissel op candle-close
+bool invNow = cs == 7 or cs == 9 or (cs == 2 and (csPrev == 4 or csPrev == 5))
+if barstate.isconfirmed and cs != csPrev and ((cs == 4 and eAArm) or (cs == 5 and eAConf) or (invNow and eAInv))
+    string fj = ""
+    string unk = ""
+    for [i, k] in fKey
+        fj += (i > 0 ? "," : "") + jsStr(k) + ":{\"telt_mee\":" + (fM.get(i) ? "true" : "false") + ",\"zichtbaar\":" + (fT.get(i) ? "true" : "false") + ",\"waarde\":" + jsStr(fM.get(i) ? gWord(cV.get(i)) : fT.get(i) ? "alleen_zichtbaar" : "uit") + "}"
+        if fM.get(i) and cV.get(i) == 0
+            unk += (unk == "" ? "" : ",") + jsStr(k)
+    Zone az = nearZone(md)
+    string setupJs = sId == "" ? "null" : "{\"setup_id\":" + jsStr(sId + "@" + str.format_time(sConfT, "yyyyMMdd-HHmm", "UTC")) + ",\"bevestigd_op\":" + jsStr(str.format_time(sConfT, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC")) + ",\"richting\":" + jsStr(sDir == 1 ? "long" : "short") + ",\"entry\":" + jsNum(sE) + ",\"stop\":" + jsNum(sS) + ",\"doel\":" + jsNum(sT) + ",\"doel_naam\":" + jsStr(sTgtN) + ",\"zone_id\":" + jsStr(sZoneId) + ",\"sweep_id\":" + jsStr(sSweepId) + ",\"structuur_id\":" + jsStr(sStrId) + ",\"uitkomst\":" + jsStr(sSt == 7 ? "FAILED" : sSt == 8 ? "DOEL" : sSt == 9 ? "EXPIRED" : "open") + ",\"r_bruto\":" + jsNum(sSt >= 7 ? sLastR : na) + ",\"telt_mee\":false}"
+    string js = "{\"schema\":\"BFX_EXEC_0.2\"," + jsBase + ",\"status\":" + jsStr(setupName(cs)) + ",\"vorige_status\":" + jsStr(setupName(csPrev)) + ",\"richting\":" + jsStr(md == 1 ? "long" : md == -1 ? "short" : "geen") + ",\"richting_bron\":" + jsStr(dirBron) + ",\"bias\":{\"versie\":" + jsStr(BIAS_VERSIE) + ",\"index\":" + jsNum(pIdxBar) + ",\"available_at\":" + jsStr(bp >= 0 ? str.format_time(bpT.get(bp), "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") : "") + "},\"context\":{\"tf\":" + jsStr(ctxNm) + ",\"richting\":" + jsStr(na(ctxDir) ? "onbekend" : dirTxt(ctxDir)) + "},\"pd_pct\":" + jsNum(cPd) + ",\"cbo\":{\"state\":" + jsStr(cboName(xSt)) + ",\"box_id\":" + jsStr(xId) + "},\"zone_id\":" + jsStr(na(az) ? "" : az.id) + ",\"filters\":{" + fj + "},\"onbekend\":[" + unk + "],\"invalidatie\":" + jsNum(sSt == 6 ? sS : stopP) + ",\"doel\":{\"naam\":" + jsStr(sSt == 6 ? sTgtN : frDn) + ",\"prijs\":" + jsNum(sSt == 6 ? sT : frD) + "},\"ruimte_r\":" + jsNum(cRoom) + ",\"setup\":" + setupJs + ",\"forward\":\"niet bevroren — geen meting\",\"let_op\":\"decision support — geen order\"}"
+    alert(js, alert.freq_once_per_bar_close)
+// Gebeurtenisalerts: alleen typen waarvoor Alert aan staat; één bericht per bar met alle gewenste gebeurtenissen
+if barstate.isconfirmed and evTyp.size() > 0
+    string el = ""
+    for [k, ty] in evTyp
+        if evWanted(ty)
+            el += (el == "" ? "" : ",") + "{\"type\":" + jsStr(ty) + ",\"data\":" + evJs.get(k) + "}"
+    if el != ""
+        alert("{\"schema\":\"BFX_EVT_0.2\"," + jsBase + ",\"gebeurtenissen\":[" + el + "],\"let_op\":\"onderzoek — geen order\"}", alert.freq_once_per_bar_close)
+
+// Kandidaten voor het logboek (alle vooraf vastgelegde varianten), één bericht per bar met alle kandidaten van die bar
+if barstate.isconfirmed and i_alertK and (kTyp.size() > 0 or uLog.size() > 0)
+    string kl = ""
+    string ul = ""
+    for u in uLog
+        ul += (ul == "" ? "" : ",") + u
+    for i = 0 to kTyp.size() - 1
+        if kTyp.size() > 0
+            kl += (i > 0 ? "," : "") + "{\"type\":" + jsStr(kTyp.get(i)) + ",\"richting\":" + jsStr(kDir.get(i) == 1 ? "long" : "short") + ",\"varianten\":" + str.tostring(kMask.get(i)) + "}"
+    bool kFwd = fwdFrozen and time_close >= FWD_START
+    string kj = "{\"schema\":\"BFX_KAND_0.1\",\"versie\":" + jsStr(FWD_VERSIE) + ",\"template_sha256\":" + jsStr(TPL_SHA) + ",\"snapshot_id\":" + jsStr(str.tostring(ENG_GENERATED)) + ",\"symbol\":" + jsStr(syminfo.tickerid) + ",\"feed\":" + jsStr(syminfo.prefix) + ",\"timeframe\":" + jsStr(timeframe.period) + ",\"bar_close\":" + jsStr(str.format_time(time_close, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC")) + ",\"close\":" + jsNum(close) + ",\"atr\":" + jsNum(atr) + ",\"bias\":{\"waarde\":" + jsNum(pIdxBar) + ",\"available_at\":" + jsStr(bp >= 0 ? str.format_time(bpT.get(bp), "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC") : "") + "},\"box_id\":" + jsStr(xId) + ",\"regime\":" + jsStr(regime) + ",\"event\":" + jsStr(evBlk ? "blok" : na(evNext) ? "onbekend" : "vrij") + ",\"telt_mee\":" + (kFwd ? "true" : "false") + ",\"kandidaten\":[" + kl + "],\"afgerond\":[" + ul + "],\"let_op\":\"onderzoek — geen order\"}"
+    alert(kj, alert.freq_once_per_bar_close)
+
+// ═══ 8. Meetwaarden in het datavenster (geen lijnen op de chart) ═══
+plot(lS.dir, "Swing richting", display = display.data_window)
+plot(lS.stage, "Swing stage", display = display.data_window)
+plot(lI.dir, "Internal richting", display = display.data_window)
+plot(lI.stage, "Internal stage", display = display.data_window)
+plot(lF.dir, "Fractal richting", display = display.data_window)
+plot(lS.nBos, "S BoS", display = display.data_window)
+plot(lS.nChoch, "S CHoCH", display = display.data_window)
+plot(lS.nSweep, "S sweeps", display = display.data_window)
+plot(lI.nBos, "I BoS", display = display.data_window)
+plot(lI.nChoch, "I CHoCH", display = display.data_window)
+plot(lI.nSweep, "I sweeps", display = display.data_window)
+plot(lF.nBos, "F BoS", display = display.data_window)
+plot(lF.nChoch, "F CHoCH", display = display.data_window)
+plot(lF.nSweep, "F sweeps", display = display.data_window)
+plot(cZP, "Zones OB-P", display = display.data_window)
+plot(cZF, "Zones OB-F", display = display.data_window)
+plot(cZx, "Zones overgeslagen", display = display.data_window)
+plot(pdOf(lS), "Swing PD %", display = display.data_window)
+plot(h4Dir, "4H richting", display = display.data_window)
+plot(dDir, "D richting", display = display.data_window)
+plot(cZR, "Zones OB-R", display = display.data_window)
+plot(xSt, "CBO state", display = display.data_window)
+plot(cK, "CBO kandidaten", display = display.data_window)
+plot(cS, "CBO verzegeld", display = display.data_window)
+plot(cB, "CBO breakouts", display = display.data_window)
+plot(cA, "CBO acceptatie", display = display.data_window)
+plot(cF, "CBO mislukt", display = display.data_window)
+plot(cE, "CBO verlopen", display = display.data_window)
+plot(cs, "Setup status (0 nvt·1 unk·2 blk·3 watch·4 armed·5 conf·6 act·7 fail·8 doel·9 exp)", display = display.data_window)
+plot(cConf, "Setups CONFIRMED", display = display.data_window)
+plot(cFail, "Setups FAILED", display = display.data_window)
+plot(cDoel, "Setups DOEL", display = display.data_window)
+plot(cExp, "Setups EXPIRED", display = display.data_window)
+plot(cBlk, "CBO eventblokkades", display = display.data_window)
+plot(fwdFrozen ? 1 : 0, "Fwd geldig (1 = bevroren parameters)", display = display.data_window)
+plot(fN, "Fwd n", display = display.data_window)
+plot(fN > 0 ? fW * 100.0 / fN : na, "Fwd hit %", display = display.data_window)
+plot(fN > 0 ? fSum / fN : na, "Fwd gem R", display = display.data_window)
+plot(fOpen, "Fwd open", display = display.data_window)
+plot(rN, "Retro n (geen bewijs)", display = display.data_window)
+plot(rN > 0 ? rSum / rN : na, "Retro gem R (geen bewijs)", display = display.data_window)
+plot(pIdxBar, "Bias paarindex (per bar)", display = display.data_window)
+plot(math.round(ENG_GENERATED / 60000), "Datablok-id (min)", display = display.data_window)
+plot(refs.size() > 5 ? refs.get(5).p : na, "PDH", display = display.data_window)
+plot(refs.size() > 6 ? refs.get(6).p : na, "PDL", display = display.data_window)
+plot(bar_index + 1, "Bars geladen", display = display.data_window)
+plot(PH, "Parameterhash", display = display.data_window)
+plot(cxDir, "Context-TF richting", display = display.data_window)
+plot(md, "Richting d", display = display.data_window)
+plot(cFB, "Failed breakouts", display = display.data_window)
+plot(cACC, "Acceptances", display = display.data_window)
+plot(cABS, "ABSORPTION-PROXY bevestigd", display = display.data_window)
+plot(cABSx, "ABSORPTION-PROXY verlopen/ongeldig", display = display.data_window)
+plot(zones.size(), "Zones in geheugen", display = display.data_window)
