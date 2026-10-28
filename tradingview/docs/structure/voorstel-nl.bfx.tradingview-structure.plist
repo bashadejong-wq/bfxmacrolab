@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VOORSTEL — NIET GEÏNSTALLEERD. Alleen Bas beslist over activeren (kopiëren naar ~/Library/LaunchAgents + launchctl load). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>nl.bfx.tradingview-structure</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/node</string><string>/Users/bashajong/Claude/bfx-cbo-research/tradingview/src/structure-deliver.mjs</string></array>
+  <key>WorkingDirectory</key><string>/Users/bashajong/Claude/bfx-cbo-research/tradingview</string>
+  <!-- Werkdagen 06:05 (Mac = Europe/Amsterdam): na de productietaak (05:45) en na de bias (±05:13); vóór Londen -->
+  <key>StartCalendarInterval</key><array><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>5</integer></dict><dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>5</integer></dict><dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>5</integer></dict><dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>5</integer></dict><dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>5</integer></dict></array>
+  <key>StandardOutPath</key><string>/Users/bashajong/Claude/bfx-cbo-research/tradingview/logs/structure-run.log</string>
+  <key>StandardErrorPath</key><string>/Users/bashajong/Claude/bfx-cbo-research/tradingview/logs/structure-run.log</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string></dict>
+</dict>
+</plist>

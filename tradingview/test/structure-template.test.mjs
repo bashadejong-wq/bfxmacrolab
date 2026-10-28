@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { ROOT } from "../src/config.mjs";
-import { buildStructure, histLines } from "../src/structure-generate.mjs";
+import { buildStructure, histLines, validFrom } from "../src/structure-generate.mjs";
+import { preflightStructure } from "../src/structure-deliver.mjs";
 
 const tpl = readFileSync(resolve(ROOT, "template/bfx_structure_engine.pine"), "utf8");
 const code = tpl.replace(/\/\/.*$/gm, "");
@@ -168,7 +169,7 @@ test("forwardbevriezing STR_0.1-F: elke HYPOTHESE-standaard staat exact in fwdFr
   assert.match(code, /sFwd := fwdFrozen and time_close >= FWD_START and xsT >= FWD_START/);
 });
 
-test("biashistorie: alleen forward-rijen, dedup per dag+valuta, max 120 dagen, paarindex = (basis − quote)/2 vanaf 06:00 UTC", () => {
+test("biashistorie: alleen forward-rijen, dedup per dag+valuta, max 120 dagen, paarindex = (basis − quote)/2, geldig vanaf max(06:00 UTC, eerst gezien)", () => {
   const NOW = Date.UTC(2026, 9, 28, 9, 0);
   const lines = histLines([
     { datum: "2026-10-26", valuta: "EUR", index: 0.47, bron: "teruggerekend" },
@@ -177,10 +178,28 @@ test("biashistorie: alleen forward-rijen, dedup per dag+valuta, max 120 dagen, p
     { datum: "2026-10-28", valuta: "usd", index: 19.2429, bron: "forward" },
     { datum: "2026-05-01", valuta: "USD", index: 5, bron: "forward" },
     { datum: "2026-10-29", valuta: "USD", index: 1, bron: "forward" },
-  ], NOW);
+  ], NOW, { "2026-10-27": Date.UTC(2026, 9, 27, 12, 9) });
   const add = lines.filter((l) => l.startsWith("    addHist("));
-  assert.deepEqual(add, [`    addHist(${Date.UTC(2026, 9, 27)}, "EUR", -9.495)`, `    addHist(${Date.UTC(2026, 9, 28)}, "USD", 19.2429)`]);
+  // 27-10 pas om 12:09 UTC gezien → geldt vanaf 12:09; 28-10 nu voor het eerst gezien (09:00) → geldt vanaf 09:00, niet 06:00
+  assert.deepEqual(add, [`    addHist(${Date.UTC(2026, 9, 27, 12, 9)}, "EUR", -9.495)`, `    addHist(${NOW}, "USD", 19.2429)`]);
+  assert.equal(validFrom(Date.UTC(2026, 9, 29), "2026-10-29", { "2026-10-29": Date.UTC(2026, 9, 29, 5, 5) }), Date.UTC(2026, 9, 29, 6, 0));
   assert.equal(lines[0], "_histLoad() =>");
-  assert.match(code, /bpT\.push\(hT\.get\(i\) \+ 6 \* 3600000\)\n {20}bpI\.push\(\(hI\.get\(i\) - hI\.get\(j\)\) \/ 2\)/);
+  assert.match(code, /bpT\.push\(hT\.get\(i\)\)\n {20}bpI\.push\(\(hI\.get\(i\) - hI\.get\(j\)\) \/ 2\)/);
   assert.match(code, /time_close - bpT\.get\(bp\) <= 96 \* 3600000/);
+});
+
+test("dagelijkse taak: raakt TradingView pas aan als het datablok compleet is en de bias van vandaag is", () => {
+  const NOW = Date.UTC(2026, 9, 29, 5, 5);
+  const good = { code: "//@version=6\n// BFX-STRUCTURE-ENGINE\n...", pairs: 28, histRows: 24 };
+  assert.deepEqual(preflightStructure(good, Date.UTC(2026, 9, 29), NOW), { ok: true, reden: "" });
+  const oud = preflightStructure(good, Date.UTC(2026, 9, 28), NOW);
+  assert.equal(oud.ok, false);
+  assert.equal(oud.wacht, true, "op een late bias wordt gewacht, niet opgegeven");
+  assert.equal(preflightStructure({ ...good, code: good.code + "{{HIST}}" }, Date.UTC(2026, 9, 29), NOW).ok, false);
+  assert.equal(preflightStructure({ ...good, pairs: 20 }, Date.UTC(2026, 9, 29), NOW).ok, false);
+  assert.equal(preflightStructure({ ...good, code: "//@version=6\n// BFX-MACRO-OVERLAY" }, Date.UTC(2026, 9, 29), NOW).ok, false);
+  const src = readFileSync(resolve(ROOT, "src/structure-deliver.mjs"), "utf8");
+  assert.ok(src.includes('LAYOUT_NAME = "BFX CBO Onderzoek"') && src.includes('LAYOUT_ID = "DcotUC2P"'));
+  assert.ok(src.includes("headless: false") && !/headless:\s*true/.test(src));
+  assert.ok(!/6b31RP4L|NlsYkVmV/.test(src), "nooit de productie- of eigen layout van Bas");
 });

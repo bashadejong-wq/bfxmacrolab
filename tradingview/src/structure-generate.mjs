@@ -2,7 +2,7 @@
 // Zelfde BFX-snapshot en datablok als de CBO-engine (alleen lezen); schrijft out/bfx_structure_engine.pine.
 // Extra: {{HIST}} = biashistorie per dag (alleen forward-rijen), zodat elke bar de bias van dát moment gebruikt.
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "./config.mjs";
 import { buildEngine } from "./engine-generate.mjs";
@@ -11,19 +11,25 @@ import { loadFromSupabase } from "./generate.mjs";
 export const STRUCTURE_TEMPLATE = "template/bfx_structure_engine.pine";
 const HIST_DAYS = 120;
 
-// Alleen 'forward' (echte meting), nooit 'teruggerekend'; per datum en valuta één regel
-export function histLines(history = [], now = Date.now()) {
+// "Eerst gezien" per biasdatum (lokaal, append-only): een dag mag nooit eerder gelden dan hij bestond
+export const SEEN_FILE = resolve(config.outDir, "bias-eerst-gezien.json");
+export const validFrom = (t, datum, seen = {}) => Math.max(t + 6 * 3600000, seen[datum] ?? Infinity);
+
+// Alleen 'forward' (echte meting), nooit 'teruggerekend'; per datum en valuta één regel.
+// Een datum zonder "eerst gezien" krijgt nu (de generator ziet hem op dit moment voor het eerst).
+export function histLines(history = [], now = Date.now(), seen = {}) {
   const from = now - HIST_DAYS * 86400000;
-  const seen = new Set();
+  const dup = new Set();
   const rows = [];
   for (const h of history) {
     const t = Date.parse(`${h.datum}T00:00:00Z`);
     const idx = Number(h.index);
     if (h.bron !== "forward" || !Number.isFinite(t) || !Number.isFinite(idx) || t < from || t > now) continue;
     const k = `${t}|${h.valuta}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    rows.push({ t, ccy: String(h.valuta).toUpperCase(), idx });
+    if (dup.has(k)) continue;
+    dup.add(k);
+    seen[h.datum] ??= now;
+    rows.push({ t: validFrom(t, h.datum, seen), ccy: String(h.valuta).toUpperCase(), idx });
   }
   rows.sort((a, b) => a.t - b.t || a.ccy.localeCompare(b.ccy));
   return [
@@ -35,15 +41,22 @@ export function histLines(history = [], now = Date.now()) {
   ];
 }
 
-export function buildStructure(data) {
+export function buildStructure(data, seen = {}) {
   const out = buildEngine(data, STRUCTURE_TEMPLATE);
-  const hist = histLines(data.history ?? [], data.generatedAt);
+  const hist = histLines(data.history ?? [], data.generatedAt, seen);
   const code = out.code.replace("{{HIST}}", hist.join("\n"));
-  return { ...out, code, hash: createHash("sha256").update(code).digest("hex"), histRows: hist.length - 4 };
+  return { ...out, code, hash: createHash("sha256").update(code).digest("hex"), histRows: hist.length - 4, seen };
+}
+
+export const readSeen = () => (existsSync(SEEN_FILE) ? JSON.parse(readFileSync(SEEN_FILE, "utf8")) : {});
+export function writeSeen(seen) {
+  mkdirSync(config.outDir, { recursive: true });
+  writeFileSync(SEEN_FILE, `${JSON.stringify(seen, null, 2)}\n`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const out = buildStructure(await loadFromSupabase(Date.now()));
+  const out = buildStructure(await loadFromSupabase(Date.now()), readSeen());
+  writeSeen(out.seen);
   mkdirSync(config.outDir, { recursive: true });
   const file = resolve(config.outDir, "bfx_structure_engine.pine");
   writeFileSync(file, out.code);

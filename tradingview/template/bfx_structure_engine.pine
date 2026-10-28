@@ -216,7 +216,8 @@ bool  biasFresh = BIAS_DATUM > 0 and BIAS_DATUM >= expectedBiasDay()
 bool  snapFresh = timenow - ENG_GENERATED <= 36 * 3600000
 int   macroDir = na(pIdx) or not biasFresh ? 0 : pIdx >= 15 ? 1 : pIdx <= -15 ? -1 : 0
 
-// Bias per bar: paarindex = (basis − quote) / 2 uit de forwardhistorie; dag D geldt vanaf D 06:00 UTC, max 96 uur oud
+// Bias per bar: paarindex = (basis − quote) / 2 uit de forwardhistorie. hT = geldig-vanaf (max van D 06:00 UTC en het
+// moment dat de generator die dag voor het eerst zag; nooit eerder dan hij bestond). Max 96 uur oud.
 var array<int>   bpT = array.new_int()
 var array<float> bpI = array.new_float()
 if barstate.isfirst and hT.size() > 0
@@ -224,7 +225,7 @@ if barstate.isfirst and hT.size() > 0
         if hC.get(i) == cb
             for j = 0 to hT.size() - 1
                 if hT.get(j) == hT.get(i) and hC.get(j) == cq
-                    bpT.push(hT.get(i) + 6 * 3600000)
+                    bpT.push(hT.get(i))
                     bpI.push((hI.get(i) - hI.get(j)) / 2)
 var int bp = -1
 while bp + 1 < bpT.size() and time_close >= bpT.get(bp + 1)
@@ -1136,8 +1137,8 @@ if barstate.islast
     string ev2 = evBlk ? "BLOK actief" : na(evNext) ? "geen event in agenda — dekking onbekend" : "vrij · " + evNext.ccy + " " + cut(evNext.name, 28) + " " + str.format_time(evNext.t, "EEE HH:mm", i_tz) + " (over " + str.tostring(math.round((evNext.t - timenow) / 3600000)) + "u)"
     array<string> gN = array.from("Data", "Macro", "HTF " + ctxNm, "Locatie", "Sweep", "Trigger", "Event", "Ruimte", "Kosten")
     array<string> gW = array.new<string>()
-    string bDayBar = bp >= 0 ? str.format_time(bpT.get(bp) - 6 * 3600000, "dd/MM", "UTC") : "–"
-    gW.push(cg.get(0) == 1 ? "forward-bias van " + bDayBar + " (BIAS " + BIAS_VERSIE + ")" : bp < 0 ? "geen forward-bias voor deze candle (forward sinds 27-10)" : "forward-bias ouder dan 96 u (" + bDayBar + ") — draai de generator")
+    string bDayBar = bp >= 0 ? str.format_time(bpT.get(bp), "dd/MM HH:mm", i_tz) : "–"
+    gW.push(cg.get(0) == 1 ? "forward-bias geldig sinds " + bDayBar + " (BIAS " + BIAS_VERSIE + ")" : bp < 0 ? "geen forward-bias voor deze candle (forward sinds 27-10)" : "forward-bias ouder dan 96 u (" + bDayBar + ") — draai de generator")
     gW.push(md != 0 ? str.lower(sideTxt(md)) + " · index " + str.tostring(pIdxBar, "+0.0;-0.0") : "geen richting · index " + (na(pIdxBar) ? "–" : str.tostring(pIdxBar, "+0.0;-0.0")) + " (±15)")
     gW.push(na(ctxDir) ? "onbekend" : str.lower(dirTxt(ctxDir)) + " · " + stgTxt(ctxStg))
     gW.push(md == 0 ? "–" : "PD " + (na(cPd) ? "–" : str.tostring(cPd, "0") + "%") + (md == 1 ? " (long: ≤ 50% of long-zone)" : " (short: ≥ 50% of short-zone)"))
@@ -1288,6 +1289,7 @@ plot(fOpen, "Fwd open", display = display.data_window)
 plot(rN, "Retro n (geen bewijs)", display = display.data_window)
 plot(rN > 0 ? rSum / rN : na, "Retro gem R (geen bewijs)", display = display.data_window)
 plot(pIdxBar, "Bias paarindex (per bar)", display = display.data_window)
+plot(math.round(ENG_GENERATED / 60000), "Datablok-id (min)", display = display.data_window)
 plot(rPDH, "PDH", display = display.data_window)
 plot(rPDL, "PDL", display = display.data_window)
 plot(bar_index + 1, "Bars geladen", display = display.data_window)

@@ -280,7 +280,8 @@ Retrospectieve tellingen zijn **geen bewijs**: de bias bestaat alleen vanaf de b
 - De generator vult `{{HIST}}` met de **forward**-rijen uit `mirror_bias50_historie` (`bron = 'forward'`, `toonbaar`), van de laatste 120 dagen.
   Teruggerekende rijen tellen nooit mee.
 - Paarindex per dag = (index basisvaluta − index quotevaluta) / 2. Dat is gecontroleerd: EURUSD 28-10 geeft (−13,02 − 19,24) / 2 = −16,13 = `paar_index`.
-- De bias van datum D geldt vanaf **D 06:00 UTC**, na de nachtketen. Een bar gebruikt de laatst geldige bias op `time_close`.
+- De bias van datum D geldt vanaf het **latere** van **D 06:00 UTC** en het moment dat de generator D **voor het eerst zag** (`out/bias-eerst-gezien.json`, bijgewerkt op 28-10).
+  Zo geldt een bias nooit voordat hij bestond. Een bar gebruikt de laatst geldige bias op `time_close`.
 - Een bias ouder dan **96 uur** maakt de bar **UNKNOWN**. Dat vangt het weekend op; een dag zonder nieuwe data maakt de bar niet stil "neutraal".
 - De Data-poort is ✓ zodra er een geldige bias voor die bar is. De kaartregel BIAS toont daarnaast of de snapshot van vandaag is.
 
