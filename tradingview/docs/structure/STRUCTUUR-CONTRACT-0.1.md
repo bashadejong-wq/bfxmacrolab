@@ -270,3 +270,42 @@ Retrospectieve tellingen zijn **geen bewijs**: de bias bestaat alleen vanaf de b
   - `onbekend` [poortnamen], `let_op`.
 - Onbekende getallen worden `null`. Strings worden ge-escaped.
 - De indicator maakt **zelf geen alert in TradingView aan**. Bas kiest zelf "Any alert() function call".
+
+---
+
+# Fase 5 (28-10-2026): bias per dag, bevriezing en forwardmeting STR_0.1-F
+
+## 22. Bias per dag (geen blik in de toekomst)
+
+- De generator vult `{{HIST}}` met de **forward**-rijen uit `mirror_bias50_historie` (`bron = 'forward'`, `toonbaar`), van de laatste 120 dagen.
+  Teruggerekende rijen tellen nooit mee.
+- Paarindex per dag = (index basisvaluta − index quotevaluta) / 2. Dat is gecontroleerd: EURUSD 28-10 geeft (−13,02 − 19,24) / 2 = −16,13 = `paar_index`.
+- De bias van datum D geldt vanaf **D 06:00 UTC**, na de nachtketen. Een bar gebruikt de laatst geldige bias op `time_close`.
+- Een bias ouder dan **96 uur** maakt de bar **UNKNOWN**. Dat vangt het weekend op; een dag zonder nieuwe data maakt de bar niet stil "neutraal".
+- De Data-poort is ✓ zodra er een geldige bias voor die bar is. De kaartregel BIAS toont daarnaast of de snapshot van vandaag is.
+
+## 23. Bevriezing STR_0.1-F
+
+- **Versie** `STR_0.1-F` · **start** `2026-10-29 00:00 UTC`.
+- `fwdFrozen` is waar als **alle** `h_`, `c_`, `e_` en `g_`-parameters op hun standaardwaarde staan, plus `h_body = false`, `g_needSweep = false` en `i_cbo = true`.
+  Weergave-instellingen en kosten tellen niet mee.
+- Zodra iemand iets wijzigt, toont de kaart **ONGELDIG** en telt de forwardmeting niet meer mee.
+- Elke wijziging van een regel of drempel wordt een nieuwe versie (`STR_0.2-F`) met een eigen start. Er wordt nooit gemengd.
+
+## 24. Forwardmeting
+
+- Een setup telt mee als de **box verzegeld is ná de start** én de **CONFIRMED-candle ná de start** sluit, met `fwdFrozen` waar.
+- **Instap** = close van de CONFIRMED-candle. **Stop** = overkant box ± `g_stopBuf` ATR. **Doel** = eerste ongeraakte referentie (PDH/PDL/PWH/PWL).
+- **Uitkomst in R** (bruto, prijs-only, zonder kosten):
+  - FAILED = −1 (stop eerst bij een gelijktijdige raak);
+  - DOEL = |doel − instap| / risico;
+  - EXPIRED = (close − instap) × richting / risico na `g_tMax` bars.
+- Op de kaart en in de Data Window staan n, hit %, gemiddelde R en het aantal open setups.
+- Serieus kijken pas na 8 weken; conclusies pas na 3 maanden. Geen edgeclaim.
+
+**Beperkingen**:
+1. Er is geen databaselogboek. TradingView rekent bij elk herladen opnieuw uit de koershistorie en de embedded biashistorie.
+   Een correctie van de feed of een herziene forward-biasrij is dan niet terug te vinden.
+2. De forwardmeting heeft **dagelijks een nieuw datablok** nodig: de generator moet draaien en het script moet opnieuw in de onderzoekslayout gezet worden.
+   Zonder dat wordt de bias na 96 uur UNKNOWN en ontstaan er geen setups meer.
+   Dagelijks automatiseren is een apart besluit van Bas, net als het herladen van de LaunchAgent.

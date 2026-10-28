@@ -271,3 +271,23 @@ Standaard komt er alleen een bericht bij een wissel van of naar ARMED en hoger. 
 | USDCAD | 240 | false | 3/0/0 | 3/0/0 | ja | BLOCKED |
 | NZDUSD | 240 | false | 6/1/1 | 6/1/1 | ja | BLOCKED |
 Screenshots: `screenshots/07-modus-Minimal.png`, `07-modus-Compact.png`, `07-modus-Expanded.png`.
+
+---
+
+# Fase 5 (28-10-2026, 10:50–11:10): bias per dag + bevriezing STR_0.1-F
+
+| Test | Uitkomst |
+|---|---|
+| Paarindex uit historie | (basis − quote) / 2 = `paar_index` (EURUSD 28-10: −16,13) |
+| Datablok | 16 forward-biasrijen (27 en 28-10 × 8 valuta's); teruggerekende rijen niet opgenomen |
+| Compileren | geslaagd |
+| Kaart | FORWARD: "STR_0.1-F · start 29-10 01:00 · nog geen metingen"; Data-poort ✓ op forward-bias van 28/10 |
+| Bewaking | swingpivot 11 → "ONGELDIG — parameters wijken af van STR_0.1"; terug op 10 → bevroren |
+| CBO tegen CBO_0.1 | 64/5/5 = 64/5/5 |
+| Herladen | identiek (alleen de live "Swing PD %" beweegt mee met de lopende candle) |
+| `npm test` | 45/45 (onder meer: bevriezing gelijk aan de standaardwaarden, alleen forward-historie, 06:00 UTC en 96 uur, alert-JSON met forwardvelden) |
+
+**Gevonden**: na een herlaadtest draaide de chart weer de vorige scriptversie, omdat de layout na het compileren nog niet was opgeslagen.
+Opgelost met opnieuw toevoegen, de oude instantie verwijderen en de layout opslaan. Dit staat als vaste stap in het bevriezingsdocument.
+
+Screenshots: `screenshots/08-forward-bevroren.png`, `screenshots/09-forward-ongeldig.png`.

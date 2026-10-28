@@ -173,6 +173,18 @@ addEv(int t, string c, bool cb, string n) =>
 {{DATA}}
 // ═══ DATA-EINDE ═══
 
+// Biashistorie per dag (alleen forward-rijen van BIAS_5.0, gegenereerd)
+var array<int>    hT = array.new_int()
+var array<string> hC = array.new_string()
+var array<float>  hI = array.new_float()
+addHist(int t, string c, float i) =>
+    hT.push(t)
+    hC.push(c)
+    hI.push(i)
+// ═══ HIST-START ═══
+{{HIST}}
+// ═══ HIST-EINDE ═══
+
 // Macro (BIAS_5.0, zelfde regel als CBO_0.1): ≥ +15 long, ≤ −15 short, alleen als de bias actueel is
 string cb = syminfo.basecurrency
 string cq = syminfo.currency
@@ -203,6 +215,22 @@ float pIdx = na(pb) ? na : (pb.basis != cb ? -pb.idx : pb.idx)
 bool  biasFresh = BIAS_DATUM > 0 and BIAS_DATUM >= expectedBiasDay()
 bool  snapFresh = timenow - ENG_GENERATED <= 36 * 3600000
 int   macroDir = na(pIdx) or not biasFresh ? 0 : pIdx >= 15 ? 1 : pIdx <= -15 ? -1 : 0
+
+// Bias per bar: paarindex = (basis − quote) / 2 uit de forwardhistorie; dag D geldt vanaf D 06:00 UTC, max 96 uur oud
+var array<int>   bpT = array.new_int()
+var array<float> bpI = array.new_float()
+if barstate.isfirst and hT.size() > 0
+    for i = 0 to hT.size() - 1
+        if hC.get(i) == cb
+            for j = 0 to hT.size() - 1
+                if hT.get(j) == hT.get(i) and hC.get(j) == cq
+                    bpT.push(hT.get(i) + 6 * 3600000)
+                    bpI.push((hI.get(i) - hI.get(j)) / 2)
+var int bp = -1
+while bp + 1 < bpT.size() and time_close >= bpT.get(bp + 1)
+    bp += 1
+float pIdxBar = bp >= 0 and time_close - bpT.get(bp) <= 96 * 3600000 ? bpI.get(bp) : na
+int   mdBar = na(pIdxBar) ? 0 : pIdxBar >= 15 ? 1 : pIdxBar <= -15 ? -1 : 0
 
 // Events van basis/quote: blok- en post-eventstatus op tijdstip t
 evAt(int t) =>
@@ -883,11 +911,11 @@ if wS == 1 or wI == 1
 if wS == -1 or wI == -1
     swBearB := bar_index
 
-int    md = macroDir
+int    md = mdBar
 int    ctxDir = tfSec <= 1800 ? h4Dir : dDir
 int    ctxStg = tfSec <= 1800 ? h4Stg : dStg
 string ctxNm = tfSec <= 1800 ? "4H" : "D"
-int gData = not na(pb) and biasFresh and snapFresh and time >= BIAS_DATUM ? 1 : 0
+int gData = not na(pIdxBar) ? 1 : 0
 int gMacro = md != 0 ? 1 : -1
 int gHtf = na(ctxDir) ? 0 : md != 0 and ctxDir == md ? 1 : md != 0 and ctxDir == -md and (ctxStg == 2 or ctxStg == 3) ? -1 : 2
 float pdNow = pdOf(lS)
@@ -943,6 +971,18 @@ var int cConf = 0
 var int cFail = 0
 var int cDoel = 0
 var int cExp = 0
+// Forwardmeting STR_0.1-F: alleen box én CONFIRMED ná de start, alleen met bevroren parameters
+const string FWD_VERSIE = "STR_0.1-F"
+int FWD_START = timestamp("UTC", 2026, 10, 29, 0, 0)
+bool fwdFrozen = i_cbo and h_lenS == 10 and h_lenI == 5 and h_lenF == 2 and h_atrLen == 14 and h_buf == 0.05 and h_body == false and h_swWick == 0.3 and h_mit == 50 and h_zAge == 300 and h_zMaxH == 1.5 and h_fvgLook == 20 and c_volLen == 20 and c_volPct == 250 and c_lowVol == 15 and c_highVol == 85 and c_compVol == 40 and c_erLen == 20 and c_erTrend == 0.35 and c_erChaos == 0.12 and c_expMult == 2.0 and c_nMin == 8 and c_nMax == 24 and c_wMax == 1.25 and c_tol == 0.15 and c_tMin == 2 and c_nSeal == 3 and c_expiry == 2.0 and c_body == 0.5 and c_accK == 2 and e_preCB == 60 and e_postCB == 120 and e_pre == 30 and e_post == 60 and e_disc == 180 and g_trigAge == 3 and g_minRoom == 1.0 and g_stopBuf == 0.1 and g_swAge == 24 and g_needSweep == false and g_tMax == 32
+var bool  sFwd = false
+var int   fN = 0
+var int   fW = 0
+var float fSum = 0.0
+var int   fOpen = 0
+// Retrospectief (geen bewijs): R van alle afgeronde setups in de geladen historie
+var int   rN = 0
+var float rSum = 0.0
 // Laatst gesloten candle: status en poorten (geen tussenstanden van een lopende candle)
 var int cs = 0
 var int csPrev = 0
@@ -954,18 +994,31 @@ if barstate.isconfirmed
     if sSt == 6
         bool hitS = sDir == 1 ? low <= sS : high >= sS
         bool hitT = not na(sT) and (sDir == 1 ? high >= sT : low <= sT)
+        float risk = math.abs(sE - sS)
+        float rr = na
         if hitS
             sSt := 7
             sEndB := bar_index
             cFail += 1
+            rr := -1.0
         else if hitT
             sSt := 8
             sEndB := bar_index
             cDoel += 1
+            rr := risk > 0 ? math.abs(sT - sE) / risk : 0.0
         else if bar_index - sB >= g_tMax
             sSt := 9
             sEndB := bar_index
             cExp += 1
+            rr := risk > 0 ? (close - sE) * sDir / risk : 0.0
+        if not na(rr)
+            rN += 1
+            rSum += rr
+            if sFwd
+                fN += 1
+                fW += rr > 0 ? 1 : 0
+                fSum += rr
+                fOpen := 0
     else if gs == 5 and sId != xId
         sSt := 6
         sE := close
@@ -976,6 +1029,8 @@ if barstate.isconfirmed
         sDir := md
         sId := xId
         cConf += 1
+        sFwd := fwdFrozen and time_close >= FWD_START and xsT >= FWD_START
+        fOpen := sFwd ? 1 : 0
     csPrev := cs
     cs := sSt == 6 ? (sB == bar_index ? 5 : 6) : sSt >= 7 and bar_index - sEndB <= 10 ? sSt : gs
     cg.set(0, gData)
@@ -1081,8 +1136,9 @@ if barstate.islast
     string ev2 = evBlk ? "BLOK actief" : na(evNext) ? "geen event in agenda — dekking onbekend" : "vrij · " + evNext.ccy + " " + cut(evNext.name, 28) + " " + str.format_time(evNext.t, "EEE HH:mm", i_tz) + " (over " + str.tostring(math.round((evNext.t - timenow) / 3600000)) + "u)"
     array<string> gN = array.from("Data", "Macro", "HTF " + ctxNm, "Locatie", "Sweep", "Trigger", "Event", "Ruimte", "Kosten")
     array<string> gW = array.new<string>()
-    gW.push(cg.get(0) == 1 ? "BIAS " + BIAS_VERSIE + " " + bDay + " actueel" : na(pb) ? "geen bias voor dit paar" : not biasFresh ? "bias verouderd (" + bDay + ")" : not snapFresh ? "snapshot ouder dan 36 u" : "candle vóór biasdatum")
-    gW.push(md != 0 ? str.lower(sideTxt(md)) + " · index " + str.tostring(pIdx, "+0.0;-0.0") : "geen richting · index " + (na(pIdx) ? "–" : str.tostring(pIdx, "+0.0;-0.0")) + " (±15)")
+    string bDayBar = bp >= 0 ? str.format_time(bpT.get(bp) - 6 * 3600000, "dd/MM", "UTC") : "–"
+    gW.push(cg.get(0) == 1 ? "forward-bias van " + bDayBar + " (BIAS " + BIAS_VERSIE + ")" : bp < 0 ? "geen forward-bias voor deze candle (forward sinds 27-10)" : "forward-bias ouder dan 96 u (" + bDayBar + ") — draai de generator")
+    gW.push(md != 0 ? str.lower(sideTxt(md)) + " · index " + str.tostring(pIdxBar, "+0.0;-0.0") : "geen richting · index " + (na(pIdxBar) ? "–" : str.tostring(pIdxBar, "+0.0;-0.0")) + " (±15)")
     gW.push(na(ctxDir) ? "onbekend" : str.lower(dirTxt(ctxDir)) + " · " + stgTxt(ctxStg))
     gW.push(md == 0 ? "–" : "PD " + (na(cPd) ? "–" : str.tostring(cPd, "0") + "%") + (md == 1 ? " (long: ≤ 50% of long-zone)" : " (short: ≥ 50% of short-zone)"))
     gW.push(cg.get(4) == 1 ? str.tostring(cSwAgo) + " bars geleden" : "geen recente sweep" + (g_needSweep ? " (verplicht)" : " (info)"))
@@ -1137,6 +1193,9 @@ if barstate.islast
         r += 1
         row2(r, "SETUP", setupName(cs) + " — " + nxt, t2c, sc, "Status op de laatst gesloten candle. WATCH = richting en context ok · ARMED = op locatie met box/trigger · CONFIRMED = alle verplichte poorten ✓. Geen totaalscore, geen order.", size.normal)
         r += 1
+        string fwdTxt = not fwdFrozen ? "ONGELDIG — parameters wijken af van STR_0.1" : timenow < FWD_START ? "start " + str.format_time(FWD_START, "dd-MM HH:mm", i_tz) + " · nog geen metingen" : fN == 0 ? "sinds " + str.format_time(FWD_START, "dd-MM", i_tz) + " · nog geen afgeronde setup" + (fOpen > 0 ? " · 1 open" : "") : "n " + str.tostring(fN) + " · hit " + str.tostring(fW * 100.0 / fN, "0") + "% · gem " + str.tostring(fSum / fN, "+0.00;-0.00") + "R" + (fOpen > 0 ? " · 1 open" : "") + " (bruto, n te klein)"
+        row2(r, "FORWARD", FWD_VERSIE + " · " + fwdTxt, t3c, fwdFrozen ? t2c : cAmb, "Forwardmeting " + FWD_VERSIE + ": alleen setups waarvan box én CONFIRMED ná " + str.format_time(FWD_START, "dd-MM-yyyy HH:mm", "UTC") + " UTC liggen, met de bevroren parameters. Bruto R, prijs-only, geen kosten. Kijken na 8 weken, conclusies na 3 maanden. Geen edgeclaim.", size.tiny)
+        r += 1
         row2(r, "POORTEN", gLine, t3c, t2c, TIP_GATE, size.tiny)
         r += 1
     // ── EXPANDED (bovenop Compact) ──
@@ -1182,7 +1241,8 @@ if barstate.isconfirmed and cs != csPrev and alertWanted(cs, csPrev)
         if cg.get(i) == 0
             unk += (unk == "" ? "" : ",") + jsStr(gk.get(i))
     Zone az = nearZone(md)
-    string js = "{" + "\"schema\":\"BFX_EXEC_0.1\",\"engine\":\"BFX Structure Engine 0.1\",\"datablok\":" + jsStr(ENG_VERSION) + ",\"snapshot_id\":" + jsStr(str.tostring(ENG_GENERATED)) + ",\"symbol\":" + jsStr(syminfo.tickerid) + ",\"feed\":" + jsStr(syminfo.prefix) + ",\"timeframe\":" + jsStr(timeframe.period) + ",\"bar_close\":" + jsStr(str.format_time(time_close, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC")) + ",\"status\":" + jsStr(setupName(cs)) + ",\"vorige_status\":" + jsStr(setupName(csPrev)) + ",\"macro\":{\"versie\":" + jsStr(BIAS_VERSIE) + ",\"datum\":" + jsStr(BIAS_DATUM > 0 ? str.format_time(BIAS_DATUM, "yyyy-MM-dd", "UTC") : "") + ",\"richting\":" + jsStr(md == 1 ? "long" : md == -1 ? "short" : "geen") + ",\"index\":" + jsNum(pIdx) + ",\"actueel\":" + (biasFresh ? "true" : "false") + "},\"structuur\":{\"context_tf\":" + jsStr(ctxNm) + ",\"context\":" + jsStr(na(ctxDir) ? "onbekend" : dirTxt(ctxDir) + " " + stgTxt(ctxStg)) + ",\"swing\":" + jsStr(dirTxt(lS.dir) + " " + stgTxt(lS.stage)) + ",\"internal\":" + jsStr(dirTxt(lI.dir) + " " + stgTxt(lI.stage)) + ",\"pd_pct\":" + jsNum(cPd) + "},\"cbo\":{\"state\":" + jsStr(cboName(xSt)) + ",\"box_id\":" + jsStr(xId) + "},\"zone_id\":" + jsStr(na(az) ? "" : az.id) + ",\"poorten\":{" + gj + "},\"invalidatie\":" + jsNum(sSt == 6 ? sS : stopP) + ",\"doel\":{\"naam\":" + jsStr(sSt == 6 ? sTgtN : frDn) + ",\"prijs\":" + jsNum(sSt == 6 ? sT : frD) + "},\"ruimte_r\":" + jsNum(cRoom) + ",\"event\":" + jsStr(evBlk ? "blok" : na(evNext) ? "onbekend" : "vrij") + ",\"onbekend\":[" + unk + "],\"let_op\":\"decision support — geen order\"}"
+    bool fwdNow = sFwd and sSt == 6
+    string js = "{" + "\"schema\":\"BFX_EXEC_0.1\",\"engine\":\"BFX Structure Engine 0.1\",\"datablok\":" + jsStr(ENG_VERSION) + ",\"snapshot_id\":" + jsStr(str.tostring(ENG_GENERATED)) + ",\"symbol\":" + jsStr(syminfo.tickerid) + ",\"feed\":" + jsStr(syminfo.prefix) + ",\"timeframe\":" + jsStr(timeframe.period) + ",\"bar_close\":" + jsStr(str.format_time(time_close, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC")) + ",\"status\":" + jsStr(setupName(cs)) + ",\"vorige_status\":" + jsStr(setupName(csPrev)) + ",\"macro\":{\"versie\":" + jsStr(BIAS_VERSIE) + ",\"datum\":" + jsStr(BIAS_DATUM > 0 ? str.format_time(BIAS_DATUM, "yyyy-MM-dd", "UTC") : "") + ",\"richting\":" + jsStr(md == 1 ? "long" : md == -1 ? "short" : "geen") + ",\"index\":" + jsNum(pIdxBar) + ",\"actueel\":" + (biasFresh ? "true" : "false") + "},\"structuur\":{\"context_tf\":" + jsStr(ctxNm) + ",\"context\":" + jsStr(na(ctxDir) ? "onbekend" : dirTxt(ctxDir) + " " + stgTxt(ctxStg)) + ",\"swing\":" + jsStr(dirTxt(lS.dir) + " " + stgTxt(lS.stage)) + ",\"internal\":" + jsStr(dirTxt(lI.dir) + " " + stgTxt(lI.stage)) + ",\"pd_pct\":" + jsNum(cPd) + "},\"cbo\":{\"state\":" + jsStr(cboName(xSt)) + ",\"box_id\":" + jsStr(xId) + "},\"zone_id\":" + jsStr(na(az) ? "" : az.id) + ",\"poorten\":{" + gj + "},\"invalidatie\":" + jsNum(sSt == 6 ? sS : stopP) + ",\"doel\":{\"naam\":" + jsStr(sSt == 6 ? sTgtN : frDn) + ",\"prijs\":" + jsNum(sSt == 6 ? sT : frD) + "},\"ruimte_r\":" + jsNum(cRoom) + ",\"event\":" + jsStr(evBlk ? "blok" : na(evNext) ? "onbekend" : "vrij") + ",\"forward\":{\"versie\":" + jsStr(FWD_VERSIE) + ",\"geldig\":" + (fwdFrozen ? "true" : "false") + ",\"telt_mee\":" + (fwdNow ? "true" : "false") + "},\"onbekend\":[" + unk + "],\"let_op\":\"decision support — geen order\"}"
     alert(js, alert.freq_once_per_bar_close)
 
 // ═══ 8. Meetwaarden in het datavenster (geen lijnen op de chart) ═══
@@ -1220,6 +1280,14 @@ plot(cFail, "Setups FAILED", display = display.data_window)
 plot(cDoel, "Setups DOEL", display = display.data_window)
 plot(cExp, "Setups EXPIRED", display = display.data_window)
 plot(cBlk, "CBO eventblokkades", display = display.data_window)
+plot(fwdFrozen ? 1 : 0, "Fwd geldig (1 = bevroren parameters)", display = display.data_window)
+plot(fN, "Fwd n", display = display.data_window)
+plot(fN > 0 ? fW * 100.0 / fN : na, "Fwd hit %", display = display.data_window)
+plot(fN > 0 ? fSum / fN : na, "Fwd gem R", display = display.data_window)
+plot(fOpen, "Fwd open", display = display.data_window)
+plot(rN, "Retro n (geen bewijs)", display = display.data_window)
+plot(rN > 0 ? rSum / rN : na, "Retro gem R (geen bewijs)", display = display.data_window)
+plot(pIdxBar, "Bias paarindex (per bar)", display = display.data_window)
 plot(rPDH, "PDH", display = display.data_window)
 plot(rPDL, "PDL", display = display.data_window)
 plot(bar_index + 1, "Bars geladen", display = display.data_window)

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { ROOT } from "../src/config.mjs";
-import { buildStructure } from "../src/structure-generate.mjs";
+import { buildStructure, histLines } from "../src/structure-generate.mjs";
 
 const tpl = readFileSync(resolve(ROOT, "template/bfx_structure_engine.pine"), "utf8");
 const code = tpl.replace(/\/\/.*$/gm, "");
@@ -83,14 +83,15 @@ test("generator vult het Structure-template met hetzelfde BFX-datablok (alleen l
     currencies: [], outlookRows: [],
     events: [{ time: NOW + 3600000, ccy: "USD", impact: 3, name: "FOMC Rate Decision" }],
   });
-  assert.ok(out.code.includes("// BFX-STRUCTURE-ENGINE") && !out.code.includes("{{DATA}}") && !out.code.includes("{{VERSION}}"));
+  assert.ok(out.code.includes("// BFX-STRUCTURE-ENGINE") && !/\{\{(DATA|VERSION|HIST)\}\}/.test(out.code));
   assert.match(out.code, /const bool {3}CAL_COVERAGE_PROVEN = false/);
   assert.ok(out.code.includes('addEv(' + (NOW + 3600000) + ', "USD", true'));
   assert.equal(out.events, 1);
 });
 
-test("poorten: onbekend telt nooit als ok, CONFIRMED eist trigger+locatie+event+ruimte, historie vóór biasdatum = UNKNOWN", () => {
-  assert.match(code, /int gData = not na\(pb\) and biasFresh and snapFresh and time >= BIAS_DATUM \? 1 : 0/);
+test("poorten: onbekend telt nooit als ok, CONFIRMED eist trigger+locatie+event+ruimte, data = geldige bias per bar", () => {
+  assert.match(code, /int gData = not na\(pIdxBar\) \? 1 : 0/);
+  assert.match(code, /int {4}md = mdBar/);
   assert.match(code, /int gEvent = evBlk \? -1 : na\(evNext\) \? 0 : 1/);
   assert.match(code, /int gRoom = na\(roomR\) \? 0 :/);
   assert.match(code, /gTrig == 1 and gLoc == 1 and gEvent == 1 and gRoom == 1 and gHtf >= 1 and \(not g_needSweep or gSweep == 1\) \? 5/);
@@ -132,6 +133,7 @@ test("JSON-alert is geldige JSON, ook met aanhalingstekens in teksten en onbeken
     setupName: (s) => ["N.V.T.", "UNKNOWN", "BLOCKED", "WATCH", "ARMED"][s], cs: 4, csPrev: 3, md: -1, pIdx: -16.1, biasFresh: true,
     ctxNm: "4H", ctxDir: -1, ctxStg: 3, dirTxt: () => "Bearish", stgTxt: () => "continuation", lS: { dir: -1, stage: 3 }, lI: { dir: 1, stage: 1 },
     cPd: null, cboName: () => 'BOX "VERZEGELD"', xSt: 4, xId: "EURUSD:30:1:2", az: null, gj: '"data":"ok","ruimte":"onbekend"',
+    pIdxBar: -16.1, FWD_VERSIE: "STR_0.1-F", fwdFrozen: true, fwdNow: false,
     sSt: 0, sS: null, stopP: 1.1135, sTgtN: "", frDn: "PDL", sT: null, frD: null, cRoom: null, evBlk: false, evNext: {}, unk: '"ruimte"',
   };
   const js = new Function(...Object.keys(ctx), `return ${expr};`)(...Object.values(ctx));
@@ -143,8 +145,42 @@ test("JSON-alert is geldige JSON, ook met aanhalingstekens in teksten en onbeken
   assert.equal(o.structuur.pd_pct, null);
   assert.deepEqual(o.onbekend, ["ruimte"]);
   assert.equal(o.let_op, "decision support — geen order");
+  assert.deepEqual(o.forward, { versie: "STR_0.1-F", geldig: true, telt_mee: false });
+  assert.equal(o.macro.index, -16.1);
 });
 
 test("stop en ruimte nooit van een oude box", () => {
   assert.match(code, /float stopP = na\(xsHi\) or md == 0 or not \(xSt == 4 or xSt == 5 or accRecent\) \? na :/);
+});
+
+test("forwardbevriezing STR_0.1-F: elke HYPOTHESE-standaard staat exact in fwdFrozen, start 29-10 00:00 UTC", () => {
+  const frozen = code.match(/^bool fwdFrozen = (.*)$/m)?.[1];
+  assert.ok(frozen, "fwdFrozen ontbreekt");
+  const inputs = [...tpl.matchAll(/^((?:h|c|e|g)_\w+)\s*=\s*input\.(?:int|float|bool)\(([\w.]+)/gm)];
+  assert.ok(inputs.length >= 40, `slechts ${inputs.length} parameters`);
+  for (const [, name, def] of inputs) {
+    const m = frozen.match(new RegExp(`\\b${name} == ([\\w.]+)`));
+    assert.ok(m, `${name} ontbreekt in fwdFrozen`);
+    assert.equal(String(m[1]), String(def), `${name}: bevroren ${m[1]} ≠ standaard ${def}`);
+  }
+  assert.ok(frozen.startsWith("i_cbo and "));
+  assert.match(code, /FWD_START = timestamp\("UTC", 2026, 10, 29, 0, 0\)/);
+  assert.match(code, /sFwd := fwdFrozen and time_close >= FWD_START and xsT >= FWD_START/);
+});
+
+test("biashistorie: alleen forward-rijen, dedup per dag+valuta, max 120 dagen, paarindex = (basis − quote)/2 vanaf 06:00 UTC", () => {
+  const NOW = Date.UTC(2026, 9, 28, 9, 0);
+  const lines = histLines([
+    { datum: "2026-10-26", valuta: "EUR", index: 0.47, bron: "teruggerekend" },
+    { datum: "2026-10-27", valuta: "EUR", index: -9.495, bron: "forward" },
+    { datum: "2026-10-27", valuta: "EUR", index: -9.495, bron: "forward" },
+    { datum: "2026-10-28", valuta: "usd", index: 19.2429, bron: "forward" },
+    { datum: "2026-05-01", valuta: "USD", index: 5, bron: "forward" },
+    { datum: "2026-10-29", valuta: "USD", index: 1, bron: "forward" },
+  ], NOW);
+  const add = lines.filter((l) => l.startsWith("    addHist("));
+  assert.deepEqual(add, [`    addHist(${Date.UTC(2026, 9, 27)}, "EUR", -9.495)`, `    addHist(${Date.UTC(2026, 9, 28)}, "USD", 19.2429)`]);
+  assert.equal(lines[0], "_histLoad() =>");
+  assert.match(code, /bpT\.push\(hT\.get\(i\) \+ 6 \* 3600000\)\n {20}bpI\.push\(\(hI\.get\(i\) - hI\.get\(j\)\) \/ 2\)/);
+  assert.match(code, /time_close - bpT\.get\(bp\) <= 96 \* 3600000/);
 });
