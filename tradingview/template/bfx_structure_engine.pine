@@ -1228,7 +1228,7 @@ if barstate.islast
         eqLb := label.new(time + 4 * tfSec * 1000, eq, "EQ 50%", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(t3c, 100), textcolor = t3c, size = size.tiny)
 
 // ═══ 7. Kaart (Minimal · Compact · Expanded) ════════════════════
-var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 30, border_width = 0, frame_width = 0)
+var table tb = table.new(i_pos == "Rechtsboven" ? position.top_right : i_pos == "Rechtsonder" ? position.bottom_right : i_pos == "Linksboven" ? position.top_left : position.bottom_left, 2, 30, bgcolor = dark ? #131722 : #FFFFFF, border_width = 0, frame_width = 0)
 row2(int r, string a, string b, color ca, color cbb, string tip = "", string sz = size.small) =>
     tb.cell(0, r, a, text_color = ca, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
     tb.cell(1, r, b, text_color = cbb, text_size = sz, text_halign = text.align_left, bgcolor = bgc, tooltip = tip)
