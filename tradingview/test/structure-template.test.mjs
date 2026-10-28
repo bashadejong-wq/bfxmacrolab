@@ -250,3 +250,23 @@ test("chart: hooguit één box, twee zones in totaal, drie referenties, labels i
   assert.match(tpl, /r_max {5}= input\.int\(3,/);
   for (const l of ['label.new(time + 4 * tfSec * 1000, xsHi, "CBO · "', 'label.new(time + 4 * tfSec * 1000, eq, "EQ 50%"', "label.new(railT, p, nm.get(i)"]) assert.ok(code.includes(l), l);
 });
+
+test("dagelijkse taak: bias pas 'gereed' bij drie signalen; sessiebewaking stopt bij profiel, productietaak of desktopapp", async () => {
+  const { biasReady, sessionBusy } = await import("../src/structure-deliver.mjs");
+  const NOW = Date.UTC(2026, 9, 29, 5, 5);
+  const ccy = { EUR: -13, USD: 19, GBP: 23 };
+  const hist = Object.entries(ccy).map(([valuta, index]) => ({ datum: "2026-10-29", valuta, index, bron: "forward" }));
+  const pairs = [{ basis: "EUR", quote: "USD", idx: -16 }, { basis: "GBP", quote: "USD", idx: 2 }];
+  const data = { raw: { datums: ["2026-10-29"], versies: ["BIAS50_1.2"] }, history: hist, pairs };
+  assert.equal(biasReady(data, NOW, 3).ok, true);
+  assert.equal(biasReady({ ...data, raw: { datums: ["2026-10-28"], versies: ["BIAS50_1.2"] } }, NOW, 3).wacht, true, "gisteren = wachten");
+  assert.equal(biasReady({ ...data, history: hist.slice(0, 2) }, NOW, 3).wacht, true, "historie onvolledig = wachten");
+  const tegen = biasReady({ ...data, pairs: [{ basis: "EUR", quote: "USD", idx: -10 }] }, NOW, 3);
+  assert.equal(tegen.ok, false);
+  assert.deepEqual(tegen.details.inconsistent, ["EURUSD"]);
+  assert.equal(biasReady({ ...data, raw: { datums: ["2026-10-29"], versies: ["BIAS50_1.1", "BIAS50_1.2"] } }, NOW, 3).ok, false);
+  const vrij = { profileLocked: () => false, productionRunning: () => false, desktopApp: () => false };
+  assert.deepEqual(sessionBusy(vrij), []);
+  assert.equal(sessionBusy({ ...vrij, desktopApp: () => true }).length, 1);
+  assert.equal(sessionBusy({ ...vrij, profileLocked: () => true, productionRunning: () => true }).length, 2);
+});

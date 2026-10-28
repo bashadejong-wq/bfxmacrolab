@@ -8,22 +8,23 @@ De forwardmeting STR_0.1-F heeft elke werkdag de nieuwe Bias 5.0 nodig. Zonder v
 Met de hand vergeet je het snel. Dan ontstaat er een gat in de meting, of nog erger: er wordt vergeten **de layout op te slaan**,
 en dan laadt TradingView de oude scriptversie.
 
-## Wat de taak doet (`node src/structure-deliver.mjs`)
+## Wat de taak doet (`node src/structure-deliver.mjs`) — volledig ontwerp
 
-1. **Data:** de BFX-snapshot ophalen (alleen lezen) en het datablok bouwen.
-   Controle: marker aanwezig, geen lege placeholders, ≥ 28 paren, ≥ 8 forward-biasrijen en **de bias van vandaag**.
-   Ontbreekt die bias, dan wacht de taak 3× 20 minuten. Daarna stopt hij **zonder TradingView aan te raken** (exit 2).
-2. **Eerst gezien:** per biasdag noteert de taak wanneer hij de dag voor het eerst zag (`out/bias-eerst-gezien.json`).
-   Een dag geldt pas vanaf het latere van **06:00 UTC** en **eerst gezien**, dus nooit voordat de bias bestond.
-   (27-10 is om 12:09 UTC geschreven, ná 06:00. Met alleen de klokregel had de engine die dag te vroeg gebruikt.)
-3. **TradingView**, met hetzelfde ingelogde profiel als de productietaak, **altijd zichtbaar en nooit headless**:
-   - alleen layout **"BFX CBO Onderzoek"** (DcotUC2P), anders stoppen (exit 4);
-   - alleen plakken als de Pine Editor **"BFX Structure Engine 0.1"** toont én breed open staat, anders stoppen (exit 5);
-   - opslaan en controleren op "saved" zonder fout (exit 6);
-   - staat er "Add to chart", dan de nieuwe versie toevoegen en de oude instantie verwijderen; er moet precies één instantie zijn;
-   - **de layout expliciet opslaan**;
-   - **herladen** en in de Data Window controleren dat "Datablok-id" de nieuwe versie is (exit 7 als niet).
-4. Een logregel in `logs/structure-runs.jsonl`, een screenshot in `logs/` en een melding (Telegram als dat is ingesteld).
+| Stap | Wat | Stopt veilig als (exitcode) |
+|---|---|---|
+| 1. Wachten tot Bias 5.0 **aantoonbaar gereed** is | drie signalen uit de publieke views (alleen lezen): (a) alle 28 paren in `mirror_bias50_paar` hebben de datum van vandaag en één versie; (b) `mirror_bias50_historie` heeft 8 forward-rijen voor vandaag; (c) elke paarindex = (basis − quote) / 2 uit die rijen (± 0,01) | na 4 pogingen met 20 min ertussen nog niet gereed, of een tegenspraak tussen de bronnen (2). TradingView wordt niet aangeraakt |
+| 2. Generator draaien | datablok bouwen; "eerst gezien" van vandaag vastleggen (= available_at); geldig vanaf max(06:00 UTC, eerst gezien) | marker ontbreekt, placeholder leeg, < 28 paren of < 8 biasrijen (2) |
+| 3. Sessieconflict voorkomen | vóór de browser: is het profiel al open (Chromium-`SingletonLock`), draait `bfx-tv.mjs` (de productietaak), of draait de TradingView-desktopapp (Bas)? Zo ja: wachten | na 3× 15 min nog bezet (8). TradingView wordt niet aangeraakt |
+| 4. Script afleveren | alleen layout "BFX CBO Onderzoek"; alleen plakken bij editortitel "BFX Structure Engine 0.1" en een editor van ≥ 300 px breed | niet ingelogd (3), verkeerde layout (4), editor niet bruikbaar (5) |
+| 5. Compilatie bevestigen | console moet `"BFX Structure Engine 0.1" saved.` tonen, zonder fout | niet opgeslagen of een fout (6) |
+| 6. Indicatorinstantie controleren | staat er "Add to chart", dan de nieuwe toevoegen en de oude verwijderen; daarna precies één instantie | ≠ 1 instantie (7) |
+| 7. Layout opslaan | via het layoutmenu, niet via autosave | — |
+| 8. Verse herlaadcontrole | de pagina opnieuw laden; in de Data Window moet "Datablok-id" gelijk zijn aan het nieuwe datablok | ander datablok na herladen (7) |
+| 9. Snapshot en hash vastleggen | `logs/structure-runs.jsonl`: bias_datum, bias_versie, bias_eerst_gezien, bewijs van gereedheid, template_sha256, code_sha256, datablok_id, sessiecontrole, console, screenshot | — |
+| 10. Melden | Telegram (als ingesteld), anders alleen het log | — |
+
+De droogtest van 28-10 (`--dry`) gaf exitcode 0: gereed (28 paren 28-10, één versie, 8 historierijen, 0 inconsistent), eerst gezien 04:13 UTC.
+De sessiebewaking meldde op 28-10 om ±11:40 terecht "TradingView-desktopapp is open (Bas)".
 
 ## Tijdstip
 
