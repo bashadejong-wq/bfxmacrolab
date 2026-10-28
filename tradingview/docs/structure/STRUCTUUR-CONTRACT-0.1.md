@@ -117,3 +117,65 @@ Gebruikte zones zijn alleen zichtbaar in Expanded, en dan vervaagd.
 ## 9. Alle HYPOTHESE-parameters (bevriezing komt pas bij de forwardstart)
 
 `h_lenS 10 · h_lenI 5 · h_lenF 2 · h_atrLen 14 · h_buf 0.05 · h_body false · h_swWick 0.3 · h_mit 50 · h_zAge 300 · h_zMaxH 1.5 · h_fvgLook 20`
+
+---
+
+# Fase 2 (28-10-2026): CBO-koppeling, OB-R en slimme referentielijnen
+
+## 10. CBO-module (regels van CBO_0.1, zonder meting)
+
+- De box-statemachine en het regime zijn **dezelfde regels en standaardwaarden** als in `bfx_cbo_engine.pine` (CBO_0.1).
+  In deze engine staan ze als `c_*`-parameters.
+- De CBO Research Engine en zijn forwardmeting CBO_0.1-F blijven **ongewijzigd en apart**.
+- De module is actief op 15m, 30m, 1H en 4H, net als de trigger-TF's van CBO in Auto.
+  De context-TF is 4H bij 15m/30m en D bij 1H/4H, en komt via `[1]` + `lookahead_on`.
+- Verschillen met CBO_0.1, bewust en tijdelijk:
+  1. **Geen eventblokkade en geen post-event-regime.** De eventdata komt in fase 3.
+  2. **Geen varianten V1/V2/V3 en geen meetslots.** Na ACCEPTATIE, MISLUKT of VERLOPEN mag direct een nieuwe box gezocht worden.
+     Daardoor kunnen de tellingen licht afwijken van de CBO-engine.
+
+| st | Naam | Regel |
+|---|---|---|
+| 0 / 1 | GEEN CONTEXT / CONTEXT GELDIG | regime niet / wel geschikt (compressie, balans, trend, lage volatiliteit) |
+| 2 | VORMT | `c_nMin` bars binnen `c_wMax × ATR` |
+| 3 | KANDIDAAT | ≥ `c_tMin` tests van boven- én ondergrens (tolerantie `c_tol`) |
+| 4 | VERZEGELD | `c_nSeal` bars zonder nieuw extreem; de grenzen liggen vanaf hier vast. Box-ID = `TICKER:TF:start:verzegeling` |
+| 5 | BREAKOUT | close buiten de box én ≥ `c_body` van de body buiten de box (een wick telt niet) |
+| 6 | ACCEPTATIE | `c_accK` closes buiten de box zonder terugkeer |
+| 9 | MISLUKT | close terug in de box na een breakout |
+| 10 | VERLOPEN | geen breakout binnen `c_expiry × boxduur` |
+
+## 11. OB-R (range-expansie)
+
+- OB-R ontstaat **alleen bij ACCEPTATIE**.
+- De oorsprongscandle is de laatste tegencandle binnen de box, vóór de breakout-candle.
+- De grenzen, de ID, de lifecycle en de maximale hoogte zijn gelijk aan §5.
+- Resultaten worden nooit samengevoegd met OB-P of OB-F.
+
+## 12. Samenhang (geen signaal)
+
+Bij een verzegelde box toont de kaart de swingzijde. Bij een breakout of acceptatie toont hij de breakoutrichting `d`. Per richting staan vier controles:
+
+1. swingrichting = `d`;
+2. internal richting = `d`;
+3. locatie: bij long niet in premium (PD < 55), bij short niet in discount (PD > 45);
+4. er ligt een actieve zone in richting `d` die de box ± 1 ATR overlapt.
+
+Bij een breakout toont de kaart ook de eerste referentie in die richting, met de afstand in boxbreedtes.
+Dit is beschrijvend. De poorten (WATCH/ARMED/CONFIRMED) komen in fase 3.
+
+## 13. Referentielijnen vanaf de echte wick
+
+- **PDH/PDL** gelden op TF's onder D. **PWH/PWL** gelden op TF's onder W.
+  Optioneel komen er **D/W Open** bij (`i_refOpen`, standaard uit).
+- Elke lijn begint op de candle die het extreem van de vorige dag of week maakte. Die candle wordt bijgehouden op de chart-TF.
+  Een nieuwe dag of week wordt herkend met `timeframe.change`.
+- **Geraakt**: op een gesloten candle `high > PDH` (of `low < PDL`). De lijn eindigt dan op die candle en wordt verborgen.
+  Met `i_refTaken` blijft hij vervaagd zichtbaar.
+- **Smart hide**: er worden maximaal `r_max` (3) niet-geraakte niveaus getoond. Het zijn de niveaus die het dichtst bij de koers liggen,
+  en alleen binnen `r_dist` (1.5) × de ATR(14) van de laatste gesloten dagcandle.
+- De labels staan in een vaste kolom rechts van de laatste candle.
+
+## 14. Parameters fase 2 (HYPOTHESE)
+
+`c_volLen 20 · c_volPct 250 · c_lowVol 15 · c_highVol 85 · c_compVol 40 · c_erLen 20 · c_erTrend 0.35 · c_erChaos 0.12 · c_expMult 2.0 · c_nMin 8 · c_nMax 24 · c_wMax 1.25 · c_tol 0.15 · c_tMin 2 · c_nSeal 3 · c_expiry 2.0 · c_body 0.5 · c_accK 2 · r_max 3 · r_dist 1.5`

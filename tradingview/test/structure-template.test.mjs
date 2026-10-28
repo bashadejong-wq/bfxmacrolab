@@ -31,17 +31,33 @@ test("structuurlogica draait alleen op gesloten candles", () => {
   assert.match(code, /if barstate\.isconfirmed\n {4}updZones\(\)/);
 });
 
-test("HTF alleen van gesloten candles: [1]-waarden met lookahead_on", () => {
+test("HTF alleen van gesloten candles: elke request.security leest een [1]-functie met lookahead_on", () => {
   const htf = code.slice(code.indexOf("htfState(int L)"), code.indexOf("int h4Dir"));
   assert.match(htf, /\[d\[1\], g\[1\], p\[1\]\]/);
+  assert.match(code, /ctxVals\(\) =>[\s\S]*?\[e\[1\], close\[1\], sl\[1\]\]/);
+  assert.match(code, /dAtrV\(\) =>\n {4}float a = ta\.atr\(14\)\n {4}a\[1\]/);
   const calls = [...code.matchAll(/request\.security\(([^\n]*)\)/g)].map((m) => m[1]);
-  assert.equal(calls.length, 2);
-  for (const c of calls) assert.ok(c.includes("htfState(") && c.includes("lookahead_on"), c);
+  assert.equal(calls.length, 4);
+  for (const c of calls) assert.ok(/(htfState|ctxVals|dAtrV)\(/.test(c) && c.includes("lookahead_on"), c);
+});
+
+test("CBO-module: breakout alleen op close met body-eis, OB-R alleen bij acceptatie", () => {
+  const cbo = code.slice(code.indexOf("if barstate.isconfirmed and i_cbo and cboTF"), code.indexOf("var box xBxS"));
+  assert.match(cbo, /bool up = close > xsHi/);
+  assert.match(cbo, /outB \/ body >= c_body/);
+  assert.ok(cbo.indexOf('addZone("OB-R"') > cbo.indexOf("xSt := 6"), "OB-R pas na ACCEPTATIE");
+  assert.ok(!/eventblok|evBlk/.test(cbo), "eventblokkade hoort bij fase 3");
+});
+
+test("referentielijnen starten bij de wick-candle en tellen geraakt alleen op gesloten candles", () => {
+  assert.match(code, /timeframe\.change\("D"\)/);
+  assert.match(code, /rPDH := dH\n {4}rPDHt := dHT/);
+  assert.match(code, /if barstate\.isconfirmed\n {4}if not na\(rPDH\) and na\(rPDHx\) and high > rPDH/);
 });
 
 test("elke HYPOTHESE-parameter staat met dezelfde standaard in het contract", () => {
-  const inputs = [...tpl.matchAll(/^(h_\w+)\s*=\s*input\.(?:int|float|bool)\(([\w.]+)/gm)];
-  assert.ok(inputs.length >= 11);
+  const inputs = [...tpl.matchAll(/^((?:h|c|r)_\w+)\s*=\s*input\.(?:int|float|bool)\(([\w.]+)/gm)];
+  assert.ok(inputs.length >= 31);
   for (const [, name, def] of inputs) {
     const m = contract.match(new RegExp(`\\b${name} (\\w[\\w.]*)`));
     assert.ok(m, `${name} ontbreekt in het contract`);
@@ -50,7 +66,7 @@ test("elke HYPOTHESE-parameter staat met dezelfde standaard in het contract", ()
 });
 
 test("zonevarianten blijven gescheiden en zones hebben een stabiel ID", () => {
-  assert.ok(code.includes('addZone("OB-P"') && code.includes('addZone("OB-F"'));
+  assert.ok(code.includes('addZone("OB-P"') && code.includes('addZone("OB-F"') && code.includes('addZone("OB-R"'));
   assert.match(code, /syminfo\.ticker \+ "-" \+ timeframe\.period \+ "-" \+ kind \+ "-" \+ str\.format_time\(time\[k\], "yyyyMMdd-HHmm", "UTC"\)/);
   assert.ok(code.includes("hasZone(id)"), "dubbele zone-ID's worden niet opnieuw gemaakt");
 });

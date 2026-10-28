@@ -74,11 +74,74 @@ De productielayout is niet geopend, het productie-worktree staat op `ea1318a` en
 
 ## Niet in fase 1 (volgende fases)
 
-- OB-R
-- slimme referentielijnen (PDH/PDL vanaf de echte wick)
-- CBO-integratie
+- ~~OB-R~~ (fase 2 gedaan)
+- ~~slimme referentielijnen~~ (fase 2 gedaan)
+- ~~CBO-integratie~~ (fase 2 gedaan, zonder eventblokkade)
 - Bias 5.0- en eventkoppeling
 - execution gates en de statussen WATCH/ARMED/CONFIRMED
 - de modi Minimal/Compact/Expanded volgens het nieuwe kaartontwerp
 - JSON-alerts en het bewijslogboek
 - bevriezen en de forwardmeting
+
+---
+
+# Fase 2 (28-10-2026, 08:45–09:00): CBO-koppeling, OB-R, referentielijnen
+
+| Test | Uitkomst |
+|---|---|
+| Compileren | geslaagd, geen fouten |
+| Runtime: 7 majors × 15m/30m/1H/4H/D | 35/35 zonder fout |
+| CBO-module tegen CBO_0.1 (kandidaten/verzegeld/breakouts) | **35/35 exact gelijk** |
+| OB-R tegen acceptaties | in elke combinatie gelijk aan het aantal acceptaties (er is geen OB-R overgeslagen) |
+| Fase-1-tellingen | ongewijzigd (EURUSD 30m: S 308/300/302, zones 1056/807/311) |
+| PDH/PDL | gelijk op 15m, 30m, 1H en 4H. Dit bevestigt dat de wick-candle juist wordt gevolgd |
+| Herladen (EURUSD 30m, alle tellingen inclusief CBO) | identiek |
+| `npm test` | 37/37 |
+
+**Kanttekening**: op de D-chart komt de waarde van de dagcandle van de feed en kan PDL 0,5 pip afwijken.
+Voorbeeld: EURUSD 1.11220 tegen 1.11225 intraday. Op D en hoger worden de dagniveaus niet getekend.
+
+Het verschil met CBO_0.1 is bewust. De module heeft geen eventblokkade en geen meetslots.
+In deze matrix gaf dat geen enkel telverschil, omdat er in de geladen historie geen verzegelde box binnen een eventvenster viel.
+
+## Matrix fase 2
+
+| Paar | TF | fout | CBO kand/verz/brk (STR) | CBO kand/verz/brk (CBO 0.1) | gelijk | acc/misl/verl | OB-R | PDH | PDL | S BoS/CHoCH |
+|---|---|---|---|---|---|---|---|---|---|---|
+| EURUSD | 15 | false | 43/4/4 | 43/4/4 | ja | 2/2/0 | 2 | 1.11768 | 1.11225 | 272/266 |
+| GBPUSD | 15 | false | 47/2/2 | 47/2/2 | ja | 1/1/0 | 1 | 1.33490 | 1.33033 | 258/270 |
+| USDJPY | 15 | false | 40/7/7 | 40/7/7 | ja | 6/1/0 | 6 | 157.976 | 157.422 | 280/246 |
+| AUDUSD | 15 | false | 42/2/2 | 42/2/2 | ja | 2/0/0 | 2 | 0.70404 | 0.70093 | 294/276 |
+| USDCHF | 15 | false | 44/3/3 | 44/3/3 | ja | 3/0/0 | 3 | 0.82946 | 0.82591 | 260/287 |
+| USDCAD | 15 | false | 30/2/2 | 30/2/2 | ja | 2/0/0 | 2 | 1.40543 | 1.40086 | 280/274 |
+| NZDUSD | 15 | false | 25/3/2 | 25/3/2 | ja | 2/0/1 | 2 | 0.57076 | 0.56712 | 279/277 |
+| EURUSD | 30 | false | 64/5/5 | 64/5/5 | ja | 2/3/0 | 2 | 1.11768 | 1.11225 | 308/300 |
+| GBPUSD | 30 | false | 41/9/9 | 41/9/9 | ja | 8/1/0 | 8 | 1.33490 | 1.33033 | 270/307 |
+| USDJPY | 30 | false | 31/6/6 | 31/6/6 | ja | 4/2/0 | 4 | 157.976 | 157.422 | 320/267 |
+| AUDUSD | 30 | false | 30/3/3 | 30/3/3 | ja | 2/1/0 | 2 | 0.70404 | 0.70093 | 304/306 |
+| USDCHF | 30 | false | 33/2/2 | 33/2/2 | ja | 1/1/0 | 1 | 0.82946 | 0.82591 | 286/315 |
+| USDCAD | 30 | false | 30/5/5 | 30/5/5 | ja | 3/2/0 | 3 | 1.40543 | 1.40086 | 305/285 |
+| NZDUSD | 30 | false | 11/0/0 | 11/0/0 | ja | 0/0/0 | 0 | 0.57076 | 0.56712 | 288/293 |
+| EURUSD | 60 | false | 59/2/2 | 59/2/2 | ja | 2/0/0 | 2 | 1.11768 | 1.11225 | 329/300 |
+| GBPUSD | 60 | false | 60/2/2 | 60/2/2 | ja | 2/0/0 | 2 | 1.33490 | 1.33033 | 344/308 |
+| USDJPY | 60 | false | 22/6/6 | 22/6/6 | ja | 4/2/0 | 4 | 157.976 | 157.422 | 328/282 |
+| AUDUSD | 60 | false | 9/0/0 | 9/0/0 | ja | 0/0/0 | 0 | 0.70404 | 0.70093 | 302/326 |
+| USDCHF | 60 | false | 16/1/1 | 16/1/1 | ja | 1/0/0 | 1 | 0.82946 | 0.82591 | 308/298 |
+| USDCAD | 60 | false | 35/1/1 | 35/1/1 | ja | 1/0/0 | 1 | 1.40543 | 1.40086 | 342/291 |
+| NZDUSD | 60 | false | 7/0/0 | 7/0/0 | ja | 0/0/0 | 0 | 0.57076 | 0.56712 | 315/302 |
+| EURUSD | 240 | false | 7/0/0 | 7/0/0 | ja | 0/0/0 | 0 | 1.11768 | 1.11225 | 315/281 |
+| GBPUSD | 240 | false | 3/0/0 | 3/0/0 | ja | 0/0/0 | 0 | 1.33490 | 1.33033 | 305/279 |
+| USDJPY | 240 | false | 9/0/0 | 9/0/0 | ja | 0/0/0 | 0 | 157.976 | 157.422 | 287/253 |
+| AUDUSD | 240 | false | 2/0/0 | 2/0/0 | ja | 0/0/0 | 0 | 0.70404 | 0.70093 | 296/287 |
+| USDCHF | 240 | false | 2/0/0 | 2/0/0 | ja | 0/0/0 | 0 | 0.82946 | 0.82591 | 295/278 |
+| USDCAD | 240 | false | 3/0/0 | 3/0/0 | ja | 0/0/0 | 0 | 1.40543 | 1.40086 | 286/286 |
+| NZDUSD | 240 | false | 6/1/1 | 6/1/1 | ja | 1/0/0 | 1 | 0.57076 | 0.56712 | 290/296 |
+| EURUSD | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 1.11768 | 1.11220 | 208/150 |
+| GBPUSD | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 1.33490 | 1.33029 | 193/177 |
+| USDJPY | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 157.976 | 157.422 | 186/150 |
+| AUDUSD | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 0.70404 | 0.70092 | 173/178 |
+| USDCHF | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 0.82947 | 0.82591 | 190/173 |
+| USDCAD | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 1.40546 | 1.40086 | 175/175 |
+| NZDUSD | 1D | false | 0/0/0 | 0/0/0 | ja | 0/0/0 | 0 | 0.57076 | 0.56705 | 195/185 |
+
+Screenshots: `screenshots/03-usdjpy-15m-cbo.png` (box geaccepteerd ↑, referenties PDL/PWH) en `screenshots/04-gbpusd-30m-cbo.png`.
