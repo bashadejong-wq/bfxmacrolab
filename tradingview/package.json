@@ -1,0 +1,21 @@
+{
+  "name": "bfx-tradingview-overlay",
+  "private": true,
+  "type": "module",
+  "description": "Zet de BFX macro-events en bias automatisch als indicator in TradingView",
+  "scripts": {
+    "login": "node bfx-tv.mjs login",
+    "generate": "node bfx-tv.mjs generate",
+    "run": "node bfx-tv.mjs run",
+    "example": "node bfx-tv.mjs generate --input examples/week44-alle.json",
+    "test": "node --test test/logic.test.mjs test/reconnect.test.mjs",
+    "check": "node bfx-tv.mjs check",
+    "acceptatie": "node bfx-tv.mjs acceptatie"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright": "1.48.2"
+  }
+}

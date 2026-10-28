@@ -1,0 +1,6 @@
+.env
+.tv-profile/
+out/
+logs/
+node_modules/
+herstel/
